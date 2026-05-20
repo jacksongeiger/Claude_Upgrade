@@ -1,0 +1,1 @@
+Run a full skeptical senior engineer review using the instructions in skills/skeptic.md. Question the core assumptions, the approach, and what will break. Give a clear GO / SLOW DOWN / STOP recommendation.
