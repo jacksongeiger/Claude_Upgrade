@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Pre-push hook: warn before pushing to main.
+# Install: cp hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+
+protected_branch="main"
+remote="$1"
+
+while read local_ref local_sha remote_ref remote_sha; do
+    # Extract branch name from refs/heads/<branch>
+    remote_branch="${remote_ref##refs/heads/}"
+
+    if [ "$remote_branch" = "$protected_branch" ]; then
+        # /dev/tty so we can read input even when git redirects stdin
+        exec < /dev/tty
+        echo ""
+        echo "⚠️  You are about to push to '$protected_branch' on '$remote'."
+        printf "Are you sure? (y/n) "
+        read -r answer
+        case "$answer" in
+            y|Y|yes|YES)
+                echo "Proceeding with push to $protected_branch."
+                ;;
+            *)
+                echo "Push to $protected_branch aborted."
+                exit 1
+                ;;
+        esac
+    fi
+done
+
+exit 0
