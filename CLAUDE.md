@@ -21,6 +21,9 @@
 ## Overengineering
 - If there is strong confidence that a solution is more complex than the problem requires, flag it clearly with reasoning. Never refuse to proceed, but always surface the concern so the user can decide.
 
+## Debugging
+- All debugging tasks end with the standard summary + next best move + git push recommendation format.
+
 ## Secrets & Environment Variables
 - Always use .env files for API keys and credentials. Never hardcode secrets.
 - Always add .env to .gitignore before anything else.
