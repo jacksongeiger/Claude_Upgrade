@@ -3,6 +3,11 @@
 A log of approaches investigated and ruled out, so the same ground isn't covered twice.
 
 ---
+### Maintaining a custom `/jg-review` slash command
+**Idea:** Ship a personal code-review command (`commands/jg-review.md`) running a five-pass checklist (Architecture → Risk → Security → Performance → Maintainability) with "fix easy issues inline" behavior.
+**Investigated:** 2026-05-21 — direct read of source files for the official `/review` plugin (`~/.claude/plugins/marketplaces/claude-plugins-official/plugins/code-review/commands/code-review.md`) and `superpowers:requesting-code-review` (`~/.claude/plugins/marketplaces/superpowers-dev/skills/requesting-code-review/SKILL.md` + `code-reviewer.md`).
+**Ruled out because:** `jg-review` was a strict subset of what the official `/review` pipeline already does, and materially weaker on every dimension that matters. Specifically `jg-review` lacked: (1) confidence scoring of issues (the official `/review` runs a Haiku scorer per issue and filters anything below 80, eliminating nitpicks); (2) git history context (the official pipeline reads git blame and comments on prior PRs touching the same files); (3) file:line severity-tagged output (the superpowers reviewer outputs Critical/Important/Minor with file:line refs, while `jg-review` was free-form); (4) parallelism (the official pipeline runs five Sonnet review agents in parallel plus per-issue scorers — `jg-review` was single-agent). The two things `jg-review` did uniquely — no-PR-required execution and "fix easy issues inline" — are trivially achievable by invoking `/code-review` or `requesting-code-review` with one extra sentence. The CLAUDE.md personalization argument did not hold either: the official `/review`'s Agent 1 reads CLAUDE.md *dynamically*, catching more than `jg-review`'s three hardcoded checks (`.env` in `.gitignore`, pinned deps, hardcoded secrets) and adapting when CLAUDE.md changes. Keeping `jg-review` cost worse reviews under muscle-memory invocation; deleting it cost a one-time retraining to reach for `/code-review` / `/review <PR>` / `requesting-code-review` instead.
+---
 ### Versioning `~/.claude/` directly with git
 **Idea:** `git init ~/.claude` and version the live Claude Code config directory directly, instead of maintaining a separate repo and symlinking into it.
 **Investigated:** 2026-05-20
