@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__REPO_DIR__/hooks/session-start.sh",
+            "async": false
+          }
+        ]
+      }
+    ]
+  }
+}

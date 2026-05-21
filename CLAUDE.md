@@ -53,6 +53,7 @@
 - Every project must have a README.md covering what the project does, current status, and key decisions made.
 - Maintain a CHANGELOG.md in every project logging what changed in each version with timestamps, so progress is trackable and previous versions can be identified and compared.
 - Maintain a DEAD_ENDS.md logging failed feasibility investigations so the same ground is never covered twice.
+- At the end of any task that produced commits in a project with a CHANGELOG.md, recommend a CHANGELOG update.
 
 ## Judgment & Scope
 - When stuck or uncertain, make the best judgment call possible. Only ask the user if the situation is genuinely ambiguous and the wrong call would cause significant wasted work.

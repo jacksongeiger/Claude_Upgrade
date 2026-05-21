@@ -2,17 +2,19 @@
 # install.sh — set up Claude Code config kit symlinks into ~/.claude/.
 #
 # Usage:
-#   ./install.sh                           Install global kit (CLAUDE.md + commands).
+#   ./install.sh                           Install global kit (CLAUDE.md + commands + SessionStart hook).
 #   ./install.sh --project /path/to/repo   Install the pre-push hook into that repo's .git/hooks/.
 #
 # Re-runnable: skips links that already point to the right place, replaces
-# stale symlinks, and refuses to overwrite real files.
+# stale symlinks, and refuses to overwrite real files. The SessionStart hook
+# registration in ~/.claude/settings.json is dedupe-safe by command path.
 
 set -u
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_DIR="$HOME/.claude"
 COMMANDS_DIR="$CLAUDE_DIR/commands"
+SETTINGS_FILE="$CLAUDE_DIR/settings.json"
 
 install_hook_into_project() {
     local project="$1"
@@ -101,6 +103,62 @@ for cmd in "$REPO_DIR/commands/"*.md; do
     [ -f "$cmd" ] || continue
     link "$cmd" "$COMMANDS_DIR/$(basename "$cmd")"
 done
+
+# Register the SessionStart hook into ~/.claude/settings.json.
+# Reads hooks/hooks.json, substitutes __REPO_DIR__ with the actual repo path,
+# then merges the SessionStart entry into settings.json under .hooks.SessionStart.
+# Dedupe-safe: any existing entry pointing at our session-start.sh is replaced.
+register_session_hook() {
+    local hook_script="$REPO_DIR/hooks/session-start.sh"
+    local hook_template="$REPO_DIR/hooks/hooks.json"
+
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "⚠ jq not available — skipping SessionStart hook registration"
+        return 0
+    fi
+    if [ ! -f "$hook_template" ]; then
+        echo "⚠ $hook_template missing — skipping SessionStart hook registration"
+        return 0
+    fi
+
+    chmod +x "$hook_script" 2>/dev/null || true
+
+    [ -f "$SETTINGS_FILE" ] || echo '{}' > "$SETTINGS_FILE"
+
+    local resolved
+    resolved=$(jq --arg repo "$REPO_DIR" '
+        walk(if type == "string" then gsub("__REPO_DIR__"; $repo) else . end)
+    ' "$hook_template") || {
+        echo "✗ failed to resolve $hook_template placeholders"
+        failures=$((failures + 1))
+        return 1
+    }
+
+    local new_entry
+    new_entry=$(echo "$resolved" | jq '.hooks.SessionStart[0]') || {
+        echo "✗ failed to extract SessionStart entry from $hook_template"
+        failures=$((failures + 1))
+        return 1
+    }
+
+    local tmp
+    tmp=$(mktemp)
+    if jq --arg cmd "$hook_script" --argjson entry "$new_entry" '
+        .hooks = (.hooks // {})
+        | .hooks.SessionStart = ((.hooks.SessionStart // [])
+            | map(select((.hooks // []) | all(.command != $cmd))))
+        | .hooks.SessionStart += [$entry]
+    ' "$SETTINGS_FILE" > "$tmp"; then
+        mv "$tmp" "$SETTINGS_FILE"
+        echo "✓ registered SessionStart hook in $SETTINGS_FILE"
+    else
+        rm -f "$tmp"
+        echo "✗ failed to merge SessionStart hook into $SETTINGS_FILE"
+        failures=$((failures + 1))
+    fi
+}
+
+register_session_hook
 
 echo ""
 if [ "$failures" -eq 0 ]; then

@@ -3,6 +3,16 @@
 A log of approaches investigated and ruled out, so the same ground isn't covered twice.
 
 ---
+### Auto-firing `/jg-changelog` on git push or session end
+**Idea:** Add a Claude Code `PostToolUse` (matching `git push`) or `Stop` hook that detects commits made during the session and nudges (or auto-runs) `/jg-changelog` to update CHANGELOG.md.
+**Investigated:** 2026-05-21
+**Ruled out because:** The global CLAUDE.md already requires every task to end with a summary, next-best-move, and git push recommendation; v1.6 added an explicit line under `## Documentation` to also recommend a CHANGELOG update at task end when commits were made. A hook on top of that would fire a second nudge in the same place, producing duplicate noise without adding signal. If the model isn't honoring the CLAUDE.md rule, a hook won't fix it — the fix is to harden the CLAUDE.md rule.
+---
+### Auto-firing `/jg-performance` on commits, pushes, or schedules
+**Idea:** Add a hook that auto-runs `/jg-performance` after performance-relevant changes so benchmarks stay current with CHANGELOG entries.
+**Investigated:** 2026-05-21
+**Ruled out because:** Performance-relevant commits are indistinguishable from normal commits at the git level — there is no reliable signal to match on without false positives. Most projects in this workspace (Excel_Evaluation_Tool, Discord clone) don't have meaningful performance metrics; auto-firing would either run benchmarks that don't exist or produce noise. Performance benchmarking stays manual via the `/jg-performance` slash command for projects where it actually matters.
+---
 ### Building a `/jg-brainstorm` slash command for project strategy
 **Idea:** Ship a personal command that, given a project's current state, generates 3 strategic directions with trade-offs and makes a single recommendation.
 **Investigated:** 2026-05-21 — source-level read of `superpowers:brainstorming`, `superpowers:writing-plans`, and `claude-mem:make-plan`, plus a usage-pattern analysis against the existing `/jg-*` commands.
