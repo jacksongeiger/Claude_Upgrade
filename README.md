@@ -9,11 +9,11 @@ Claude_Upgrade/
   CLAUDE.md              # global instructions for Claude Code
   install.sh             # one-shot setup: symlinks everything into ~/.claude/
   commands/              # slash commands (each file is the full prompt)
-    feasibility.md
-    review.md
-    changelog.md
-    status.md
-    skeptic.md
+    jg-feasibility.md
+    jg-review.md
+    jg-changelog.md
+    jg-status.md
+    jg-skeptic.md
   templates/
     CLAUDE.general.md    # generic per-project template
     CLAUDE.python.md     # Python project template
@@ -24,6 +24,8 @@ Claude_Upgrade/
   DEAD_ENDS.md
   README.md
 ```
+
+All command files are prefixed `jg-` so they don't collide with built-in Claude Code commands or skills of the same name (`/review`, `/status`, etc.). Invoke them as `/jg-review`, `/jg-feasibility`, and so on.
 
 ## Setup
 
@@ -37,7 +39,6 @@ cd ~/Claude_Upgrade
 
 - `CLAUDE.md` → `~/.claude/CLAUDE.md`
 - each `commands/*.md` → `~/.claude/commands/`
-- `skills/` → `~/.claude/skills/` (only if the folder is present in the repo)
 
 Because these are symlinks, any edit you make in the repo is live everywhere immediately — no re-installing. Re-running `install.sh` is safe: it skips links that already point to the right place, replaces stale links, and refuses to overwrite real files.
 
@@ -53,11 +54,10 @@ cp ~/Claude_Upgrade/templates/CLAUDE.general.md /path/to/your/project/CLAUDE.md
 
 ## Pre-push hook
 
-The `hooks/pre-push` script prompts for confirmation before pushing to `main`. Git hooks are per-repo and not tracked by git, so install it explicitly in each project you want protected:
+Install the hook into a project with:
 
 ```bash
-cp ~/Claude_Upgrade/hooks/pre-push .git/hooks/pre-push
-chmod +x .git/hooks/pre-push
+~/Claude_Upgrade/install.sh --project /path/to/your/project
 ```
 
-Run that from inside the target project, not from inside `Claude_Upgrade`.
+This symlinks `hooks/pre-push` into the target project's `.git/hooks/pre-push`, so edits to the hook in this repo flow through to every project that installed it. The hook prompts for confirmation before pushing to `main`. In non-interactive environments (CI, automated tooling) it allows the push through silently — the prompt is a safety net for humans, not an authorization barrier.

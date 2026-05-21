@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Pre-push hook: warn before pushing to main.
-# Install: cp hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+#
+# Install via the kit's installer (recommended — uses a symlink so updates flow through):
+#   ~/Claude_Upgrade/install.sh --project /path/to/your/project
+#
+# In non-interactive or CI environments (no /dev/tty available), this hook
+# allows the push through without prompting. The prompt is a safety net for
+# humans, not an authorization barrier — CI is expected to enforce its own rules.
 
 protected_branch="main"
 remote="$1"
@@ -10,7 +16,10 @@ while read local_ref local_sha remote_ref remote_sha; do
     remote_branch="${remote_ref##refs/heads/}"
 
     if [ "$remote_branch" = "$protected_branch" ]; then
-        # /dev/tty so we can read input even when git redirects stdin
+        if [ ! -r /dev/tty ]; then
+            # Non-interactive (CI, automated tooling): allow the push through silently.
+            exit 0
+        fi
         exec < /dev/tty
         echo ""
         echo "⚠️  You are about to push to '$protected_branch' on '$remote'."
