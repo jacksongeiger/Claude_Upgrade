@@ -31,6 +31,9 @@
 - For any UI change, verify in a real browser via chrome-devtools-mcp before claiming done: screenshot at desktop (1440×900), tablet (768×1024), and mobile (375×667); test light AND dark mode if the project supports both; capture list_console_messages for errors; run lighthouse_audit for an a11y baseline.
 - Before writing any UI code, read the project's design token source (tailwind.config.js, theme.css, tokens.css, design-tokens.json) and any ## Design System section in the project's CLAUDE.md. Use existing tokens — never hardcode colors, fonts, or spacing. Reuse existing components rather than creating new ones; if a needed token or component doesn't exist, add it to the source rather than inlining a one-off.
 
+## Parallel Work
+- When you have 2+ independent tasks (different bugs, different subsystems, different files with no shared state), dispatch them in parallel via the Task tool rather than working sequentially.
+
 ## Secrets & Environment Variables
 - Always use .env files for API keys and credentials. Never hardcode secrets.
 - Always add .env to .gitignore before anything else.
