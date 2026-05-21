@@ -24,6 +24,9 @@
 ## Debugging
 - All debugging tasks end with the standard summary + next best move + git push recommendation format.
 
+## Strategy
+- When asked about project direction or strategy, generate 3 distinct directions with trade-offs, and make ONE clear recommendation with reasoning. Do not hedge.
+
 ## Secrets & Environment Variables
 - Always use .env files for API keys and credentials. Never hardcode secrets.
 - Always add .env to .gitignore before anything else.
