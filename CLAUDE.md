@@ -33,6 +33,7 @@
 
 ## Parallel Work
 - When you have 2+ independent tasks (different bugs, different subsystems, different files with no shared state), dispatch them in parallel via the Task tool rather than working sequentially.
+- When given a multi-task prompt, explicitly plan phases before starting — identify which tasks are independent and dispatch those as parallel sub-agents in Phase 2, only running sequential tasks in Phase 1 and 3.
 
 ## Secrets & Environment Variables
 - Always use .env files for API keys and credentials. Never hardcode secrets.

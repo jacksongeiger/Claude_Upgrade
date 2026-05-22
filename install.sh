@@ -4,6 +4,7 @@
 # Usage:
 #   ./install.sh                           Install global kit (CLAUDE.md + commands + SessionStart hook).
 #   ./install.sh --project /path/to/repo   Install the pre-push hook into that repo's .git/hooks/.
+#   ./install.sh --plugins                 Print the recommended /plugin install commands to copy into Claude Code.
 #
 # Re-runnable: skips links that already point to the right place, replaces
 # stale symlinks, and refuses to overwrite real files. The SessionStart hook
@@ -53,8 +54,27 @@ install_hook_into_project() {
     echo "✓ installed pre-push hook into $project"
 }
 
+print_plugin_commands() {
+    cat <<'EOF'
+Recommended plugins (run these inside Claude Code — plugin installs require Claude Code's plugin system, so they cannot be auto-run from a shell):
+
+/plugin install feature-dev@claude-plugins-official
+/plugin install commit-commands@claude-plugins-official
+/plugin install playwright@claude-plugins-official
+/plugin install serena@claude-plugins-official
+/plugin install code-simplifier@claude-plugins-official
+
+See PLUGINS.md in this repo for the full inventory (currently installed, recommended, and skipped).
+EOF
+}
+
 if [ "${1:-}" = "--project" ]; then
     install_hook_into_project "${2:-}"
+    exit 0
+fi
+
+if [ "${1:-}" = "--plugins" ]; then
+    print_plugin_commands
     exit 0
 fi
 
@@ -166,6 +186,9 @@ if [ "$failures" -eq 0 ]; then
     echo ""
     echo "To install the pre-push hook into a project:"
     echo "  $REPO_DIR/install.sh --project /path/to/your/project"
+    echo ""
+    echo "To print the recommended /plugin install commands:"
+    echo "  $REPO_DIR/install.sh --plugins"
 else
     echo "Done with $failures failure(s). See messages above."
     exit 1
