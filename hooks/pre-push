@@ -16,11 +16,12 @@ while read local_ref local_sha remote_ref remote_sha; do
     remote_branch="${remote_ref##refs/heads/}"
 
     if [ "$remote_branch" = "$protected_branch" ]; then
-        if [ ! -r /dev/tty ]; then
-            # Non-interactive (CI, automated tooling): allow the push through silently.
+        # Non-interactive detection: try to open /dev/tty. On macOS, the device
+        # node exists (so -r passes) but cannot be opened when there's no
+        # controlling terminal — so the open is the authoritative test.
+        if [ ! -r /dev/tty ] || ! exec < /dev/tty 2>/dev/null; then
             exit 0
         fi
-        exec < /dev/tty
         echo ""
         echo "⚠️  You are about to push to '$protected_branch' on '$remote'."
         printf "Are you sure? (y/n) "
