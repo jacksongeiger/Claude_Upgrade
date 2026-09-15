@@ -22,7 +22,7 @@
 - If there is strong confidence that a solution is more complex than the problem requires, flag it clearly with reasoning. Never refuse to proceed, but always surface the concern so the user can decide.
 
 ## Debugging
-- All debugging tasks end with the standard summary + next best move + git push recommendation format.
+- All debugging tasks end with the standard summary + next best move format.
 
 ## Strategy
 - When asked about project direction or strategy, generate 3 distinct directions with trade-offs, and make ONE clear recommendation with reasoning. Do not hedge.
@@ -53,9 +53,8 @@
 
 ## Git
 - Never interrupt work to commit or push.
-- At the end of every task summary, recommend whether it is a good time to push to git and why.
-- If the user agrees, they will include "yes push to git" at the start of the next prompt and Claude should handle it before continuing with the next task.
-- Never push automatically without this confirmation.
+- Never push automatically. Do not raise the subject or recommend pushing.
+- To have work pushed, the user includes "yes push to git" at the start of a prompt, and Claude handles it before continuing with the next task.
 
 ## Documentation
 - Every project must have a README.md covering what the project does, current status, and key decisions made.
@@ -74,4 +73,3 @@
 ## On Completion
 - Always end every task with a summary of what was done in a clean, easy to read format.
 - Include a short section on what the next best move is to progress the project forward.
-- Include a git push recommendation with reasoning.
