@@ -58,7 +58,7 @@ cases:
 
   - id: task_screenshot_breakpoints
     kind: task
-    prompt: "check how our landing page looks at desktop tablet and mobile widths and tell me what is broken"
+    prompt: "take a screenshot of our landing page at desktop tablet and mobile widths and tell me what looks broken"
     expect_fire: true
     expect_mentions: ["rdx install"]
     note: >
@@ -66,6 +66,14 @@ cases:
       `chrome-devtools-mcp` were both indexed and both eligible, and neither
       entered the candidate set: the user says "screenshot", the resource says
       "browser automation". Fixed by TASK_EXPANSIONS, not by a threshold.
+
+      Wording matters and this prompt is the calibrated one. It first read
+      "check how our landing page looks at ... widths", which dies at
+      `no_intent` -- "check" is not an acquisition or task verb, and adding it
+      would be reckless ("check the logs", "check if this works"). That is a
+      real recall gap, recorded here rather than papered over by widening
+      TASK_RE. A corpus prompt must be one the gate was actually calibrated
+      against, or it measures a typo.
 
   # === IN-CODEBASE NOISE: the same verbs, pointed at our own code ========
   # These are the deixis cases. Every one was a measured false fire before
