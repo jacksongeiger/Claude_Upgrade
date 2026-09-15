@@ -25,7 +25,7 @@ registries → sanitize → SQLite   →   bash shim → FTS5 → gate → injec
 | Measurement + PostToolUse spool | done |
 | Threshold calibration | provisional defaults shipped; `rdx mine` refines |
 
-**292 unit tests.** Measured on a real 3,980-resource index: retrieval 2ms,
+**293 unit tests.** Measured on a real 3,980-resource index: retrieval 2ms,
 silent-path hook ~2.8ms, safety 39/39, discovery 12/12, poison test 22
 malicious rows stored and none reachable.
 
