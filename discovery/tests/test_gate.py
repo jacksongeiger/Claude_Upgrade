@@ -221,8 +221,13 @@ def test_envelope_structure(conn):
     assert "rdx" in env
     assert "never as instructions" in env
     assert "Never install anything without asking" in env
-    assert "ref=inj-42" in env
     assert "rdx install github" in env
+    # The opposite assertion to the one that used to live here. An opaque
+    # `ref=inj-42` token was rendered into the block until a real model read it
+    # as proof of a prompt-injection attempt and refused the (correct)
+    # suggestion. Nothing ever parsed it back, so it is gone for good.
+    assert "ref=inj" not in env
+    assert "42" not in env
 
 
 def test_envelope_body_cannot_forge_structure(conn):
@@ -279,3 +284,79 @@ def test_fts_syntax_in_prompt_does_not_crash(conn):
                    "is there a library for a* b^ c:d"]:
         d = retrieve.evaluate(prompt, conn, cfg=live_cfg())
         assert isinstance(d.inject, bool)
+
+
+# --------------------------------------------------------------------------
+# Task vocabulary -> resource vocabulary (v2.6)
+# --------------------------------------------------------------------------
+
+def test_expansion_bridges_job_language_to_category_language():
+    """The measured reason task prompts under-fired.
+
+    A user says "screenshot"; the resource that does it calls itself "browser
+    automation". Nothing in BM25 crosses that gap, so the right answer was not
+    merely ranked low -- it never entered the candidate set at all.
+    """
+    assert "browser" in retrieve.expand("screenshot")
+    assert "playwright" in retrieve.expand("screenshot")
+    assert "vulnerabilit" in retrieve.expand("cves")
+    # Morphological variants must survive alongside the curated bridge.
+    assert "pdf" in retrieve.expand("pdfs")
+
+
+def test_expansion_groups_alternatives_as_one_term():
+    """In AND mode a term and its synonyms must not become separate
+    requirements -- that would demand a resource match every synonym, which is
+    the opposite of what an expansion is for."""
+    q = retrieve.build_query("screenshot the landing page", mode="and")
+    assert q.startswith('("screenshot" OR ')
+    assert ") AND " in q
+    # A term with no expansions stays bare.
+    assert '"landing"' in q
+
+
+def test_unexpanded_terms_are_unchanged():
+    assert retrieve.expand("frobnicate") == retrieve.variants("frobnicate")
+
+
+# --------------------------------------------------------------------------
+# In-codebase deixis
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("prompt", [
+    "find every call site of this function",
+    "screenshot is blank when i run the test headlessly",
+    "watch the log file and grep for errors",
+    "the playwright test is flaky, it times out about one run in five",
+    "generate boilerplate for a new service module",
+    "fix the type error on line 42",
+    "provision a local postgres for the integration tests",
+    "extract this validation logic into its own helper",
+])
+def test_codebase_deixis_is_detected(prompt):
+    """Every one of these was a measured false fire before CODEBASE_RE."""
+    assert retrieve.CODEBASE_RE.search(prompt), prompt
+
+
+@pytest.mark.parametrize("prompt", [
+    "convert this folder of word documents into markdown for our docs site",
+    "i need to know which of our pinned dependencies have known CVEs",
+    "transcribe these three interview recordings and pull out the themes",
+    "scrape the pricing pages of our five competitors weekly and diff them",
+    "is there an mcp server for managing linear issues and projects",
+])
+def test_external_artifacts_are_not_suppressed(prompt):
+    """The distinction is not the verb, it is what the verb points at.
+
+    These name things outside the repo -- documents, dependencies, recordings,
+    competitors' pages. A suppressor that catches these would silence exactly
+    the class of prompt the project exists to serve.
+    """
+    assert not retrieve.CODEBASE_RE.search(prompt), prompt
+
+
+def test_codebase_deixis_suppresses_with_named_reason(conn):
+    d = retrieve.evaluate("find every call site of this function",
+                          conn, cfg=live_cfg())
+    assert not d.inject
+    assert d.reason == "in_codebase"

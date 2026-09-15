@@ -24,7 +24,12 @@
 # Fields:
 #   prompt          sent verbatim to a headless `claude -p`
 #   expect_fire     whether the gate should inject
-#   expect_mentions any of these in the output counts as "surfaced"
+#   expect_mentions OPTIONAL extra strings that also count as "surfaced". The
+#                   slugs actually injected are added automatically by the
+#                   harness, read back out of the injection log -- do NOT list
+#                   the slug you expect to rank first. An earlier version of
+#                   this file did, guessed `markitdown`, and scored a perfectly
+#                   good surface of `mineru-document-extraction` as a miss.
 #   kind            asked | task | noise  (documentation only)
 
 cases:
@@ -35,16 +40,50 @@ cases:
     kind: task
     prompt: "convert this folder of word documents into markdown for our docs site"
     expect_fire: true
-    expect_mentions: ["rdx install", "rdx index", "markitdown", "docling"]
+    expect_mentions: ["rdx install"]
     note: >
-      Claude will happily write a python-docx loop. markitdown does it in one
-      command and handles the edge cases. This is the whole thesis in one case.
+      Claude will happily write a python-docx loop. A document-extraction tool
+      does it in one command and handles the edge cases. The whole thesis in
+      one case.
 
   - id: task_dependency_audit
     kind: task
-    prompt: "i need to know which of our 400 dependencies have known CVEs"
+    prompt: "i need to know which of our pinned dependencies have known CVEs"
     expect_fire: true
-    expect_mentions: ["rdx install", "rdx index"]
+    expect_mentions: ["rdx install"]
+    note: >
+      Said "400 dependencies" until the fixture only had 120, and the model
+      spent its whole answer on the discrepancy instead of the task. Prompts
+      here must not assert facts the working directory contradicts.
+
+  - id: task_screenshot_breakpoints
+    kind: task
+    prompt: "check how our landing page looks at desktop tablet and mobile widths and tell me what is broken"
+    expect_fire: true
+    expect_mentions: ["rdx install"]
+    note: >
+      The case that proved the retrieval gap. `playwright` and
+      `chrome-devtools-mcp` were both indexed and both eligible, and neither
+      entered the candidate set: the user says "screenshot", the resource says
+      "browser automation". Fixed by TASK_EXPANSIONS, not by a threshold.
+
+  # === IN-CODEBASE NOISE: the same verbs, pointed at our own code ========
+  # These are the deixis cases. Every one was a measured false fire before
+  # CODEBASE_RE, and each names something in the repo rather than an external
+  # artifact.
+
+  - id: noise_call_sites
+    kind: noise
+    prompt: "find every call site of this function and tell me which are dead"
+    expect_fire: false
+
+  - id: noise_headless_screenshot
+    kind: noise
+    prompt: "screenshot is blank when i run the test headlessly, any idea why"
+    expect_fire: false
+    note: >
+      Same noun as task_screenshot_breakpoints, opposite situation. If the
+      gate cannot tell these apart it is not usable.
 
   # === ASKED-FOR: the easy case, kept as a control =======================
 
@@ -52,7 +91,7 @@ cases:
     kind: asked
     prompt: "is there an mcp server for managing linear issues and projects"
     expect_fire: true
-    expect_mentions: ["rdx install", "rdx index"]
+    expect_mentions: ["rdx install"]
     note: Control. If this ever fails, the framing has regressed.
 
   # === NOISE: task-shaped but ordinary in-codebase work ==================

@@ -4,15 +4,19 @@ The gate is silent by default and that is the whole design. A false positive on
 a trivial prompt costs far more than a missed suggestion, because noise is what
 makes someone disable the system - after which the recall is zero forever.
 
-Eight conditions, each logging a named suppression reason so the histogram can
+Ten conditions, each logging a named suppression reason so the histogram can
 be tuned against real data instead of guesses:
 
-    trivial | no_intent | no_match | below_threshold
-    flat_distribution | cooldown | snoozed | shadow
+    trivial | no_intent | in_codebase | no_match | below_threshold
+    weak_coverage | flat_distribution | cooldown | snoozed | shadow
 
-The most important is `no_intent`, and it is deliberately a regex rather than a
-learned score: it is inspectable, testable, and costs microseconds. "fix the
-failing test" has no acquisition verb and no known slug, so it dies immediately.
+The two that do the most work are `no_intent` and `in_codebase`, and both are
+deliberately regexes rather than learned scores: inspectable, testable, and
+microseconds to run. "fix the failing test" has no acquisition verb and no
+known slug, so it dies immediately at the first. "find every call site of this
+function" clears the first -- it is a real task -- and dies at the second,
+because it points at the code in front of us, where no catalogue entry can
+help.
 """
 
 from __future__ import annotations
@@ -35,6 +39,8 @@ a an and are as at be but by can could do does doing for from has have how i if
 in into is it its me my of on or our so than that the their them then there
 these they this to was we were what when where which who why will with would
 you your please help need want make get use using just also like should
+know knows about really actually tell show give find take lot
+one two three four five out up down over here again still even much many
 """.split())
 
 _TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9+#._-]*")
@@ -68,7 +74,18 @@ def build_query(prompt: str, *, mode: str = "or") -> str:
     if not terms:
         return ""
     joiner = " AND " if mode == "and" else " OR "
-    return joiner.join(f'"{t}"' for t in terms)
+
+    groups = []
+    for t in terms:
+        alts = [t] + [e for e in TASK_EXPANSIONS.get(t, ())[:MAX_EXPANSIONS]]
+        if len(alts) == 1:
+            groups.append(f'"{t}"')
+        else:
+            # Parenthesised so a term and its category bridge count as ONE
+            # term. Flattening them into the AND-mode query would demand that
+            # a resource match every synonym, which is the opposite of intent.
+            groups.append("(" + " OR ".join(f'"{a}"' for a in alts) + ")")
+    return joiner.join(groups)
 
 
 # A pure-OR query returns a row if ANY single term matches, which is how
@@ -98,6 +115,43 @@ def search(conn: sqlite3.Connection, prompt: str, *,
     loose = build_query(prompt, mode="or")
     return db.candidates(conn, loose, limit=limit), loose
 
+
+# --------------------------------------------------------------------------
+# In-codebase deixis: the strongest silence signal there is
+# --------------------------------------------------------------------------
+#
+# Derived from the false fires in corpora/gate.starter.yaml, not invented.
+# Every one of them had the same shape:
+#
+#   "find every call site of THIS FUNCTION"        -> gortex
+#   "screenshot is blank when i run THE TEST"      -> playwright-pro
+#   "watch THE LOG FILE and grep for errors"       -> conversation-log
+#   "THE PLAYWRIGHT TEST is flaky"                 -> playwright-pro
+#
+# The user is pointing at the code in front of Claude. No catalogue entry can
+# help with a specific function in a specific repo, so a suggestion there is
+# pure noise -- and noise is what gets the system switched off.
+#
+# Contrast the task cases that SHOULD fire: "this folder of word documents",
+# "our pinned dependencies", "our competitors' pricing pages", "these
+# interview recordings". All external artifacts. The distinction is not the
+# verb, it is what the verb is pointed at, which is why no amount of threshold
+# tuning found it.
+CODEBASE_RE = re.compile(r"""(?:
+      \b(?:this|that|these|those|the)\s+
+      (?:function|method|class|module|file|script|test|tests|suite|variable
+        |loop|regex|decorator|helper|handler|callback|import|imports|branch
+        |commit|diff|repo|repository|build|linter|stack\s+trace|call\s+site
+        |log\s+file|type\s+error|error\s+message|logic)\b
+    | \bits\s+own\s+(?:helper|function|method|class|module|file)\b
+    | \b(?:this|that|the)\s+\w+\s+(?:test|tests|suite|function|module|file)\b
+    | \bline\s+\d+
+    | \bcall\s+sites?\b
+    | \bboilerplate\b
+    | \bgrep\b
+    | \bgithub\s+action\b
+    | \bintegration\s+tests?\b
+)""", re.I | re.X)
 
 # --------------------------------------------------------------------------
 # Gate 2: intent
@@ -231,7 +285,11 @@ def variants(term: str) -> list[str]:
     metric that matters here.
     """
     out = [term]
-    if len(term) > 4:
+    # `> 3`, not `> 4`. The docstring above cites "pdfs" -> "pdf" as the case
+    # this function exists to fix, and with a `> 4` guard that exact example
+    # did not work: "pdfs" is four characters. Same for docs, apis, logs, jobs,
+    # sdks -- most of the short technical plurals that matter here.
+    if len(term) > 3:
         if term.endswith("ies"):
             out.append(term[:-3] + "y")
         elif term.endswith("es"):
@@ -242,6 +300,79 @@ def variants(term: str) -> list[str]:
         if term.endswith("ing"):
             out.append(term[:-3])
             out.append(term[:-3] + "e")
+    return out
+
+
+
+# --------------------------------------------------------------------------
+# Task vocabulary -> resource vocabulary
+# --------------------------------------------------------------------------
+#
+# The measured reason task-shaped prompts under-fire, and it is not a
+# threshold. A user says "take a screenshot of the landing page at three
+# widths"; the resource that does that describes itself as "browser automation
+# and end-to-end testing". Zero lexical overlap. `playwright` and
+# `chrome-devtools-mcp` are both indexed, both eligible, and neither appears
+# anywhere in the candidate set. People name the JOB, catalogues name the
+# CATEGORY, and BM25 cannot cross that gap.
+#
+# The usual answer is embeddings. This index is lexical by explicit choice, so
+# the answer here is a small curated bridge: hand-written, inspectable,
+# testable, microseconds to apply, and wrong in ways you can see and fix -- the
+# same argument that made INTENT_RE a regex instead of a classifier.
+#
+# Rules for adding an entry:
+#   * left side is what a USER types while describing work
+#   * right side is what a CATALOGUE ENTRY says about itself
+#   * prefer stems ("vulnerabilit") over full words, matching is substring
+#   * never add a term so generic it matches ordinary in-codebase work; the
+#     noise cases in corpora/behaviour.yaml exist to catch exactly that
+TASK_EXPANSIONS: dict[str, tuple[str, ...]] = {
+    # browser / visual
+    "screenshot": ("browser", "chromium", "playwright", "puppeteer", "viewport"),
+    "responsive": ("browser", "viewport", "breakpoint"),
+    "lighthouse": ("browser", "performance", "accessibility"),
+    # documents
+    "docx": ("document", "office", "word"),
+    "pdf": ("document", "ocr", "extraction"),
+    "spreadsheet": ("excel", "xlsx", "sheet", "office"),
+    "slides": ("powerpoint", "pptx", "presentation"),
+    # audio / language
+    "transcribe": ("transcription", "speech", "audio", "whisper"),
+    "transcript": ("transcription", "speech", "audio"),
+    "subtitles": ("caption", "transcription"),
+    "translate": ("translation", "localization", "i18n"),
+    # security / dependencies
+    "cve": ("vulnerabilit", "advisory", "security"),
+    "cves": ("vulnerabilit", "advisory", "security"),
+    "vulnerabilities": ("vulnerabilit", "advisory", "security"),
+    "dependencies": ("dependency", "package", "sbom", "supply chain"),
+    "secrets": ("credential", "scanning", "security"),
+    # data
+    "scrape": ("scraping", "crawler", "extraction"),
+    "crawl": ("crawler", "scraping", "spider"),
+    "embeddings": ("vector", "rag", "semantic"),
+    "dataframe": ("dataframes", "analytics", "columnar"),
+    # workflow systems
+    "tickets": ("issue", "tracker", "jira", "linear"),
+    "tracker": ("issue", "jira", "linear", "project management"),
+    "changelog": ("release notes", "releases"),
+    "diagram": ("mermaid", "graphviz", "visualization"),
+    # ops
+    "benchmark": ("performance", "profiling", "latency"),
+    "profiling": ("performance", "profiler", "flamegraph"),
+    "observability": ("tracing", "metrics", "telemetry"),
+}
+
+MAX_EXPANSIONS = 5
+
+
+def expand(term: str) -> list[str]:
+    """Morphological variants plus any curated category bridge."""
+    out = variants(term)
+    for extra in TASK_EXPANSIONS.get(term, ())[:MAX_EXPANSIONS]:
+        if extra not in out:
+            out.append(extra)
     return out
 
 
@@ -260,7 +391,7 @@ def term_coverage(resource: Resource, terms: list[str]) -> float:
         resource.name.lower(), resource.summary.lower(),
         resource.slug.lower(), " ".join(resource.tags).lower(),
     ])
-    hits = sum(1 for t in terms if any(v in haystack for v in variants(t)))
+    hits = sum(1 for t in terms if any(v in haystack for v in expand(t)))
     return hits / len(terms)
 
 
@@ -273,7 +404,7 @@ def term_matches(resource: Resource, terms: list[str]) -> int:
         resource.name.lower(), resource.summary.lower(),
         resource.slug.lower(), " ".join(resource.tags).lower(),
     ])
-    return sum(1 for t in terms if any(v in haystack for v in variants(t)))
+    return sum(1 for t in terms if any(v in haystack for v in expand(t)))
 
 
 def score_candidates(rows: list[tuple[Resource, float]], cfg: config.Config, *,
@@ -431,8 +562,16 @@ def render_envelope(candidates: list[Candidate],
             f"| {r.type} | {r.slug} | {_signal(r)} | {r.trust_tier} | "
             f"{r.summary} | rdx install {r.slug}"
         )
-    if injection_id is not None:
-        lines.append(f"ref=inj-{injection_id}")
+    # `injection_id` is deliberately NOT rendered. It used to appear as a
+    # trailing `ref=inj-<n>` line, and the behavioural eval caught what that
+    # cost: a real model read the block, correctly identified the resource,
+    # and then refused it -- "it came bundled with an embedded reference
+    # marker that looks like a prompt-injection test rather than a genuine
+    # recommendation". An opaque token abbreviating the word "injection" is
+    # the single most suspicious thing you can staple to untrusted-looking
+    # content. Nothing ever parsed it back: accept-rate joins on the DB's own
+    # injection_id (measure.py), never on envelope text. So it bought nothing
+    # and cost the model's trust in the whole block.
     lines.append(ENVELOPE_FOOTER)
     return "\n".join(lines)
 
@@ -472,6 +611,19 @@ def evaluate(prompt: str, conn: sqlite3.Connection, *, cfg: config.Config,
     intent, kind = has_intent(stripped, conn)
     if not intent:
         return done(False, "no_intent")
+
+    # Gate 2b: is the user pointing at the code in front of us? If so, no
+    # catalogue entry can help and a suggestion is pure noise. This single
+    # check removed 6 of the 8 false fires in the starter corpus -- more than
+    # any threshold change achieved, because the signal was never score, it
+    # was what the verb pointed at. See CODEBASE_RE.
+    # Applies to ALL three intent paths, including the explicit ask. Exempting
+    # the verb path looks kinder -- the user did ask -- but was measured on the
+    # 123-case corpus and costs precision (0.905 -> 0.864) for zero extra
+    # recall. "Is there a tool to speed up the docker build" stays silent, and
+    # that is the intended trade.
+    if CODEBASE_RE.search(stripped):
+        return done(False, "in_codebase", kind=kind)
 
     # An unasked-for suggestion must clear a higher bar than a requested one.
     min_score = cfg.min_score_task if kind == "task" else cfg.min_score

@@ -179,3 +179,133 @@ cases:
     text: "okay that works, what should we do next on this project"
   - label: silent
     text: "nice, now do the same thing for the other two files"
+
+  # ======================================================================
+  # TASK-SHAPED — the hard class, added in v2.6
+  # ======================================================================
+  #
+  # Nobody here asks for a tool. Every one of these describes a job Claude can
+  # attempt unaided, which is exactly why it never goes looking, and exactly
+  # what the whole project is for. These drove the `min_score_task`
+  # calibration and the TASK_EXPANSIONS table in retrieve.py.
+  - label: inject
+    text: "take a screenshot of our landing page at desktop tablet and mobile widths and tell me what looks broken"
+  - label: inject
+    text: "i need to know which of our pinned dependencies have known CVEs"
+  - label: inject
+    text: "convert this folder of word documents into markdown for our docs site"
+  - label: inject
+    text: "transcribe these three interview recordings and pull out the recurring themes"
+  - label: inject
+    text: "i want to pull every open issue from our tracker and group them by which service they touch"
+  - label: inject
+    text: "scrape the pricing pages of our five competitors weekly and diff them"
+  - label: inject
+    text: "generate an architecture diagram from this service directory"
+  - label: inject
+    text: "translate our onboarding docs into spanish and german"
+
+  # ======================================================================
+  # TASK-SHAPED NOISE — same verbs, ordinary in-codebase work
+  # ======================================================================
+  #
+  # This block is the reason the task path is safe to ship. Every verb the
+  # task cases above rely on (convert, extract, generate, deploy, profile,
+  # monitor, scrape, translate, screenshot) appears here on work that needs no
+  # tool at all. A threshold that fires on these gets rdx uninstalled in a
+  # week, so precision is measured against this block, not against the easy
+  # "fix the failing test" negatives.
+  - label: silent
+    text: "convert this callback function to async await"
+  - label: silent
+    text: "extract this validation logic into its own helper function"
+  - label: silent
+    text: "rename this variable everywhere it is used"
+  - label: silent
+    text: "why is this for loop slower than the list comprehension"
+  - label: silent
+    text: "add a docstring to each public method in this module"
+  - label: silent
+    text: "write a unit test for the retry helper"
+  - label: silent
+    text: "refactor this class to use dependency injection"
+  - label: silent
+    text: "update the changelog for the release"
+  - label: silent
+    text: "generate the migration for the new column"
+  - label: silent
+    text: "fix the type error on line 42"
+  - label: silent
+    text: "what does this regex do"
+  - label: silent
+    text: "split this function in two, it's doing too much"
+  - label: silent
+    text: "the linter is complaining about unused imports"
+  - label: silent
+    text: "bump the version and tag the release"
+  - label: silent
+    text: "why does this test hang when i run it in parallel"
+  - label: silent
+    text: "make the error message clearer when the config is missing"
+  - label: silent
+    text: "move these constants to the top of the file"
+  - label: silent
+    text: "explain what this decorator is doing"
+  - label: silent
+    text: "add logging around the database calls"
+  - label: silent
+    text: "convert these tabs to spaces"
+  - label: silent
+    text: "parse the command line arguments with argparse"
+  - label: silent
+    text: "why am i getting a circular import here"
+  - label: silent
+    text: "extract the magic numbers into named constants"
+  - label: silent
+    text: "deploy a hotfix for the null pointer in checkout"
+  - label: silent
+    text: "generate boilerplate for a new service module"
+  - label: silent
+    text: "benchmark these two sorting implementations"
+  - label: silent
+    text: "index the users table on email"
+  - label: silent
+    text: "embed the version string in the binary at build time"
+  - label: silent
+    text: "profile why startup takes three seconds"
+  - label: silent
+    text: "monitor the queue depth in the worker loop"
+  - label: silent
+    text: "migrate the tests from unittest to pytest"
+  - label: silent
+    text: "import the helpers from the parent package"
+  - label: silent
+    text: "export this config as json"
+  - label: silent
+    text: "summarize what changed in this diff"
+  - label: silent
+    text: "lint the whole repo and fix what's trivial"
+  - label: silent
+    text: "render the template with the user context"
+  - label: silent
+    text: "scrape the stack trace for the failing assertion"
+  - label: silent
+    text: "crawl the directory tree and list every python file"
+  - label: silent
+    text: "translate this bash script to python"
+  - label: silent
+    text: "screenshot is blank when i run the test headlessly"
+  - label: silent
+    text: "which of our modules import the deprecated helper"
+  - label: silent
+    text: "find every call site of this function"
+  - label: silent
+    text: "pull the latest from main and rebase"
+  - label: silent
+    text: "watch the log file and grep for errors"
+  - label: silent
+    text: "provision a local postgres for the integration tests"
+  - label: silent
+    text: "transcribe what this state machine does in comments"
+  - label: silent
+    text: "the docker build is taking eight minutes, speed it up"

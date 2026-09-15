@@ -99,6 +99,9 @@ class GitHubFunnel:
     def fetch(self, state: dict[str, Any], http: HttpClient,
               limit: int | None = None) -> Iterator[FunnelPage]:
         seen = 0
+        ok_queries = 0
+        last_error: HttpError | None = None
+
         for i, query in enumerate(_queries()):
             if i:
                 time.sleep(self._pause)
@@ -107,11 +110,15 @@ class GitHubFunnel:
                    f"&per_page={PER_PAGE}")
             try:
                 resp = http.get(url, headers=self._headers())
-            except HttpError:
+            except HttpError as exc:
                 # One bad query (rate limit, transient 5xx) must not abandon
                 # the whole crawl; the remaining topics are still worth having.
+                # But TOTAL failure must not be reported as success -- see the
+                # re-raise below.
+                last_error = exc
                 continue
 
+            ok_queries += 1
             items = (resp.json() or {}).get("items") or []
             records = [
                 RawRecord(
@@ -128,6 +135,13 @@ class GitHubFunnel:
 
             if limit is not None and seen >= limit:
                 return
+
+        # Every single query failed. Swallowing that reported `github ok
+        # seen=0` -- indistinguishable from "GitHub genuinely had nothing" --
+        # and the discovery eval then blamed ranking for cases that had no
+        # rows to rank. A funnel that fetched nothing at all is an error.
+        if ok_queries == 0 and last_error is not None:
+            raise last_error
 
     def to_draft(self, rec: RawRecord) -> ResourceDraft | None:
         from ..sanitize import apply_whitelist

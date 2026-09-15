@@ -18,15 +18,15 @@ registries → sanitize → SQLite   →   bash shim → FTS5 → gate → injec
 | Schema + FTS5 index | done |
 | Sanitizer + adversarial corpus | done, 39/39 |
 | Funnels: 4 marketplaces, MCP registry, local scan, **GitHub** | done |
-| Retrieval + 9-condition gate | done |
-| Eval harness (gate / discovery / safety / poison) | done, **12/12 discovery** |
+| Retrieval + 10-condition gate | done, **precision 0.905 / recall 0.679** |
+| Eval harness (gate / discovery / safety / poison) | done, **123 labelled gate cases** |
 | Hook + statusline + CLI + installer | done |
 | Install runner, three tiers | done |
 | Measurement + PostToolUse spool | done |
-| Behavioural eval (`--behaviour`) | done, **7/7, surfaced 1.0** |
+| Behavioural eval (`--behaviour`) | done; see the section below |
 | Threshold calibration | provisional defaults shipped; `rdx mine` refines |
 
-**293 unit tests.** Measured on a real 3,980-resource index: retrieval 2ms,
+**310 unit tests.** Measured on a real 3,980-resource index: retrieval 2ms,
 silent-path hook ~2.8ms, safety 39/39, discovery 12/12, poison test 22
 malicious rows stored and none reachable.
 
@@ -74,29 +74,93 @@ registered, then classifies the outcome three ways — **surfaced**, **ignored**
 or **rejected**. The third category exists because a model that argues with the
 index is worse than one that quietly ignores it, and it is detected by name.
 
-### Current result, and the gap it exposes
+### What the behavioural test found, and what it cost to fix
 
-| Case kind | Result |
+The corpus went through three versions, and the first two were worthless in
+instructive ways.
+
+**v1 scored 7/7, surfaced rate 1.0 — and measured nothing.** Every case asked
+for a tool outright ("is there an mcp server for ..."). That is the easy half.
+The stated problem was "I don't know about most of them."
+
+**v2 was task-shaped and scored 0/4.** The user describes a job, never a tool.
+That looked like a framing failure, and two envelope rewrites did not move it.
+
+**v3 fixed the measurement, and the picture inverted.** Four defects in the
+harness, not the model:
+
+| Defect | Effect |
 |---|---|
-| **asked-for** ("is there an mcp for linear") | **2/2 surfaced** |
-| **task-shaped** ("convert this folder of word docs to markdown") | **0/4 surfaced** |
-| **noise** (task verbs on in-codebase work) | **8/8 correctly silent** |
+| `claude -p` prints only the FINAL message | A model that flags the tool and then works scores as a miss |
+| Corpus hard-coded the expected slug | A correct surface of `mineru-document-extraction` scored IGNORED because the guess said `markitdown` |
+| Envelope carried a `ref=inj-<n>` token | The model read it as proof of an attack and refused a correct suggestion |
+| Fixture wrote 21-byte fake `.docx` files | The model opened them, found `PKplaceholder docx`, and declined to fabricate output |
 
-The first version of this corpus scored 7/7 with a surfaced rate of 1.0 — and
-was worthless, because every case asked for a tool outright. That measures the
-easy half. The stated problem was "I don't know about most of them", so the
-corpus was rewritten around task-shaped prompts where the user describes work
-and never mentions tooling.
+The `ref=inj-<n>` one is the sharpest. It was an opaque token abbreviating the
+word "injection", stapled to the bottom of a block of third-party content.
+Nothing ever parsed it back — accept-rate joins on the database's own
+`injection_id` — so it bought nothing and cost the model's trust in the whole
+block. Verbatim:
 
-Against that, the honest result is: **the model surfaces the index reliably
-when asked, and not at all when it wasn't.** On a task prompt it simply does
-the work, which is exactly the behaviour rdx exists to change. Two envelope
-rewrites did not move it.
+> "I'd treat that suggestion with caution since it came bundled with an
+> embedded reference marker that looks like a prompt-injection test rather than
+> a genuine recommendation, so I'm not installing anything based on it."
 
-The gate side is fixed — task-shaped prompts went from firing 0/10 to firing,
-with zero false positives across 12 in-codebase task prompts using the same
-verbs. The remaining gap is entirely in whether the model chooses to speak.
-That is now measurable, which is the precondition for fixing it.
+### The real blocker was retrieval, not framing
+
+With the measurement honest, the residual failures had one cause, and it was
+not the envelope:
+
+> A user says **"take a screenshot of the landing page at three widths"**.
+> The resource that does this describes itself as **"browser automation and
+> end-to-end testing"**.
+
+Zero lexical overlap. `playwright` and `chrome-devtools-mcp` were both indexed
+and both eligible, and neither entered the candidate set at all. People name
+the **job**; catalogues name the **category**. No threshold can cross that gap.
+
+The usual answer is embeddings. This index is lexical by explicit choice, so
+the fix is a curated bridge — `TASK_EXPANSIONS` in `retrieve.py`, ~30 entries,
+hand-written and unit-tested, the same argument that made the intent gate a
+regex instead of a classifier. `playwright` went from absent to rank 1.
+
+### The other half: what the verb is pointed at
+
+Widening recall surfaced the opposite failure. These all fired, and all are
+noise:
+
+```
+"find every call site of this function"        -> gortex
+"screenshot is blank when i run the test"      -> playwright-pro
+"watch the log file and grep for errors"       -> conversation-log
+```
+
+The user is pointing at the code in front of Claude. Contrast the cases that
+*should* fire: "this folder of word documents", "our pinned dependencies",
+"these interview recordings". All external artifacts. **The distinction is not
+the verb — it is what the verb points at**, which is why threshold tuning never
+found it. `CODEBASE_RE` removed 7 of 8 false fires on its own, at zero cost to
+recall.
+
+### Measured result
+
+Gate, against all 123 labelled cases in `corpora/gate.starter.yaml`:
+
+| | before | after |
+|---|---|---|
+| precision | 0.652 | **0.905** |
+| recall | 0.536 | **0.679** |
+| false fires | 8 | 2 |
+
+`min_score_task` moved 0.60 → 0.55 only *after* `CODEBASE_RE` created the
+precision headroom to spend. Swept before the suppressor existed, 0.55 looked
+reckless — ordering mattered.
+
+Note that `rdx eval --gate` now falls back to the shipped starter corpus when
+no mined `gate.yaml` exists. Previously it reported "No labelled prompts" on
+every fresh install, which meant the thresholds every new user actually runs
+had **no regression test at all**, and `gate.yaml` is gitignored by design so
+CI could never have caught a calibration regression either.
 
 Behaviour here is **non-deterministic**: the same prompt, index and envelope
 produced both a clean surface and a complete miss on consecutive runs, which is

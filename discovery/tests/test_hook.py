@@ -191,3 +191,49 @@ def test_shim_honours_disable_env(tmp_path):
         timeout=30)
     assert proc.returncode == 0
     assert json.loads(proc.stdout) == {}
+
+
+# --------------------------------------------------------------------------
+# Behavioural harness must never leave settings.json wedged
+# --------------------------------------------------------------------------
+
+def test_behaviour_repairs_orphaned_registration(tmp_path, monkeypatch):
+    """A killed eval must not leave UserPromptSubmit pointing at a temp script.
+
+    This happened: the run was killed, `finally` never ran (SIGTERM does not
+    raise), and settings.json was left invoking /tmp/rdx-behaviour-hook-*.sh
+    after that file had been deleted -- so every prompt in every session would
+    have run a hook that no longer existed.
+    """
+    from rdx import behaviour
+
+    settings = tmp_path / "settings.json"
+    monkeypatch.setattr(behaviour, "_settings_path", lambda: settings)
+
+    pristine = json.dumps({"extraKnownMarketplaces": {}}, indent=2)
+    settings.write_text(pristine)
+
+    original = behaviour._register(Path("/tmp/does-not-matter.sh"))
+    assert behaviour._backup_path().exists(), "backup must exist while registered"
+    assert "does-not-matter" in settings.read_text()
+
+    # Simulate the kill: no _restore call at all.
+    assert behaviour._repair_orphan() is True
+    assert json.loads(settings.read_text()) == json.loads(pristine)
+    assert not behaviour._backup_path().exists()
+    # Idempotent: nothing to repair the second time.
+    assert behaviour._repair_orphan() is False
+    assert original == pristine
+
+
+def test_behaviour_restore_clears_the_backup(tmp_path, monkeypatch):
+    from rdx import behaviour
+
+    settings = tmp_path / "settings.json"
+    monkeypatch.setattr(behaviour, "_settings_path", lambda: settings)
+    settings.write_text("{}")
+
+    original = behaviour._register(Path("/tmp/x.sh"))
+    behaviour._restore(original)
+    assert not behaviour._backup_path().exists()
+    assert settings.read_text() == "{}"

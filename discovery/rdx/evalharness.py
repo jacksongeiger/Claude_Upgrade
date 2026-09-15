@@ -147,8 +147,19 @@ def run_poison_test(conn: sqlite3.Connection) -> EvalResult:
 def run_gate(conn: sqlite3.Connection, *, cfg: config.Config | None = None,
              corpora_dir: Path | None = None) -> EvalResult:
     corpora_dir = corpora_dir or config.CORPORA_DIR
-    data = _load_yaml(corpora_dir / "gate.yaml")
     res = EvalResult("gate")
+
+    # Prefer the user's mined corpus; fall back to the shipped starter one.
+    # Without the fallback `rdx eval --all` reported "No labelled prompts" on
+    # every fresh install and the shipped thresholds -- the numbers every new
+    # user actually runs -- had no regression test at all. gate.yaml is
+    # gitignored by design (it contains real prompts), so CI would never have
+    # caught a calibration regression either.
+    source = corpora_dir / "gate.yaml"
+    if not source.exists():
+        source = corpora_dir / "gate.starter.yaml"
+    data = _load_yaml(source)
+    res.notes.append(f"corpus: {source.name}")
 
     cases = [c for c in data.get("cases", []) if c.get("label") in ("inject", "silent")]
     if not cases:
@@ -218,7 +229,21 @@ def run_gate(conn: sqlite3.Connection, *, cfg: config.Config | None = None,
 # Discovery
 # --------------------------------------------------------------------------
 
-AVAILABLE_FUNNELS = {"marketplace", "mcp_registry", "local_scan", "github"}
+# `requires_funnel` used to be checked against a hardcoded set of funnels that
+# had been BUILT. That is the wrong question: a funnel can exist and still have
+# put nothing in the index -- GitHub's search API is unreachable from some
+# sandboxes, so the funnel errors and contributes zero rows. The eval then ran
+# github-dependent cases against an index containing no GitHub rows and
+# reported them as RANKING failures, which sent debugging in exactly the wrong
+# direction. Ask the index instead.
+def populated_funnels(conn: sqlite3.Connection) -> set[str]:
+    rows = conn.execute(
+        "SELECT DISTINCT funnel FROM resource "
+        "WHERE status = 'active' AND eligible = 1").fetchall()
+    found = {str(r["funnel"]) for r in rows}
+    # Corpus cases name funnel FAMILIES ("marketplace"), the index stores
+    # specific ones ("mp_official", "mp_community").
+    return found | {f.split("_", 1)[0] for f in found}
 
 
 def run_discovery(conn: sqlite3.Connection, *, cfg: config.Config | None = None,
@@ -233,12 +258,16 @@ def run_discovery(conn: sqlite3.Connection, *, cfg: config.Config | None = None,
     cfg = config.Config(**{**cfg.__dict__, "shadow": False,
                            "min_score": 0.0, "min_margin": 0.0})
 
+    populated = populated_funnels(conn)
     for case in data.get("cases", []):
         cid = case.get("id", "?")
         requires = case.get("requires_funnel")
-        if requires and requires not in AVAILABLE_FUNNELS:
+        if requires and requires not in populated:
             res.skipped += 1
-            res.notes.append(f"SKIP {cid}: needs the '{requires}' funnel (not built)")
+            res.notes.append(
+                f"SKIP {cid}: the '{requires}' funnel contributed no eligible "
+                f"rows to this index (run `rdx sync --funnel {requires}` and "
+                f"check its status)")
             continue
 
         prompt = str(case.get("prompt", ""))

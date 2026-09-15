@@ -98,6 +98,7 @@ def cmd_search(args) -> int:
     print()
     print(f"decision   : {'INJECT' if decision.inject else 'silent'}"
           f"  reason={decision.reason or '-'}"
+          f"  intent={decision.intent_kind or '-'}"
           f"  top={decision.top_score}  margin={decision.margin}"
           f"  {decision.latency_ms}ms")
 
@@ -105,7 +106,13 @@ def cmd_search(args) -> int:
         print()
         print("envelope that would be injected:")
         print()
-        for line in retrieve.render_envelope(decision.items, 0).splitlines():
+        # Use the decision's own envelope. Re-rendering here with default
+        # arguments silently showed the "verb" header for every prompt, so the
+        # debug view disagreed with production on exactly the cases -- the
+        # task-shaped ones -- where the wording was the thing under test.
+        envelope = decision.context or retrieve.render_envelope(
+            decision.items, intent_kind=decision.intent_kind or "verb")
+        for line in envelope.splitlines():
             print(f"    {line}")
     return 0
 

@@ -1,6 +1,96 @@
 # Changelog
 
 ---
+### v2.6 — 2026-09-15 — the blocker was retrieval, not framing
+
+**What changed:** `TASK_EXPANSIONS` and `expand()` (a curated task-vocabulary →
+resource-vocabulary bridge), `CODEBASE_RE` and a new `in_codebase` suppression
+reason, `min_score_task` 0.60 → 0.55, an off-by-one fix in `variants()`, 55 new
+labelled gate cases, and four fixes to the behavioural harness itself.
+
+**Why:** v2.5 recorded task-shaped prompts as firing the gate but never being
+surfaced by the model, and concluded the framing was at fault. That conclusion
+was wrong, and the evidence for it was broken in four separate places:
+
+1. `claude -p` prints only the FINAL message. A model that flagged the resource
+   up front and then did ten turns of work scored as a miss. Now parsed from
+   `--output-format stream-json`, over the whole transcript.
+2. The corpus hard-coded which slug it expected. The index ranked
+   `mineru-document-extraction`, the corpus guessed `markitdown`, and a
+   textbook-correct surface scored IGNORED. Now graded against the slugs read
+   back out of the injection log — what the model was actually shown.
+3. The envelope carried a trailing `ref=inj-<n>` token. A real model read it as
+   proof of an attack and refused a correct suggestion: *"it came bundled with
+   an embedded reference marker that looks like a prompt-injection test rather
+   than a genuine recommendation, so I'm not installing anything based on it."*
+   Nothing ever parsed it back — accept-rate joins on the database's own
+   `injection_id` — so it bought nothing and cost the model's trust in the
+   entire block. Removed.
+4. The fixture wrote 21-byte fake `.docx` files. The model opened them, found
+   `PKplaceholder docx`, and declined to fabricate output. Correct call, and it
+   cost the case. The fixture now writes real OOXML and real pinned packages.
+
+**Result:** with the measurement honest, the residual failures had a single
+cause and it was not the envelope. A user says *"take a screenshot of the
+landing page at three widths"*; the resource that does it calls itself
+*"browser automation and end-to-end testing"*. `playwright` and
+`chrome-devtools-mcp` were both indexed and both eligible, and neither entered
+the candidate set at all. People name the **job**, catalogues name the
+**category**, and no threshold crosses that gap. `TASK_EXPANSIONS` is ~30
+hand-written entries that do — `playwright` went from absent to rank 1.
+
+Widening recall surfaced the mirror-image failure: `"find every call site of
+this function"` → `gortex`, `"watch the log file and grep for errors"` →
+`conversation-log`. The user is pointing at the code in front of Claude. The
+cases that *should* fire name external artifacts — a folder of documents, our
+dependencies, these recordings. **The distinction is not the verb, it is what
+the verb points at**, which is why threshold tuning never found it.
+`CODEBASE_RE` removed 7 of 8 false fires at zero cost to recall.
+
+Gate, over all 123 labelled cases:
+
+| | before | after |
+|---|---|---|
+| precision | 0.652 | **0.905** |
+| recall | 0.536 | **0.679** |
+| false fires | 8 | 2 |
+
+`min_score_task` moved to 0.55 only after `CODEBASE_RE` created the headroom.
+Swept beforehand, 0.55 looked reckless — the ordering was the whole finding.
+
+**Also fixed, found along the way:**
+
+* `rdx eval --gate` read only the gitignored `gate.yaml` and reported "No
+  labelled prompts" on every fresh install. The thresholds every new user runs
+  had **no regression test at all**, and CI could never have caught a
+  calibration regression. Now falls back to the shipped starter corpus.
+* `variants()` documented `"pdfs"` → `"pdf"` as the case it existed to fix, and
+  its `len(term) > 4` guard excluded it. Four-letter plurals — pdfs, docs, apis,
+  logs, sdks — never matched.
+* `rdx search` always rendered the *verb* envelope, so the debug view disagreed
+  with production on exactly the task-shaped prompts whose wording was under
+  test.
+* The GitHub funnel swallowed every per-query failure and reported `ok seen=0`.
+  Total failure now surfaces as an error. (Its search API is unreachable from
+  this sandbox — sessions are bound to their configured repositories — which is
+  environmental, not a code fault.)
+* `run_discovery` checked `requires_funnel` against a hardcoded list of funnels
+  that had been *built*. A funnel can exist and contribute nothing, so three
+  cases were reported as ranking failures when the index simply had no rows to
+  rank. Now checked against the index.
+* **The behavioural harness could wedge the editor.** `finally` does not run on
+  SIGTERM, so a killed eval left `UserPromptSubmit` pointing at a temp script
+  that was then deleted — every prompt in every session invoking a hook that no
+  longer existed. Now backed up before registration, repaired on next start,
+  and restored from SIGTERM/SIGINT handlers. Two regression tests.
+
+**Performance:** Unchanged; `expand()` is a dict lookup. Gate latency 2-5ms.
+**Breaking changes:** None. `min_score_task` is overridable via
+`RDX_MIN_SCORE_TASK`.
+**Dependencies:** None.
+**Tests:** 312 unit, safety 39/39, poison clean, discovery 9/9 (3 skipped for
+the unreachable GitHub funnel), gate 0.905/0.679.
+---
 ### v2.4 — 2026-09-15 — behavioural eval
 **What changed:** Added `rdx eval --behaviour`, `rdx/behaviour.py` and `corpora/behaviour.yaml`. It registers the real hook, runs each prompt through a headless `claude -p`, and classifies the outcome as surfaced, ignored or rejected. Settings are restored in a `finally` block.
 

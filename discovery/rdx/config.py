@@ -90,13 +90,24 @@ class Config:
     # suggestion has to be better evidenced: at least TWO content terms
     # actually present in the resource, not one.
     #
-    # The score threshold is the same 0.60 as the asked-for path, measured
-    # against 12 task-shaped prompts that are ordinary in-codebase work
-    # ("convert this callback to async await", "extract this logic into a
-    # helper", "deploy the current branch"). At 0.60 those produce zero false
-    # fires; at 0.55 two of them fire. The two-term requirement is what carries
-    # the extra strictness, not a higher score.
-    min_score_task: float = 0.60
+    # 0.55, swept against all 123 cases in corpora/gate.starter.yaml:
+    #
+    #     thr    precision  recall   TP  FP  FN
+    #     0.60     0.938     0.536   15   1  13
+    #     0.55     0.900     0.643   18   2  10     <- knee
+    #     0.50     0.857     0.643   18   3  10
+    #     0.45 and below: identical to 0.50
+    #
+    # 0.55 is where the curve turns: three more true positives for one more
+    # false positive, and nothing below it buys any recall at all -- the
+    # remaining misses fail on term coverage, not score, so lowering further
+    # only costs precision.
+    #
+    # This was 0.60 until the in-codebase suppressor (CODEBASE_RE) landed. That
+    # check removed 7 of 8 false fires on its own, which is what created the
+    # precision headroom to spend here. Ordering matters: swept before the
+    # suppressor existed, 0.55 looked reckless.
+    min_score_task: float = 0.55
     min_matched_terms_task: int = 2
 
     max_suggestions: int = 2
@@ -142,7 +153,7 @@ def load_config(**overrides) -> Config:
         min_score=_env_float("RDX_MIN_SCORE", DEFAULT_MIN_SCORE),
         min_margin=_env_float("RDX_MIN_MARGIN", DEFAULT_MIN_MARGIN),
         min_matched_terms=int(_env_float("RDX_MIN_MATCHED_TERMS", 1)),
-        min_score_task=_env_float("RDX_MIN_SCORE_TASK", 0.60),
+        min_score_task=_env_float("RDX_MIN_SCORE_TASK", 0.55),
     )
     if overrides:
         cfg = Config(**{**cfg.__dict__, **overrides})
