@@ -97,6 +97,11 @@ class Candidate:
     # normalizes to 1.0 no matter how poor the match - coverage is the only
     # signal here that carries ABSOLUTE match quality.
     coverage: float = 0.0
+    # Raw count of content terms matched. The fraction alone punishes verbose
+    # prompts: "is there a way to integrate claude with slack for
+    # notifications" matched `slack` - the only term that mattered - and still
+    # scored 1/3. The count is what the gate should test.
+    matched: int = 0
 
 
 @dataclass

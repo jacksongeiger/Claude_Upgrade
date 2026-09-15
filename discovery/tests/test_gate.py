@@ -47,7 +47,8 @@ def conn():
 def live_cfg(**over):
     """A calibrated-ish config, so gate behaviour is testable before the real
     thresholds are derived from shadow data."""
-    base = dict(shadow=False, min_score=0.35, min_margin=0.02, min_coverage=0.5)
+    base = dict(shadow=False, min_score=0.35, min_margin=0.02,
+                min_matched_terms=1)
     base.update(over)
     return config.load_config(**base)
 
@@ -101,14 +102,25 @@ def test_shadow_mode_never_injects(conn):
     assert d.items, "shadow mode should still evaluate candidates for logging"
 
 
-def test_uncalibrated_thresholds_are_silent(conn):
-    """Default config has min_score=+inf, so a fresh install injects nothing
-    until someone calibrates it."""
+def test_shadow_is_on_by_default(conn):
+    """A fresh install must inject nothing until someone explicitly sets
+    RDX_SHADOW=0. The installer promises this; the default enforces it, so
+    forgetting the variable can never silently go live."""
+    cfg = config.load_config()
+    assert cfg.shadow is True
     d = retrieve.evaluate(
-        "is there an mcp server for github issues", conn,
-        cfg=config.load_config(shadow=False))
+        "is there an mcp server for managing github issues and pull requests",
+        conn, cfg=cfg)
     assert not d.inject
-    assert d.reason == "below_threshold"
+    assert d.reason == "shadow"
+
+
+def test_shipped_thresholds_are_real_numbers_not_infinity(conn):
+    """Shipping +inf meant the system did nothing until the user did
+    calibration work. The defaults come from a swept corpus instead."""
+    cfg = config.load_config()
+    assert cfg.min_score == config.DEFAULT_MIN_SCORE == 0.60
+    assert cfg.min_margin == config.DEFAULT_MIN_MARGIN == 0.0
 
 
 # --------------------------------------------------------------------------

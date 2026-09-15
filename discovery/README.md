@@ -23,7 +23,7 @@ registries → sanitize → SQLite   →   bash shim → FTS5 → gate → injec
 | Hook + statusline + CLI + installer | done |
 | Install runner, three tiers | done |
 | Measurement + PostToolUse spool | done |
-| **Threshold calibration** | **needs your machine** — `rdx mine` |
+| Threshold calibration | provisional defaults shipped; `rdx mine` refines |
 
 **292 unit tests.** Measured on a real 3,980-resource index: retrieval 2ms,
 silent-path hook ~2.8ms, safety 39/39, discovery 12/12, poison test 22
@@ -65,8 +65,21 @@ rdx search "is there an mcp for linear"   # the exact would-be envelope
 
 ## Calibration — the speed-run
 
-Thresholds start at `+inf`, so a fresh install is silent by construction. They
-are set from **your own prompts**, not guesses:
+**rdx ships with working thresholds.** They were derived by sweeping a 68-case
+labelled corpus (`corpora/gate.starter.yaml`) against a real 3,980-resource
+index:
+
+| min_score | precision | recall |
+|---|---|---|
+| 0.55 | 0.82 | 0.90 |
+| **0.60** | **1.00** | **0.70** ← shipped |
+| 0.65 | 1.00 | 0.50 |
+
+Zero false fires across 48 ordinary-work prompts. Shadow mode is still on by
+default, so nothing is injected until you set `RDX_SHADOW=0`.
+
+Those numbers come from a representative corpus, not yours. To refine them from
+your own history:
 
 ```bash
 rdx mine                      # extracts real prompts from ~/.claude/projects
@@ -77,10 +90,10 @@ rdx stats                     # top_score percentiles + calibration hint
 
 Aim for **high precision, deliberately low recall**. A false positive on a
 trivial prompt is what makes you turn the thing off, after which recall is zero
-forever. Start `RDX_MIN_SCORE` near p75–p90, then:
+forever. Then go live:
 
 ```bash
-export RDX_MIN_SCORE=0.45 RDX_MIN_MARGIN=0.12 RDX_SHADOW=0
+export RDX_SHADOW=0        # thresholds already have sane defaults
 ```
 
 ## Safety

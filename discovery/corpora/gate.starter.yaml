@@ -1,0 +1,181 @@
+# Starter gate corpus — provisional calibration.
+#
+# These are NOT the user's prompts. They are representative development
+# prompts, hand-labelled, used to derive sensible default thresholds so a fresh
+# install ships with working numbers instead of +inf.
+#
+# `rdx mine` produces the real corpus from actual transcript history and should
+# replace these numbers. This file exists so the system is useful on day one
+# rather than after a labelling session.
+#
+# The silent cases outnumber the inject cases roughly 3:1 on purpose: that is
+# the real ratio of ordinary coding work to tool-acquisition questions, and
+# calibrating on a balanced corpus would set the threshold far too low.
+#
+#   label: inject  -> a suggestion here would have been welcome
+#          silent  -> a suggestion here would have been noise
+
+cases:
+  # ======================================================================
+  # SHOULD INJECT — genuine tool-acquisition intent
+  # ======================================================================
+  - label: inject
+    text: "is there an mcp server for querying github issues and pull requests"
+  - label: inject
+    text: "any tool for automating a browser and taking screenshots of a page"
+  - label: inject
+    text: "how do i connect claude to a postgres database"
+  - label: inject
+    text: "is there a plugin for semantic code search across a large codebase"
+  - label: inject
+    text: "any mcp for looking up up-to-date library documentation"
+  - label: inject
+    text: "is there a way to integrate claude with slack for notifications"
+  - label: inject
+    text: "any tool to pull data from linear and create issues"
+  - label: inject
+    text: "is there an mcp server for sentry error monitoring"
+  - label: inject
+    text: "what's the best library for scraping a javascript heavy website"
+  - label: inject
+    text: "is there a faster alternative to pandas for large dataframes"
+  - label: inject
+    text: "is there a library for extracting tables from pdfs"
+  - label: inject
+    text: "any good tool for converting documents to markdown for an llm"
+  - label: inject
+    text: "recommend a package for parsing and validating yaml config files"
+  - label: inject
+    text: "how can i automate taking screenshots across multiple viewports"
+  - label: inject
+    text: "is there an sdk for the stripe api that handles webhooks well"
+  - label: inject
+    text: "any mcp server that lets claude read my notion workspace"
+  - label: inject
+    text: "i need a client for talking to elasticsearch from python"
+  - label: inject
+    text: "is there a tool that can diff two json files structurally"
+  - label: inject
+    text: "any library for generating pdfs from html templates"
+  - label: inject
+    text: "how do i set up a vector database for embeddings search"
+
+  # ======================================================================
+  # SHOULD STAY SILENT — ordinary development work
+  # ======================================================================
+
+  # --- debugging -------------------------------------------------------
+  - label: silent
+    text: "fix the failing test in the auth module please"
+  - label: silent
+    text: "why is this function returning None when the list is empty"
+  - label: silent
+    text: "the build is broken after merging main into my branch"
+  - label: silent
+    text: "this test passes locally but fails in ci, any idea why"
+  - label: silent
+    text: "i'm getting a segfault when the buffer is larger than 4096 bytes"
+  - label: silent
+    text: "the migration ran but the column is still showing as nullable"
+  - label: silent
+    text: "why does this async function resolve before the loop finishes"
+  - label: silent
+    text: "there's a race condition somewhere in the worker pool, help me find it"
+  - label: silent
+    text: "the docker build fails at the pip install step with no error message"
+  - label: silent
+    text: "this regex matches more than i expected, what's wrong with it"
+
+  # --- refactoring and code changes -------------------------------------
+  - label: silent
+    text: "refactor this class to use dependency injection instead of globals"
+  - label: silent
+    text: "extract the validation logic into its own module"
+  - label: silent
+    text: "rename all the handler functions to follow the same convention"
+  - label: silent
+    text: "split this file, it's gotten way too long to work with"
+  - label: silent
+    text: "convert these callbacks to async await throughout the file"
+  - label: silent
+    text: "add type hints to every function in the parsers directory"
+  - label: silent
+    text: "simplify this nested conditional, it's four levels deep"
+  - label: silent
+    text: "move the config loading out of main and into its own function"
+
+  # --- explanation and review -------------------------------------------
+  - label: silent
+    text: "explain what this regular expression actually matches"
+  - label: silent
+    text: "walk me through how the request flows from the router to the handler"
+  - label: silent
+    text: "review this diff before i commit it and tell me what's weak"
+  - label: silent
+    text: "is this thread safe the way it's currently written"
+  - label: silent
+    text: "what are the tradeoffs between these two approaches in the file"
+  - label: silent
+    text: "summarize what changed in the last five commits on this branch"
+
+  # --- writing new code within the project ------------------------------
+  - label: silent
+    text: "write a test that covers the empty input case for the parser"
+  - label: silent
+    text: "add a retry with exponential backoff to the upload function"
+  - label: silent
+    text: "implement the delete endpoint following the same pattern as update"
+  - label: silent
+    text: "add logging to the worker so we can see which job failed"
+  - label: silent
+    text: "make the cli accept a --verbose flag that raises the log level"
+  - label: silent
+    text: "write a migration that adds an index on the created_at column"
+
+  # --- git and process ---------------------------------------------------
+  - label: silent
+    text: "commit this with a message describing the schema change"
+  - label: silent
+    text: "rebase my branch onto main and resolve the conflicts"
+  - label: silent
+    text: "what's the difference between my branch and origin right now"
+  - label: silent
+    text: "squash the last three commits into one before i open the pr"
+
+  # --- near misses: mention tooling words but are NOT acquisition --------
+  - label: silent
+    text: "the playwright test is flaky, it times out about one run in five"
+    note: Names a tool we index, but the task is debugging an existing setup.
+  - label: silent
+    text: "update the github action so it runs on pull requests too"
+    note: Mentions github; this is editing CI config, not finding a tool.
+  - label: silent
+    text: "our postgres queries got slower after the last deploy, investigate"
+    note: Names postgres; this is performance debugging.
+  - label: silent
+    text: "why is the docker image 2gb, what's taking up all the space"
+  - label: silent
+    text: "the slack webhook stopped firing after we rotated the token"
+    note: Names slack; this is fixing a broken integration we already have.
+  - label: silent
+    text: "add pandas to the requirements file and pin it to the current version"
+    note: Contains "add ... requirements" but the choice is already made.
+  - label: silent
+    text: "the linear ticket says the bug is in checkout, can you reproduce it"
+  - label: silent
+    text: "install the dependencies and run the test suite"
+    note: Contains "install" but refers to existing project dependencies.
+
+  # --- conversational / meta --------------------------------------------
+  - label: silent
+    text: "yes that looks right, go ahead and apply it"
+  - label: silent
+    text: "actually hold on, revert that last change"
+  - label: silent
+    text: "can you explain that again but shorter"
+  - label: silent
+    text: "what were we working on before the compact"
+  - label: silent
+    text: "okay that works, what should we do next on this project"
+  - label: silent
+    text: "nice, now do the same thing for the other two files"

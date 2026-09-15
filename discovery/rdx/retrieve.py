@@ -124,7 +124,12 @@ INTENT_RE = re.compile(r"""\b(?:
     # miner caught this on the very first transcript it read.
     | sett?(?:ing)?\s*-?\s*up
     | wire\s+up
-    | install
+    # Bare "install" fires on ordinary project setup ("install the
+    # dependencies and run the test suite"), which is not acquisition.
+    # Require it to be followed by something that is not the project's own
+    # existing deps.
+    | install\s+(?!the\s+(?:dep|requirement|package|module|lib)|
+                  dependencies|requirements|deps|packages|modules)
     | pull\s+(?:data\s+)?from
     | sync\s+with
 )\b""", re.I | re.X)
@@ -224,6 +229,18 @@ def term_coverage(resource: Resource, terms: list[str]) -> float:
     return hits / len(terms)
 
 
+def term_matches(resource: Resource, terms: list[str]) -> int:
+    """Raw count of content terms present. This is what the gate tests."""
+    terms = coverage_terms(terms)
+    if not terms:
+        return 0
+    haystack = " ".join([
+        resource.name.lower(), resource.summary.lower(),
+        resource.slug.lower(), " ".join(resource.tags).lower(),
+    ])
+    return sum(1 for t in terms if any(v in haystack for v in variants(t)))
+
+
 def score_candidates(rows: list[tuple[Resource, float]], cfg: config.Config, *,
                      terms: list[str] | None = None) -> list[Candidate]:
     """Combine BM25, term coverage, quality and trust.
@@ -243,6 +260,7 @@ def score_candidates(rows: list[tuple[Resource, float]], cfg: config.Config, *,
     for (resource, bm), r in zip(rows, raw):
         bm25_norm = (r - lo) / span if len(rows) > 1 else 1.0
         coverage = term_coverage(resource, terms)
+        matched = term_matches(resource, terms)
         trust = cfg.trust_bonus.get(resource.trust_tier, 0.2)
         score = (cfg.w_bm25 * bm25_norm
                  + cfg.w_coverage * coverage
@@ -250,7 +268,7 @@ def score_candidates(rows: list[tuple[Resource, float]], cfg: config.Config, *,
                  + cfg.w_trust * trust)
         out.append(Candidate(resource=resource, bm25_raw=bm,
                              bm25_norm=bm25_norm, coverage=round(coverage, 3),
-                             score=round(score, 4)))
+                             matched=matched, score=round(score, 4)))
 
     out.sort(key=lambda c: (c.score, c.coverage), reverse=True)
     return dedupe(out)
@@ -388,7 +406,7 @@ def evaluate(prompt: str, conn: sqlite3.Connection, *, cfg: config.Config,
     # Gate 3b: the top hit must actually contain the words that were asked
     # about. This is what keeps a nonsense query silent, since bm25_norm alone
     # always scores the best-of-batch at 1.0.
-    if scored[0].coverage < cfg.min_coverage:
+    if scored[0].matched < cfg.min_matched_terms:
         return done(False, "weak_coverage", top=top, margin=margin,
                     n=len(scored), query=query)
 

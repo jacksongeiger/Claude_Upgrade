@@ -48,22 +48,43 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
+# Provisional thresholds, derived from a 68-case labelled corpus
+# (corpora/gate.starter.yaml) swept against a real 3,980-resource index:
+#
+#   score  margin  precision  recall
+#   0.55   0.00    0.82       0.90
+#   0.60   0.00    1.00       0.70   <- shipped
+#   0.65   0.00    1.00       0.50
+#
+# 0.60 is the knee: zero false fires across 48 ordinary-work prompts while
+# still catching 14 of 20 genuine acquisition prompts. `rdx mine` + `rdx eval
+# --gate` against real transcript history should replace these.
+DEFAULT_MIN_SCORE = 0.60
+DEFAULT_MIN_MARGIN = 0.0
+
+
 @dataclass(frozen=True)
 class Config:
-    """Runtime knobs. Thresholds start at +inf so the gate is silent until
-    calibrated against real data by `rdx eval --gate`."""
+    """Runtime knobs.
+
+    Shadow mode is ON by default: a fresh install evaluates and logs every
+    prompt but injects nothing until someone explicitly sets RDX_SHADOW=0.
+    The installer promises this; the default enforces it.
+    """
 
     db_path: Path = DB_PATH
-    shadow: bool = False
+    shadow: bool = True
     disabled: bool = False
 
-    min_score: float = float("inf")
-    min_margin: float = float("inf")
+    min_score: float = DEFAULT_MIN_SCORE
+    min_margin: float = DEFAULT_MIN_MARGIN
 
-    # Fraction of query terms the top candidate must actually contain.
-    # Without this, "zzzqqxx frobnicating the wibble manifold" confidently
-    # surfaced three unrelated MCP servers off a single incidental term match.
-    min_coverage: float = 0.5
+    # How many content terms the top candidate must actually contain. This is
+    # the defense against "zzzqqxx frobnicating the wibble manifold", which
+    # matches ZERO terms; a real query matches at least one. Testing a FRACTION
+    # here instead silently dropped 7 of 20 genuine acquisition prompts purely
+    # for being wordy, and left min_score doing nothing.
+    min_matched_terms: int = 1
 
     max_suggestions: int = 2
     second_item_ratio: float = 0.85  # show a 2nd only if within 15% of the top
@@ -96,12 +117,18 @@ class Config:
 
 
 def load_config(**overrides) -> Config:
+    # Shadow defaults ON. Only an explicit falsey RDX_SHADOW turns it off, so
+    # forgetting to set the variable can never silently go live.
+    raw_shadow = os.environ.get("RDX_SHADOW")
+    shadow = True if raw_shadow is None else \
+        raw_shadow.strip().lower() not in {"0", "false", "no", "off", ""}
+
     cfg = Config(
-        shadow=_env_flag("RDX_SHADOW"),
+        shadow=shadow,
         disabled=_env_flag("RDX_DISABLE") or DISABLED_FLAG.exists(),
-        min_score=_env_float("RDX_MIN_SCORE", float("inf")),
-        min_margin=_env_float("RDX_MIN_MARGIN", float("inf")),
-        min_coverage=_env_float("RDX_MIN_COVERAGE", 0.5),
+        min_score=_env_float("RDX_MIN_SCORE", DEFAULT_MIN_SCORE),
+        min_margin=_env_float("RDX_MIN_MARGIN", DEFAULT_MIN_MARGIN),
+        min_matched_terms=int(_env_float("RDX_MIN_MATCHED_TERMS", 1)),
     )
     if overrides:
         cfg = Config(**{**cfg.__dict__, **overrides})

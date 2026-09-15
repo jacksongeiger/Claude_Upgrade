@@ -273,8 +273,12 @@ install_discovery() {
     fi
 
     echo ""
-    echo "Installed. rdx starts in SHADOW MODE: it evaluates every prompt and"
-    echo "logs the decision, but injects nothing until you calibrate it."
+    echo "Installed. rdx starts in SHADOW MODE, enforced by the default config"
+    echo "rather than by convention: it evaluates every prompt and logs the"
+    echo "decision, but injects nothing until you set RDX_SHADOW=0."
+    echo ""
+    echo "Thresholds ship calibrated (min_score 0.60: precision 1.00, recall"
+    echo "0.70 on a 68-case corpus). Refine them with your own history below."
     echo ""
     echo "Next:"
     echo "  rdx sync                 # build the index (~3 min for a full crawl)"

@@ -250,7 +250,14 @@ def run_discovery(conn: sqlite3.Connection, *, cfg: config.Config | None = None,
         # rank?", so it applies only to the cases asserting nothing should
         # surface at all.
         if case.get("expect_none"):
-            scored = [c for c in scored if c.coverage >= cfg.min_coverage]
+            # Silence is the GATE's job, so test the real gate rather than a
+            # partial reimplementation of it: score threshold, margin and match
+            # count together are what actually keep a nonsense query quiet.
+            live = config.Config(**{**cfg.__dict__,
+                                    "min_score": config.DEFAULT_MIN_SCORE,
+                                    "min_margin": config.DEFAULT_MIN_MARGIN})
+            decision = retrieve.evaluate(prompt, conn, cfg=live)
+            scored = decision.items
         top_n = int(case.get("top_n", 5))
         got = [c.resource.slug.lower() for c in scored[:top_n]]
 
