@@ -237,3 +237,57 @@ def test_behaviour_restore_clears_the_backup(tmp_path, monkeypatch):
     behaviour._restore(original)
     assert not behaviour._backup_path().exists()
     assert settings.read_text() == "{}"
+
+
+def test_behaviour_finds_the_injection_that_fired_not_the_newest(tmp_path):
+    """A later suppressed attempt must not mask an earlier successful one.
+
+    One `claude -p` run can emit several UserPromptSubmit events; every one
+    after the first is snoozed. Reading the NEWEST injection row therefore
+    reports `fired=False` even when the first fired and the model acted on it
+    -- which scored a textbook-correct surface as a gate failure.
+    """
+    from rdx import behaviour
+
+    conn = db.init_db(tmp_path / "index.db")
+    ingest.sanitize_and_store(conn, ResourceDraft(
+        id="mcp:t:conv", type="plugin", name="conv", slug="conv",
+        funnel="mp_official", source_ref="https://example.test/c",
+        summary="Convert Word documents and PDFs into clean Markdown output.",
+        url="https://example.test/c", trust_tier="yellow",
+    ), now="2026-09-15T00:00:00Z")
+    conn.commit()
+
+    shown = db.log_injection(
+        conn, ts="2026-09-15T00:00:00Z", session_id="s", cwd="/tmp",
+        prompt="convert these docs", query_terms="convert docs", n_shown=1,
+        suppressed_reason=None, shadow=False, top_score=0.7, margin=0.2,
+        n_candidates=3, latency_ms=3, items=[("mcp:t:conv", 0, 0.7)])
+    # The snoozed follow-up, written AFTER the one that fired.
+    db.log_injection(
+        conn, ts="2026-09-15T00:00:01Z", session_id="s", cwd="/tmp",
+        prompt="convert these docs", query_terms="convert docs", n_shown=0,
+        suppressed_reason="snoozed", shadow=False, top_score=0.7, margin=0.2,
+        n_candidates=3, latency_ms=3, items=[])
+    conn.commit()
+
+    injection_id, reason = behaviour._shown_injection(conn)
+    assert injection_id == shown, "must find the injection that fired"
+    assert reason is None
+    assert behaviour._shown_slugs(conn, injection_id) == ["conv"]
+
+
+def test_behaviour_reports_the_reason_when_nothing_fired(tmp_path):
+    from rdx import behaviour
+
+    conn = db.init_db(tmp_path / "index.db")
+    db.log_injection(
+        conn, ts="2026-09-15T00:00:00Z", session_id="s", cwd="/tmp",
+        prompt="find every call site of this function", query_terms="call site",
+        n_shown=0, suppressed_reason="in_codebase", shadow=False,
+        top_score=None, margin=None, n_candidates=0, latency_ms=1, items=[])
+    conn.commit()
+
+    injection_id, reason = behaviour._shown_injection(conn)
+    assert injection_id is None
+    assert reason == "in_codebase"

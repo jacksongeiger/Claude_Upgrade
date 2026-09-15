@@ -182,16 +182,38 @@ def _restore(original: str) -> None:
     _backup_path().unlink(missing_ok=True)
 
 
-def _last_injection(conn: sqlite3.Connection) -> tuple[bool, str | None]:
+def _shown_injection(conn: sqlite3.Connection) -> tuple[int | None, str | None]:
+    """The injection in this case's window that actually reached the model.
+
+    Deliberately not "the newest row". A single `claude -p` run can produce
+    more than one UserPromptSubmit event, and every attempt after the first is
+    suppressed by the snooze window -- so the NEWEST row reliably says
+    `n_shown = 0` even when the first one fired and the model acted on it.
+
+    That is not hypothetical either. It scored this, verbatim, as a gate
+    failure:
+
+        "One quick note: there's a local plugin, `mineru-document-extraction`
+         ... `rdx install mineru-document-extraction` ... which might handle
+         this more reliably than a hand-rolled conversion."
+
+    Which is precisely the behaviour the whole project is trying to produce.
+    The eval tables are cleared before each case, so scanning the whole table
+    is scoped to this case.
+    """
     row = conn.execute(
-        "SELECT n_shown, suppressed_reason FROM injection ORDER BY id DESC LIMIT 1"
+        "SELECT id, suppressed_reason FROM injection "
+        "WHERE n_shown > 0 ORDER BY id LIMIT 1").fetchone()
+    if row is not None:
+        return int(row["id"]), None
+
+    last = conn.execute(
+        "SELECT suppressed_reason FROM injection ORDER BY id DESC LIMIT 1"
     ).fetchone()
-    if row is None:
-        return False, "no-row"
-    return bool(row["n_shown"]), row["suppressed_reason"]
+    return None, (last["suppressed_reason"] if last else "no-row")
 
 
-def _shown_slugs(conn: sqlite3.Connection) -> list[str]:
+def _shown_slugs(conn: sqlite3.Connection, injection_id: int) -> list[str]:
     """The slugs the model was actually shown, straight from the log.
 
     This is the only honest basis for "did it surface?". The first version of
@@ -204,9 +226,8 @@ def _shown_slugs(conn: sqlite3.Connection) -> list[str]:
     rows = conn.execute(
         """SELECT r.slug FROM injection_item ii
              JOIN resource r ON r.id = ii.resource_id
-            WHERE ii.injection_id = (SELECT MAX(id) FROM injection)
-            ORDER BY ii.rank"""
-    ).fetchall()
+            WHERE ii.injection_id = ?
+            ORDER BY ii.rank""", (injection_id,)).fetchall()
     return [str(r["slug"]) for r in rows]
 
 
@@ -500,6 +521,8 @@ def run_behaviour(*, repo_dir: Path | None = None, limit: int | None = None,
     def _on_signal(signum, _frame):
         _restore(original)
         hook.unlink(missing_ok=True)
+        if cwd is None:
+            shutil.rmtree(run_cwd, ignore_errors=True)
         signal.signal(signum, signal.SIG_DFL)
         os.kill(os.getpid(), signum)
 
@@ -555,8 +578,9 @@ def _run_case(case, report, env, run_cwd, verbose, *, trial, trials):
                 return
 
             with db.open_db(config.DB_PATH, readonly=True) as conn:
-                fired, _reason = _last_injection(conn)
-                shown = _shown_slugs(conn)
+                injection_id, _reason = _shown_injection(conn)
+                fired = injection_id is not None
+                shown = _shown_slugs(conn, injection_id) if fired else []
 
             # Graded against what was actually injected, plus any explicit
             # expectations from the corpus. Naming a shown slug, or quoting the
