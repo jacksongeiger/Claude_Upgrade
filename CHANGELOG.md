@@ -88,7 +88,11 @@ Swept beforehand, 0.55 looked reckless — the ordering was the whole finding.
 **Breaking changes:** None. `min_score_task` is overridable via
 `RDX_MIN_SCORE_TASK`.
 **Dependencies:** None.
-**Tests:** 312 unit, safety 39/39, poison clean, discovery 9/9 (3 skipped for
+**Behavioural:** 10 cases x 2 trials — **surfaced rate 1.0, zero rejections.**
+Task-shaped 6/6, asked-for 2/2, noise 12/12 correctly silent. v2.5 was 0.333
+with task-shaped at 0/4.
+
+**Tests:** 319 unit, safety 39/39, poison clean, discovery 9/9 (3 skipped for
 the unreachable GitHub funnel), gate 0.905/0.679.
 ---
 ### v2.4 — 2026-09-15 — behavioural eval

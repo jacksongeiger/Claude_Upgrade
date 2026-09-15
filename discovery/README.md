@@ -23,12 +23,13 @@ registries → sanitize → SQLite   →   bash shim → FTS5 → gate → injec
 | Hook + statusline + CLI + installer | done |
 | Install runner, three tiers | done |
 | Measurement + PostToolUse spool | done |
-| Behavioural eval (`--behaviour`) | done; see the section below |
+| Behavioural eval (`--behaviour`) | done, **surfaced 1.0, 0 rejections** |
 | Threshold calibration | provisional defaults shipped; `rdx mine` refines |
 
-**310 unit tests.** Measured on a real 3,980-resource index: retrieval 2ms,
-silent-path hook ~2.8ms, safety 39/39, discovery 12/12, poison test 22
-malicious rows stored and none reachable.
+**319 unit tests.** Measured on a real 32,217-resource index: retrieval 2-5ms,
+silent-path hook ~2.8ms, safety 39/39, discovery 9/9 (3 skipped — they need
+the GitHub funnel, whose search API is unreachable from a repo-scoped
+sandbox), poison test 22 malicious rows stored and none reachable.
 
 ### Both assumptions are confirmed behaviourally, not assumed
 
@@ -141,6 +142,38 @@ The user is pointing at the code in front of Claude. Contrast the cases that
 the verb — it is what the verb points at**, which is why threshold tuning never
 found it. `CODEBASE_RE` removed 7 of 8 false fires on its own, at zero cost to
 recall.
+
+### Behavioural result
+
+Ten cases, two trials each, with the real hook registered and a real model:
+
+| Case kind | Result |
+|---|---|
+| **task-shaped** — user describes a job, never a tool | **6/6 surfaced** |
+| **asked-for** — control | **2/2 surfaced** |
+| **noise** — same verbs, in-codebase work | **12/12 correctly silent** |
+| | **surfaced rate 1.0, zero rejections** |
+
+Compare v2.5: surfaced rate 0.333, task-shaped 0/4. What moved it was not
+envelope wording — both rewrites of that failed — but the five measurement
+bugs above plus the retrieval fix below.
+
+What a pass actually looks like, verbatim:
+
+> "There's an official plugin for exactly this — `rdx install sonatype-guide`
+> analyzes dependencies for known vulnerabilities directly. I'll proceed
+> manually for now since it's not installed, but that would be a faster path
+> going forward."
+
+The model was making progress unaided, and still looked up. That is the whole
+brief.
+
+One trial initially scored REJECTED — and it was the sentence above. The
+detector matched "unverified" and "can't confirm" later in the same answer,
+which is simply how a careful model talks about CVE data. Rejection is now
+scored per sentence, only in sentences that mention the index, and never at all
+when the model surfaced a resource: if it used the block, it did not refuse it.
+The loudest alarm in the harness is the one that can least afford to cry wolf.
 
 ### Measured result
 

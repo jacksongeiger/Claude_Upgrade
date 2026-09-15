@@ -537,6 +537,47 @@ def build_fixture(root: Path) -> Path:
     return root
 
 
+# Words that mean a sentence is talking about the injected block rather than
+# about the user's own subject matter.
+_ABOUT_INDEX = re.compile(
+    r"\b(?:rdx|resource-suggestions|the index|local index|"
+    r"suggestion|suggestions|plugin|plugins|mcp|catalogue|catalog)\b", re.I)
+
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
+
+
+def detect_rejection(output: str, *, surfaced: bool) -> bool:
+    """Did the model read the block and refuse it?
+
+    Two guards, both added after this returned a false alarm on the one metric
+    that is supposed to be the loudest in the file.
+
+    First: if the model surfaced a resource, it did not reject one. The run
+    that forced this said, in full:
+
+        "There's an official plugin for exactly this -- `rdx install
+         sonatype-guide` analyzes dependencies for known vulnerabilities
+         directly. I'll proceed manually for now since it's not installed,
+         but that would be a faster path going forward."
+
+    That is the designed behaviour exactly, and it scored REJECTED.
+
+    Second: the patterns are scored per sentence, and only in sentences that
+    mention the index. "unverified", "can't confirm" and "known
+    vulnerabilities" are the ordinary vocabulary of a CVE audit -- which is
+    one of the corpus prompts. Matching them anywhere in the output means the
+    detector fires on the model doing the task WELL.
+    """
+    if surfaced:
+        return False
+    for sentence in _SENTENCE_SPLIT.split(output):
+        if not _ABOUT_INDEX.search(sentence):
+            continue
+        if any(p.search(sentence) for p in REJECTION_PATTERNS):
+            return True
+    return False
+
+
 def _transcript_text(stdout: str) -> str:
     """Every assistant text block from a stream-json run, in order.
 
@@ -667,7 +708,7 @@ def _run_case(case, report, env, run_cwd, verbose, *, trial, trials):
             mentions += [f"rdx install {sl.lower()}" for sl in shown]
             lowered = output.lower()
             surfaced = any(m in lowered for m in mentions) if mentions else False
-            rejected = any(p.search(output) for p in REJECTION_PATTERNS)
+            rejected = detect_rejection(output, surfaced=surfaced)
 
             result = CaseResult(cid, fired, expected_fire, surfaced, rejected,
                                 output=output)
@@ -679,8 +720,9 @@ def _run_case(case, report, env, run_cwd, verbose, *, trial, trials):
                 # verdict with no way to tell a real miss from a matcher bug.
                 if result.verdict in ("IGNORED", "REJECTED", "GATE"):
                     snippet = " ".join(output.split())[:400]
+                    label = "matched" if result.surfaced else "matched_none_of"
                     print(f"      fired={fired} shown={shown} "
-                          f"matched_none_of={mentions[:6]}")
+                          f"{label}={mentions[:6]}")
                     print(f"      output: {snippet}")
 
 
