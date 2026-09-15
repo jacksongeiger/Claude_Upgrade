@@ -1,0 +1,22 @@
+# Secrets — first rule, per CLAUDE.md
+.env
+.env.*
+!.env.example
+
+# rdx: the gate corpus is the user's OWN prompt history, mined from local
+# transcripts. It is calibration data, not source, and must never be committed.
+discovery/corpora/gate.yaml
+
+# Python
+discovery/venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# SQLite (the index lives in ~/.claude/rdx, but guard against stray copies)
+*.db
+*.db-wal
+*.db-shm
+
+# macOS
+.DS_Store

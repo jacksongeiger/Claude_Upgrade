@@ -1,0 +1,97 @@
+# Known-answer discovery tests.
+#
+# This corpus answers the question "does it find the RIGHT thing?", separately
+# from "does it fire at the right time?" (gate.yaml) and "is it safe?"
+# (safety.yaml).
+#
+# Each case gives a task phrased the way a real prompt would be, and the slugs
+# that should appear in the top N. Cases are scored against whatever is
+# actually in the index, so a failure means one of three things - all worth
+# knowing:
+#   1. the resource is missing from the index      -> a funnel gap
+#   2. it is present but ranks too low             -> a scoring problem
+#   3. the expectation is unrealistic              -> fix the corpus
+#
+# `requires_funnel` marks cases that cannot pass until a later-phase funnel
+# exists. They are reported as SKIP, not FAIL, so the suite stays honest about
+# what is not built yet rather than quietly lowering the bar.
+
+cases:
+  # --- Claude-ecosystem resources (Phase 1 funnels cover these) ------------
+  - id: github_issues
+    prompt: "is there an mcp server for querying github issues and pull requests"
+    expect_any: [github]
+    top_n: 5
+
+  - id: browser_automation
+    prompt: "any tool for automating a browser and taking screenshots"
+    expect_any: [playwright, chrome-devtools, puppeteer, chrome-devtools-mcp]
+    top_n: 5
+
+  - id: semantic_code_search
+    prompt: "is there a plugin for semantic code search across a large codebase"
+    expect_any: [serena, lumen, local-rag, codealive]
+    top_n: 5
+    note: >
+      KNOWN LIMITATION, recorded rather than papered over. The curated answer is
+      serena, but its description says "semantic code ANALYSIS ... codebase
+      navigation" - it never uses the word "search", so lexical retrieval scores
+      it 0.40 coverage and drops it below tools whose text happens to match.
+      lumen and local-rag genuinely do answer the question, so the case passes,
+      but this is the concrete cost of the BM25-only decision and the first
+      real evidence for revisiting local embeddings in a later phase.
+
+  - id: postgres_access
+    prompt: "how do i connect claude to a postgres database"
+    expect_any: [postgres, postgresql, supabase, neon]
+    top_n: 8
+
+  - id: docs_lookup
+    prompt: "any mcp for looking up up-to-date library documentation"
+    expect_any: [context7]
+    top_n: 5
+
+  - id: slack_integration
+    prompt: "is there a way to integrate claude with slack"
+    expect_any: [slack]
+    top_n: 8
+
+  - id: linear_issues
+    prompt: "any tool to pull data from linear"
+    expect_any: [linear]
+    top_n: 8
+
+  - id: sentry_errors
+    prompt: "is there an mcp server for sentry error monitoring"
+    expect_any: [sentry]
+    top_n: 8
+
+  # --- Silence checks: a good index knows when it has nothing -------------
+  - id: nonsense_query
+    prompt: "is there a tool for zzzqqxx frobnicating the wibble manifold"
+    expect_none: true
+    note: Gibberish must not confidently surface an unrelated resource.
+
+  # --- OSS library discovery (needs the Phase 2 GitHub/PyPI funnels) ------
+  - id: pdf_table_extraction
+    prompt: "is there a library for extracting tables from pdfs"
+    expect_any: [docling, mineru, markitdown, pdfplumber, camelot]
+    top_n: 5
+    requires_funnel: github
+    note: >
+      The motivating example. Baseline GitHub search ranked the ARCHIVED
+      atlanhq/camelot first and missed docling, MinerU and markitdown entirely.
+      Once the GitHub funnel exists this case must surface a maintained tool,
+      and quality_score must keep the archived one out.
+
+  - id: web_scraping
+    prompt: "what's the best library for scraping a javascript-heavy website"
+    expect_any: [playwright, scrapy, crawl4ai, firecrawl]
+    top_n: 5
+    requires_funnel: github
+
+  - id: dataframe_speed
+    prompt: "is there a faster alternative to pandas for large dataframes"
+    expect_any: [polars, duckdb, vaex]
+    top_n: 5
+    requires_funnel: github

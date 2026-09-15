@@ -11,6 +11,18 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__REPO_DIR__/hooks/resource-suggest.sh",
+            "async": false,
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }
