@@ -190,7 +190,7 @@ def cmd_eval(args) -> int:
         print("Running behavioural eval. This makes real model calls, takes a")
         print("few minutes, and temporarily registers the hook in settings.json.")
         print()
-        report = behav.run_behaviour(verbose=True)
+        report = behav.run_behaviour(verbose=True, trials=args.trials)
         print()
         print(evalharness.format_report([behav.to_eval_result(report)]))
         return 0 if all(r.verdict in ("PASS", "ERROR") for r in report.results) else 1
@@ -340,6 +340,9 @@ def build_parser() -> argparse.ArgumentParser:
                    dest="behaviour",
                    help="does a real model ACT on the envelope? Makes real "
                         "model calls; not included in --all")
+    s.add_argument("--trials", type=int, default=1,
+                   help="repeat each behavioural case N times; model behaviour "
+                        "here is non-deterministic, so 1 is an anecdote")
     s.add_argument("--all", action="store_true")
     s.set_defaults(func=cmd_eval)
 

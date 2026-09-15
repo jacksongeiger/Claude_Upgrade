@@ -147,14 +147,29 @@ def _last_injection(conn: sqlite3.Connection) -> tuple[bool, str | None]:
 
 
 def run_behaviour(*, repo_dir: Path | None = None, limit: int | None = None,
-                  corpora_dir: Path | None = None,
+                  corpora_dir: Path | None = None, trials: int = 1,
+                  cwd: Path | None = None,
                   verbose: bool = False) -> BehaviourReport:
+    """Run the behavioural corpus.
+
+    `trials` matters more than it looks. Model behaviour here is genuinely
+    non-deterministic: the same prompt, index and envelope produced both a
+    clean surface and a complete miss on consecutive runs. A single trial per
+    case is an anecdote, so the surfaced rate is averaged over trials.
+
+    `cwd` matters too. The first version ran in an empty /tmp, where prompts
+    referencing "our dependencies" or "this folder" have no referent — the
+    model correctly asked for a path instead of doing the work, and the case
+    scored as IGNORED for reasons that had nothing to do with the envelope.
+    It now defaults to a real project directory.
+    """
     repo_dir = repo_dir or config.PROJECT_DIR.parent
     cases = _load_yaml((corpora_dir or config.CORPORA_DIR) / "behaviour.yaml"
                        ).get("cases", [])
     if limit:
         cases = cases[:limit]
 
+    run_cwd = Path(cwd) if cwd else repo_dir
     report = BehaviourReport()
     hook = _hook_script(repo_dir)
     original = _register(hook)
@@ -166,6 +181,17 @@ def run_behaviour(*, repo_dir: Path | None = None, limit: int | None = None,
 
     try:
         for case in cases:
+            for trial in range(max(1, trials)):
+                _run_case(case, report, env, run_cwd, verbose,
+                          trial=trial, trials=max(1, trials))
+    finally:
+        _restore(original)
+        hook.unlink(missing_ok=True)
+
+    return report
+
+
+def _run_case(case, report, env, run_cwd, verbose, *, trial, trials):
             cid = str(case.get("id", "?"))
             prompt = str(case.get("prompt", ""))
             expected_fire = bool(case.get("expect_fire"))
@@ -179,12 +205,12 @@ def run_behaviour(*, repo_dir: Path | None = None, limit: int | None = None,
             try:
                 proc = subprocess.run(
                     ["claude", "-p", prompt], capture_output=True, text=True,
-                    timeout=CLAUDE_TIMEOUT_S, env=env, cwd=tempfile.gettempdir())
+                    timeout=CLAUDE_TIMEOUT_S, env=env, cwd=str(run_cwd))
                 output = (proc.stdout or "") + (proc.stderr or "")
             except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
                 report.results.append(CaseResult(
                     cid, False, expected_fire, False, False, error=str(exc)))
-                continue
+                return
 
             with db.open_db(config.DB_PATH, readonly=True) as conn:
                 fired, _reason = _last_injection(conn)
@@ -198,12 +224,14 @@ def run_behaviour(*, repo_dir: Path | None = None, limit: int | None = None,
                                 output=output)
             report.results.append(result)
             if verbose:
-                print(f"  [{result.verdict:<8}] {cid}")
-    finally:
-        _restore(original)
-        hook.unlink(missing_ok=True)
-
-    return report
+                suffix = f"  (trial {trial + 1}/{trials})" if trials > 1 else ""
+                print(f"  [{result.verdict:<8}] {cid}{suffix}")
+                # Show the evidence on failure. Without this the eval reports a
+                # verdict with no way to tell a real miss from a matcher bug.
+                if result.verdict in ("IGNORED", "REJECTED", "GATE"):
+                    snippet = " ".join(output.split())[:400]
+                    print(f"      fired={fired} matched_none_of={mentions}")
+                    print(f"      output: {snippet}")
 
 
 def to_eval_result(report: BehaviourReport) -> EvalResult:

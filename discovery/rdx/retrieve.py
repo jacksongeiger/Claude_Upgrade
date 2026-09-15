@@ -135,12 +135,42 @@ INTENT_RE = re.compile(r"""\b(?:
 )\b""", re.I | re.X)
 
 
-def has_intent(prompt: str, conn: sqlite3.Connection | None = None) -> tuple[bool, str]:
-    """True when the prompt looks like tool acquisition.
+# Task-shaped work: the user is describing a JOB, not asking for a tool.
+#
+# This is the case the project actually exists for. Measured: the acquisition
+# regex above fired on 0 of 10 realistic task prompts ("extract the line items
+# from these 200 invoice pdfs into one csv", "check whether our staging site
+# renders correctly on mobile"). Claude can attempt every one of them unaided,
+# which is exactly why it never goes looking — and why a system that only helps
+# when you already know to ask solves the wrong problem.
+#
+# These are actions performed ON something, not questions about existing code.
+# "refactor this module" and "explain this regex" are deliberately absent: they
+# are work on the code in front of you, not work a tool would do better.
+TASK_RE = re.compile(r"""\b(?:
+      extract\w*   | convert\w*  | parse\w*     | scrape\w*   | crawl\w*
+    | transcrib\w* | translat\w* | summaris\w*  | summariz\w*
+    | screenshot\w*| render\w*   | monitor\w*   | watch\s+the
+    | ingest\w*    | migrat\w*   | export\w*    | import\w*
+    | generat\w*   | benchmark\w*| profil\w*    | lint\w*
+    | deploy\w*    | provision\w*| index\w*     | embed\w*
+    | turn\s+(?:this|these|that|it)\s+\w+\s+into
+    | pull\s+(?:the|all|every|our|down)
+    | find\s+(?:every|all)\s+
+    | which\s+of\s+(?:our|the|these)
+)\b""", re.I | re.X)
 
-    Two ways to qualify: an acquisition verb, or a token that exactly matches a
-    known resource slug (so "can you use docling here" works even though it
-    contains no verb from the list).
+
+def has_intent(prompt: str, conn: sqlite3.Connection | None = None) -> tuple[bool, str]:
+    """Classify why a prompt might warrant a suggestion.
+
+    Three paths, and the KIND matters downstream: a prompt that explicitly asks
+    for a tool has earned a suggestion, while one that merely describes work has
+    not, so the latter faces a higher evidence bar in the gate.
+
+      verb   — explicit acquisition ("is there an mcp for ...")
+      entity — names a resource we index ("can we use docling here")
+      task   — describes work a tool might do better (the real case)
     """
     if INTENT_RE.search(prompt):
         return True, "verb"
@@ -159,6 +189,11 @@ def has_intent(prompt: str, conn: sqlite3.Connection | None = None) -> tuple[boo
                 row = None
             if row:
                 return True, "entity"
+
+    # Task shape is checked LAST: it is the weakest signal and carries the
+    # strictest downstream threshold.
+    if TASK_RE.search(prompt) and len(coverage_terms(query_terms(prompt))) >= 2:
+        return True, "task"
     return False, ""
 
 
@@ -324,6 +359,25 @@ If one clearly fits what the user is doing, mention it in a sentence with its
 install command, alongside whatever you would have answered anyway. If none
 fits, say nothing about this block. Never install anything without asking."""
 
+# The unasked case needs a different instruction, and this is not a stylistic
+# preference — it is a measured one.
+#
+# With the shared wording above, the behavioural eval scored 1/3: the model
+# surfaced the index when the user ASKED for a tool, and ignored it completely
+# on task-shaped prompts ("convert this folder of word documents to markdown"),
+# where it simply did the work itself. That is the original problem in its
+# purest form — Claude is competent, proceeds, and never looks up.
+#
+# "If one clearly fits, mention it" reads as optional to a model that already
+# knows how to do the job. The task variant names the situation explicitly and
+# asks for one sentence BEFORE starting, which costs the user nothing if the
+# suggestion is unwanted.
+TASK_ENVELOPE_TAIL = """The user described a job, not a tool - they may not know these exist. Before
+you start, if one of these would do this job more reliably, more accurately or
+far faster than hand-writing it, say so in one sentence with its install
+command, then carry on as you normally would. If none genuinely beats doing it
+yourself, say nothing about this block. Never install anything without asking."""
+
 ENVELOPE_FOOTER = "</resource-suggestions>"
 
 
@@ -353,7 +407,8 @@ def _signal(resource: Resource) -> str:
 
 
 def render_envelope(candidates: list[Candidate],
-                    injection_id: int | None = None) -> str:
+                    injection_id: int | None = None,
+                    intent_kind: str = "verb") -> str:
     """Render the injected block.
 
     Every framing line and delimiter here is ours. The only untrusted content
@@ -363,7 +418,12 @@ def render_envelope(candidates: list[Candidate],
     """
     from .sanitize import envelope_safe
 
-    lines = [ENVELOPE_HEADER]
+    header = ENVELOPE_HEADER
+    if intent_kind == "task":
+        # Swap the closing instruction for the unasked-for variant.
+        header = header.rsplit("If one clearly fits", 1)[0].rstrip()
+        header = f"{header}\n{TASK_ENVELOPE_TAIL}"
+    lines = [header]
     for c in candidates:
         r = c.resource
         assert envelope_safe(r.summary), "unsafe summary reached the envelope"
@@ -393,11 +453,12 @@ def evaluate(prompt: str, conn: sqlite3.Connection, *, cfg: config.Config,
     now = now or _dt.datetime.now(_dt.timezone.utc)
 
     def done(inject: bool, reason: str | None, *, items=None, context=None,
-             top=None, margin=None, n=0, query="") -> Decision:
+             top=None, margin=None, n=0, query="", kind="") -> Decision:
         return Decision(
             inject=inject, context=context, items=items or [], reason=reason,
             top_score=top, margin=margin, n_candidates=n, query_terms=query,
             latency_ms=int((time.perf_counter() - started) * 1000),
+            intent_kind=kind,
         )
 
     # Gate 1: trivial prompts. Also enforced in the bash shim, cheaply.
@@ -408,9 +469,14 @@ def evaluate(prompt: str, conn: sqlite3.Connection, *, cfg: config.Config,
         return done(False, "trivial")
 
     # Gate 2: intent. The single most important lever.
-    intent, _kind = has_intent(stripped, conn)
+    intent, kind = has_intent(stripped, conn)
     if not intent:
         return done(False, "no_intent")
+
+    # An unasked-for suggestion must clear a higher bar than a requested one.
+    min_score = cfg.min_score_task if kind == "task" else cfg.min_score
+    min_matched = (cfg.min_matched_terms_task if kind == "task"
+                   else cfg.min_matched_terms)
 
     # Gate 3: candidates
     rows, query = search(conn, stripped, limit=25)
@@ -428,12 +494,12 @@ def evaluate(prompt: str, conn: sqlite3.Connection, *, cfg: config.Config,
     # Gate 3b: the top hit must actually contain the words that were asked
     # about. This is what keeps a nonsense query silent, since bm25_norm alone
     # always scores the best-of-batch at 1.0.
-    if scored[0].matched < cfg.min_matched_terms:
+    if scored[0].matched < min_matched:
         return done(False, "weak_coverage", top=top, margin=margin,
                     n=len(scored), query=query)
 
     # Gate 4: absolute quality
-    if top < cfg.min_score:
+    if top < min_score:
         return done(False, "below_threshold", top=top, margin=margin,
                     n=len(scored), query=query)
 
@@ -469,8 +535,10 @@ def evaluate(prompt: str, conn: sqlite3.Connection, *, cfg: config.Config,
         return done(False, "shadow", items=chosen, top=top, margin=margin,
                     n=len(scored), query=query)
 
-    return done(True, None, items=chosen, context=render_envelope(chosen),
-                top=top, margin=margin, n=len(scored), query=query)
+    return done(True, None, items=chosen,
+                context=render_envelope(chosen, intent_kind=kind),
+                top=top, margin=margin, n=len(scored), query=query,
+                kind=kind)
 
 
 def suggest(payload: dict[str, Any], conn: sqlite3.Connection, *,
@@ -501,7 +569,8 @@ def suggest(payload: dict[str, Any], conn: sqlite3.Connection, *,
         )
         decision.injection_id = injection_id
         if decision.inject:
-            decision.context = render_envelope(decision.items, injection_id)
+            decision.context = render_envelope(
+                decision.items, injection_id, decision.intent_kind or "verb")
     except sqlite3.Error:
         # Losing a log row is acceptable; failing a prompt is not.
         pass

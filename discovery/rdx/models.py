@@ -118,6 +118,9 @@ class Decision:
     query_terms: str = ""
     latency_ms: int = 0
     injection_id: int | None = None
+    # Which intent path matched: verb | entity | task. Determines both the
+    # threshold applied and which envelope instruction is rendered.
+    intent_kind: str = ""
 
 
 @dataclass

@@ -86,6 +86,19 @@ class Config:
     # for being wordy, and left min_score doing nothing.
     min_matched_terms: int = 1
 
+    # Task-shaped prompts did not ask for anything, so an unsolicited
+    # suggestion has to be better evidenced: at least TWO content terms
+    # actually present in the resource, not one.
+    #
+    # The score threshold is the same 0.60 as the asked-for path, measured
+    # against 12 task-shaped prompts that are ordinary in-codebase work
+    # ("convert this callback to async await", "extract this logic into a
+    # helper", "deploy the current branch"). At 0.60 those produce zero false
+    # fires; at 0.55 two of them fire. The two-term requirement is what carries
+    # the extra strictness, not a higher score.
+    min_score_task: float = 0.60
+    min_matched_terms_task: int = 2
+
     max_suggestions: int = 2
     second_item_ratio: float = 0.85  # show a 2nd only if within 15% of the top
     cooldown_s: int = 900
@@ -129,6 +142,7 @@ def load_config(**overrides) -> Config:
         min_score=_env_float("RDX_MIN_SCORE", DEFAULT_MIN_SCORE),
         min_margin=_env_float("RDX_MIN_MARGIN", DEFAULT_MIN_MARGIN),
         min_matched_terms=int(_env_float("RDX_MIN_MATCHED_TERMS", 1)),
+        min_score_task=_env_float("RDX_MIN_SCORE_TASK", 0.60),
     )
     if overrides:
         cfg = Config(**{**cfg.__dict__, **overrides})

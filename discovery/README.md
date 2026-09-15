@@ -74,9 +74,33 @@ registered, then classifies the outcome three ways — **surfaced**, **ignored**
 or **rejected**. The third category exists because a model that argues with the
 index is worse than one that quietly ignores it, and it is detected by name.
 
-Current result: **7/7 passed, surfaced rate 1.0, zero rejections** — four
-acquisition prompts surfaced the index, three ordinary-work prompts stayed
-silent.
+### Current result, and the gap it exposes
+
+| Case kind | Result |
+|---|---|
+| **asked-for** ("is there an mcp for linear") | **2/2 surfaced** |
+| **task-shaped** ("convert this folder of word docs to markdown") | **0/4 surfaced** |
+| **noise** (task verbs on in-codebase work) | **8/8 correctly silent** |
+
+The first version of this corpus scored 7/7 with a surfaced rate of 1.0 — and
+was worthless, because every case asked for a tool outright. That measures the
+easy half. The stated problem was "I don't know about most of them", so the
+corpus was rewritten around task-shaped prompts where the user describes work
+and never mentions tooling.
+
+Against that, the honest result is: **the model surfaces the index reliably
+when asked, and not at all when it wasn't.** On a task prompt it simply does
+the work, which is exactly the behaviour rdx exists to change. Two envelope
+rewrites did not move it.
+
+The gate side is fixed — task-shaped prompts went from firing 0/10 to firing,
+with zero false positives across 12 in-codebase task prompts using the same
+verbs. The remaining gap is entirely in whether the model chooses to speak.
+That is now measurable, which is the precondition for fixing it.
+
+Behaviour here is **non-deterministic**: the same prompt, index and envelope
+produced both a clean surface and a complete miss on consecutive runs, which is
+why `--trials` exists and why a single run is an anecdote.
 
 The envelope tests assert these *properties* rather than any literal phrase,
 because the exact wording turned out to be load-bearing and tunable.
