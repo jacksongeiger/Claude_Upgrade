@@ -23,6 +23,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__REPO_DIR__/hooks/tool-observe.sh",
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }

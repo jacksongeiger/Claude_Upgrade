@@ -308,17 +308,24 @@ def mark_stale_deprecated(conn: sqlite3.Connection, funnel: str, run_ts: str) ->
 
 # Funnel priority for the eligibility cap.
 #
-# Phase 1 funnels supply no stars and no push dates, so quality_score is close
-# to constant and cannot rank anything on its own. Ordering by quality alone
-# made the cap an arbitrary tie-break that evicted the official `github`,
-# `serena`, `playwright` and `linear` plugins in favour of ~1,300 anonymous
-# registry entries. Curation is the signal we actually have, so it goes first.
+# Ordering by quality_score alone made the cap an arbitrary tie-break, because
+# most funnels supply no stars and no push dates: it evicted the official
+# `github`, `serena`, `playwright` and `linear` plugins in favour of ~1,300
+# anonymous registry entries. Priority fixes that.
+#
+# Tier 1 is "we have a real reason to trust this": either first-party curation
+# (the Anthropic marketplaces) or a genuine popularity-and-freshness signal
+# (the GitHub funnel). Putting github in the ELSE bucket starved it completely
+# — measured: 0 of 33 rows eligible, because the 2,000 cap was exhausted by
+# 1,686 community plugins first. The funnel carrying the best quality data must
+# not be the one that loses the tie-break.
 FUNNEL_PRIORITY_SQL = """
   CASE funnel
     WHEN 'local_scan'     THEN 0
     WHEN 'mp_official'    THEN 1
     WHEN 'mp_claude_code' THEN 1
     WHEN 'mp_skills'      THEN 1
+    WHEN 'github'         THEN 1
     WHEN 'mp_community'   THEN 2
     ELSE 3
   END

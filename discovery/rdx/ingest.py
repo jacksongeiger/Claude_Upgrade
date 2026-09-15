@@ -59,11 +59,14 @@ def quality_score(*, stars: int | None = None, pushed_at: str | None = None,
     if archived:
         return 0.0
 
+    # Divisor 6.0, not 4.5: at 4.5 everything above ~30k stars saturated at
+    # 1.0, so markitdown (184k) and koreader (30k) were indistinguishable.
+    # 6.0 keeps the curve spread across the range that actually occurs.
     popularity = 0.0
     if stars:
-        popularity = max(popularity, min(1.0, math.log10(1 + stars) / 4.5))
+        popularity = max(popularity, min(1.0, math.log10(1 + stars) / 6.0))
     if install_count:
-        popularity = max(popularity, min(1.0, math.log10(1 + install_count) / 4.0))
+        popularity = max(popularity, min(1.0, math.log10(1 + install_count) / 5.0))
     if not stars and not install_count:
         popularity = 0.25  # unknown, not zero: most registry entries have no stars
 

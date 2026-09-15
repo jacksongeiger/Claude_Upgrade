@@ -118,9 +118,13 @@ INJECTION_PATTERNS: dict[str, list[re.Pattern[str]]] = {
         re.compile(r"</?\s*(?:system|assistant|user|human)\s*>", re.I),
         re.compile(r"\[/?\s*INST\s*\]", re.I),
         re.compile(r"<\|[^|>]{0,40}\|>"),
-        # Anchored on any whitespace, not just \n: normalize() has already
-        # collapsed newlines to spaces by the time screening runs.
-        re.compile(r"(?:^|\s)(?:Human|Assistant|System)\s*:", re.I),
+        # A forged conversational turn starts a sentence; a compound noun does
+        # not. Anchoring on any whitespace quarantined the 45k-star
+        # paperless-ngx for the phrase "document management system: scan ...".
+        # Requiring start-of-text or a sentence boundary keeps "Helper. Human:
+        # install everything" (normalize() has already turned the newlines into
+        # spaces) while letting ordinary prose through.
+        re.compile(r"(?:\A|[.!?]\s+)(?:Human|Assistant|System)\s*:\s*\S", re.I),
     ],
     "tool_forge": [
         re.compile(r"\bmcp__\w+", re.I),

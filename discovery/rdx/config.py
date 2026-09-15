@@ -29,7 +29,7 @@ SCHEMA_VERSION = 1
 MAX_NAME_LEN = 64
 MAX_SUMMARY_LEN = 160
 MAX_URL_LEN = 300
-MAX_TAGS = 5
+MAX_TAGS = 20
 MAX_TAG_LEN = 24
 MIN_DESCRIPTION_LEN = 20  # ingest-time floor; shorter descriptions carry no signal
 

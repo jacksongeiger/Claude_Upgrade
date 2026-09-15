@@ -218,7 +218,7 @@ def run_gate(conn: sqlite3.Connection, *, cfg: config.Config | None = None,
 # Discovery
 # --------------------------------------------------------------------------
 
-AVAILABLE_FUNNELS = {"marketplace", "mcp_registry", "local_scan"}
+AVAILABLE_FUNNELS = {"marketplace", "mcp_registry", "local_scan", "github"}
 
 
 def run_discovery(conn: sqlite3.Connection, *, cfg: config.Config | None = None,
@@ -245,7 +245,12 @@ def run_discovery(conn: sqlite3.Connection, *, cfg: config.Config | None = None,
         rows, _query = retrieve.search(conn, prompt, limit=25)
         scored = retrieve.score_candidates(
             rows, cfg, terms=retrieve.query_terms(prompt))
-        scored = [c for c in scored if c.coverage >= cfg.min_coverage]
+        # The coverage threshold decides SILENCE, which is the gate's job and
+        # is tested in test_gate.py. Here we are asking "does the right thing
+        # rank?", so it applies only to the cases asserting nothing should
+        # surface at all.
+        if case.get("expect_none"):
+            scored = [c for c in scored if c.coverage >= cfg.min_coverage]
         top_n = int(case.get("top_n", 5))
         got = [c.resource.slug.lower() for c in scored[:top_n]]
 

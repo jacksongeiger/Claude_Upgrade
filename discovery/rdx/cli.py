@@ -18,7 +18,8 @@ import json
 import sys
 from pathlib import Path
 
-from . import config, db, evalharness, ingest, mine, retrieve, statusline
+from . import (config, db, evalharness, ingest, measure, mine, retrieve,
+               runner, statusline)
 
 
 def _open(readonly: bool = False):
@@ -139,6 +140,21 @@ def cmd_audit(args) -> int:
     return 0
 
 
+def cmd_install(args) -> int:
+    import sys as _sys
+
+    conn = _open()
+    result = runner.install(
+        conn, args.slug, dry_run=args.dry_run, assume_yes=args.yes,
+        scope=args.scope, allow_project_scope=args.i_understand_project_scope,
+        interactive=_sys.stdin.isatty(),
+    )
+    print(f"  -> {result.message}")
+    if result.stderr.strip():
+        print(result.stderr.strip()[-1200:])
+    return 0 if result.ok else 1
+
+
 def cmd_mine(args) -> int:
     prompts = mine.mine()
     if not prompts:
@@ -180,7 +196,13 @@ def cmd_eval(args) -> int:
 
 
 def cmd_stats(args) -> int:
-    conn = _open(readonly=True)
+    conn = _open()
+
+    drained = measure.drain_spool(conn)
+    if drained.events_stored:
+        print(f"drained {drained.events_stored} tool events "
+              f"({drained.attributed} attributed to an installed resource)")
+        print()
 
     total = conn.execute("SELECT COUNT(*) FROM injection").fetchone()[0]
     shown = conn.execute(
@@ -218,16 +240,26 @@ def cmd_stats(args) -> int:
         print("  Calibration: set RDX_MIN_SCORE near p75-p90 to fire on roughly")
         print("  10-25% of prompts that already passed the intent gate.")
 
-    accepted = conn.execute("""
-        SELECT COUNT(DISTINCT i.id) FROM injection i
-        WHERE i.n_shown > 0 AND EXISTS (
-          SELECT 1 FROM injection_item ii
-          JOIN installed_resource ir ON ir.resource_id = ii.resource_id
-          WHERE ii.injection_id = i.id AND ir.installed_by = 'rdx')
-    """).fetchone()[0]
-    if shown:
+    stats = measure.accept_rate(conn)
+    if stats["shown"]:
         print()
-        print(f"accept rate : {100 * accepted / shown:.1f}%  ({accepted}/{shown})")
+        print(f"accept rate : {100 * stats['rate']:.1f}%  "
+              f"({stats['accepted']}/{stats['shown']}) "
+              f"within {measure.ACCEPT_WINDOW_MINUTES}min")
+
+    unaccepted = measure.top_unaccepted(conn, limit=5)
+    if unaccepted:
+        print()
+        print("suggested but never installed:")
+        for slug, n in unaccepted:
+            print(f"  {slug:<30} shown {n}x")
+
+    drift = measure.tool_drift(conn)
+    if drift:
+        print()
+        print("TOOL DRIFT since install (an MCP server grew new tools):")
+        for d in drift:
+            print(f"  {d.resource_id}: +{', '.join(d.added)}")
     return 0
 
 
@@ -262,6 +294,19 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--quarantined", action="store_true")
     s.add_argument("--limit", type=int, default=40)
     s.set_defaults(func=cmd_audit)
+
+    s = sub.add_parser("install", help="install a resource by slug")
+    s.add_argument("slug")
+    s.add_argument("--dry-run", action="store_true",
+                   help="print the exact argv without executing")
+    s.add_argument("-y", "--yes", action="store_true",
+                   help="auto-confirm yellow tier (never red)")
+    s.add_argument("--scope", default="local",
+                   choices=["local", "user", "project"])
+    s.add_argument("--i-understand-project-scope", action="store_true",
+                   help="required for --scope project: a committed .mcp.json "
+                        "loads without a trust prompt in non-interactive sessions")
+    s.set_defaults(func=cmd_install)
 
     s = sub.add_parser("mine", help="build the gate corpus from transcripts")
     s.add_argument("--out")

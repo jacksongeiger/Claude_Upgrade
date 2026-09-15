@@ -1,0 +1,409 @@
+{
+  "total_count": 189,
+  "incomplete_results": false,
+  "items": [
+    {
+      "size": 4717,
+      "pushed_at": "2026-09-14T16:53:38Z",
+      "open_issues_count": 663,
+      "language": "Python",
+      "fork": false,
+      "description": "Python tool for converting files and office documents to Markdown.",
+      "html_url": "https://github.com/microsoft/markitdown",
+      "name": "markitdown",
+      "topics": [
+        "autogen",
+        "autogen-extension",
+        "langchain",
+        "markdown",
+        "microsoft-office",
+        "openai",
+        "pdf"
+      ],
+      "archived": false,
+      "full_name": "microsoft/markitdown",
+      "license": {
+        "spdx_id": "MIT",
+        "key": "mit"
+      },
+      "stargazers_count": 184350
+    },
+    {
+      "size": 1168,
+      "pushed_at": "2026-07-29T00:39:06Z",
+      "open_issues_count": 6,
+      "fork": false,
+      "description": ":books: \u514d\u8d39\u7684\u8ba1\u7b97\u673a\u7f16\u7a0b\u7c7b\u4e2d\u6587\u4e66\u7c4d\uff0c\u6b22\u8fce\u6295\u7a3f",
+      "html_url": "https://github.com/justjavac/free-programming-books-zh_CN",
+      "name": "free-programming-books-zh_CN",
+      "topics": [
+        "android",
+        "angular",
+        "books",
+        "free",
+        "ios",
+        "javascript",
+        "kotlin",
+        "pdf",
+        "programming",
+        "python",
+        "react",
+        "react-native",
+        "swift",
+        "vue"
+      ],
+      "archived": false,
+      "full_name": "justjavac/free-programming-books-zh_CN",
+      "license": {
+        "spdx_id": "GPL-3.0",
+        "key": "gpl-3.0"
+      },
+      "stargazers_count": 118923
+    },
+    {
+      "size": 492420,
+      "pushed_at": "2026-09-15T20:09:09Z",
+      "open_issues_count": 630,
+      "language": "TypeScript",
+      "fork": false,
+      "description": "#1 PDF Application on GitHub that lets you edit PDFs on any device anywhere",
+      "html_url": "https://github.com/Stirling-Tools/Stirling-PDF",
+      "name": "Stirling-PDF",
+      "topics": [
+        "docker",
+        "hacktoberfest",
+        "java",
+        "pdf",
+        "pdf-converter",
+        "pdf-editor",
+        "pdf-manipulation",
+        "pdf-merger",
+        "pdf-ocr",
+        "pdf-tools",
+        "pdf-web-apps",
+        "pdfmerger",
+        "self-hosted"
+      ],
+      "archived": false,
+      "full_name": "Stirling-Tools/Stirling-PDF",
+      "license": {
+        "spdx_id": "NOASSERTION",
+        "key": "other"
+      },
+      "stargazers_count": 92207
+    },
+    {
+      "size": 183585,
+      "pushed_at": "2026-09-15T07:03:02Z",
+      "open_issues_count": 113,
+      "language": "Python",
+      "fork": false,
+      "description": "Transforms complex documents like PDFs and Office docs into LLM-ready markdown/JSON for your Agentic workflows.",
+      "html_url": "https://github.com/opendatalab/MinerU",
+      "name": "MinerU",
+      "topics": [
+        "ai4science",
+        "document-analysis",
+        "docx",
+        "extract-data",
+        "layout-analysis",
+        "ocr",
+        "parser",
+        "pdf",
+        "pdf-converter",
+        "pdf-extractor-llm",
+        "pdf-extractor-pretrain",
+        "pdf-extractor-rag",
+        "pdf-parser",
+        "pptx",
+        "python",
+        "xlsx"
+      ],
+      "archived": false,
+      "full_name": "opendatalab/MinerU",
+      "license": {
+        "spdx_id": "NOASSERTION",
+        "key": "other"
+      },
+      "stargazers_count": 79982
+    },
+    {
+      "size": 380131,
+      "pushed_at": "2026-09-15T16:26:53Z",
+      "open_issues_count": 919,
+      "language": "Python",
+      "fork": false,
+      "description": "Get your documents ready for gen AI",
+      "html_url": "https://github.com/docling-project/docling",
+      "name": "docling",
+      "topics": [
+        "ai",
+        "convert",
+        "document-parser",
+        "document-parsing",
+        "documents",
+        "docx",
+        "html",
+        "markdown",
+        "pdf",
+        "pdf-converter",
+        "pdf-to-json",
+        "pdf-to-text",
+        "pptx",
+        "tables",
+        "xlsx"
+      ],
+      "archived": false,
+      "full_name": "docling-project/docling",
+      "license": {
+        "spdx_id": "MIT",
+        "key": "mit"
+      },
+      "stargazers_count": 66455
+    },
+    {
+      "size": 220944,
+      "pushed_at": "2026-09-15T19:37:48Z",
+      "open_issues_count": 7,
+      "language": "Python",
+      "fork": false,
+      "description": "A community-supported supercharged document management system: scan, index and archive all your documents",
+      "html_url": "https://github.com/paperless-ngx/paperless-ngx",
+      "name": "paperless-ngx",
+      "topics": [
+        "ai",
+        "angular",
+        "archiving",
+        "django",
+        "dms",
+        "document-management",
+        "document-management-system",
+        "llm",
+        "machine-learning",
+        "ocr",
+        "optical-character-recognition",
+        "pdf"
+      ],
+      "archived": false,
+      "full_name": "paperless-ngx/paperless-ngx",
+      "license": {
+        "spdx_id": "GPL-3.0",
+        "key": "gpl-3.0"
+      },
+      "stargazers_count": 45170
+    },
+    {
+      "size": 98501,
+      "pushed_at": "2026-09-15T16:52:55Z",
+      "open_issues_count": 154,
+      "language": "Python",
+      "fork": false,
+      "description": "[EMNLP 2025 Demo] PDF scientific paper translation with preserved formats - \u57fa\u4e8e AI \u5b8c\u6574\u4fdd\u7559\u6392\u7248\u7684 PDF \u6587\u6863\u5168\u6587\u53cc\u8bed\u7ffb\u8bd1\uff0c\u652f\u6301 Google/DeepL/Ollama/OpenAI \u7b49\u670d\u52a1\uff0c\u63d0\u4f9b CLI/GUI/MCP/Docker/Zotero",
+      "html_url": "https://github.com/PDFMathTranslate/PDFMathTranslate",
+      "name": "PDFMathTranslate",
+      "topics": [
+        "chinese",
+        "document",
+        "edit",
+        "english",
+        "japanese",
+        "korean",
+        "latex",
+        "math",
+        "mcp",
+        "modify",
+        "obsidian",
+        "openai",
+        "pdf",
+        "pdf2zh",
+        "python",
+        "russian",
+        "translate",
+        "translation",
+        "zotero"
+      ],
+      "archived": false,
+      "full_name": "PDFMathTranslate/PDFMathTranslate",
+      "license": {
+        "spdx_id": "AGPL-3.0",
+        "key": "agpl-3.0"
+      },
+      "stargazers_count": 36957
+    },
+    {
+      "size": 15306973,
+      "pushed_at": "2026-09-11T21:46:10Z",
+      "open_issues_count": 0,
+      "language": "CSS",
+      "fork": false,
+      "description": "\u7ecf\u6d4e\u5b66\u4eba(\u542b\u97f3\u9891)\u3001\u7ebd\u7ea6\u5ba2\u3001\u536b\u62a5\u3001\u8fde\u7ebf\u3001\u5927\u897f\u6d0b\u6708\u520a\u7b49\u82f1\u8bed\u6742\u5fd7\u514d\u8d39\u4e0b\u8f7d,\u652f\u6301epub\u3001mobi\u3001pdf\u683c\u5f0f, \u6bcf\u5468\u66f4\u65b0",
+      "html_url": "https://github.com/hehonghui/awesome-english-ebooks",
+      "name": "awesome-english-ebooks",
+      "topics": [
+        "download",
+        "ebooks",
+        "economist",
+        "economist-ebooks",
+        "new-yorker",
+        "pdf"
+      ],
+      "archived": false,
+      "full_name": "hehonghui/awesome-english-ebooks",
+      "stargazers_count": 36380
+    },
+    {
+      "size": 71433,
+      "pushed_at": "2026-09-15T04:16:02Z",
+      "open_issues_count": 95,
+      "language": "Python",
+      "fork": false,
+      "description": "OCRmyPDF adds an OCR text layer to scanned PDF files, allowing them to be searched",
+      "html_url": "https://github.com/ocrmypdf/OCRmyPDF",
+      "name": "OCRmyPDF",
+      "topics": [
+        "image-processing",
+        "ocr",
+        "pdf",
+        "python",
+        "tesseract"
+      ],
+      "archived": false,
+      "full_name": "ocrmypdf/OCRmyPDF",
+      "license": {
+        "spdx_id": "MPL-2.0",
+        "key": "mpl-2.0"
+      },
+      "stargazers_count": 34767
+    },
+    {
+      "size": 73223,
+      "pushed_at": "2026-09-15T20:16:48Z",
+      "open_issues_count": 1346,
+      "language": "Lua",
+      "fork": false,
+      "description": "An ebook reader application supporting PDF, DjVu, EPUB, FB2 and many more formats, running on Cervantes, Kindle, Kobo, PocketBook and Android devices",
+      "html_url": "https://github.com/koreader/koreader",
+      "name": "koreader",
+      "topics": [
+        "cbz",
+        "djvu",
+        "djvu-reflow",
+        "ebook",
+        "ebook-reader",
+        "eink",
+        "epub",
+        "ereader",
+        "fb2",
+        "kindle",
+        "kobo",
+        "luajit",
+        "opds",
+        "pdf",
+        "pdf-reflow",
+        "pocketbook",
+        "reader",
+        "reflow",
+        "remarkable-tablet",
+        "ubuntu-touch"
+      ],
+      "archived": false,
+      "full_name": "koreader/koreader",
+      "license": {
+        "spdx_id": "AGPL-3.0",
+        "key": "agpl-3.0"
+      },
+      "stargazers_count": 29721
+    },
+    {
+      "size": 87741,
+      "pushed_at": "2026-09-14T12:10:04Z",
+      "open_issues_count": 93,
+      "language": "Java",
+      "fork": false,
+      "description": "PDF Parser for AI-ready data. Automate PDF accessibility. Open-source.",
+      "html_url": "https://github.com/opendataloader-project/opendataloader-pdf",
+      "name": "opendataloader-pdf",
+      "topics": [
+        "a11y",
+        "accessibility",
+        "ai",
+        "bounding-box",
+        "document-parsing",
+        "eaa",
+        "html",
+        "json",
+        "markdown",
+        "ocr",
+        "ocr-recognition",
+        "pdf",
+        "pdf-accessibility",
+        "pdf-converter",
+        "pdf-extraction",
+        "pdf-parser",
+        "pdf-ua",
+        "rag",
+        "tables",
+        "tagged-pdf"
+      ],
+      "archived": false,
+      "full_name": "opendataloader-project/opendataloader-pdf",
+      "license": {
+        "spdx_id": "Apache-2.0",
+        "key": "apache-2.0"
+      },
+      "stargazers_count": 29230
+    },
+    {
+      "size": 17269,
+      "pushed_at": "2026-09-14T07:34:00Z",
+      "open_issues_count": 143,
+      "language": "TeX",
+      "fork": false,
+      "description": ":page_facing_up: Awesome CV is LaTeX template for your outstanding job application",
+      "html_url": "https://github.com/posquit0/Awesome-CV",
+      "name": "Awesome-CV",
+      "topics": [
+        "awesome",
+        "coverletter",
+        "cv",
+        "latex",
+        "latex-template",
+        "overleaf",
+        "pdf",
+        "resume",
+        "sharelatex",
+        "tex"
+      ],
+      "archived": false,
+      "full_name": "posquit0/Awesome-CV",
+      "license": {
+        "spdx_id": "LPPL-1.3c",
+        "key": "lppl-1.3c"
+      },
+      "stargazers_count": 28505
+    },
+    {
+      "name": "camelot",
+      "full_name": "atlanhq/camelot",
+      "description": "Camelot: PDF Table Extraction for Humans",
+      "html_url": "https://github.com/atlanhq/camelot",
+      "stargazers_count": 3710,
+      "pushed_at": "2026-09-11T19:35:22Z",
+      "archived": true,
+      "fork": false,
+      "license": {
+        "spdx_id": "MIT",
+        "key": "mit"
+      },
+      "topics": [
+        "extract",
+        "for-humans",
+        "pdf",
+        "table"
+      ],
+      "language": "Python",
+      "open_issues_count": 117,
+      "size": 5000
+    }
+  ]
+}

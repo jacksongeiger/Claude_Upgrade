@@ -11,12 +11,13 @@ from .base import Funnel, HttpClient, HttpError  # noqa: F401
 
 
 def all_funnels() -> dict[str, Any]:
-    from . import local_scan, marketplace, mcp_registry
+    from . import github, local_scan, marketplace, mcp_registry
 
     funnels: dict[str, Any] = {}
     for f in marketplace.instances():
         funnels[f.name] = f
     funnels["mcp_registry"] = mcp_registry.McpRegistryFunnel()
+    funnels["github"] = github.GitHubFunnel()
     funnels["local_scan"] = local_scan.LocalScanFunnel()
     return funnels
 

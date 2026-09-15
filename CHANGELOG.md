@@ -1,6 +1,21 @@
 # Changelog
 
 ---
+### v2.1 — 2026-09-15 — rdx Phase 1b + the GitHub funnel; core assumption confirmed
+**What changed:** Added the GitHub funnel (`funnels/github.py`), the install runner (`recipes.py`, `runner.py`, `rdx install`), and measurement (`measure.py`, `hooks/tool-observe.sh` PostToolUse spool). `install.sh --discovery` now registers PostToolUse alongside UserPromptSubmit and the statusline, and `--discovery-uninstall` removes both. Test count 214 → 292; discovery eval 9 passed/3 skipped → **12 passed, 0 skipped**.
+
+**Why:** Two gaps. First, Phase 1 only indexed the Claude ecosystem — the original ask was about "thousands of free tools, apis, open source repos", which is the GitHub funnel's job. It is also the first funnel to supply a real popularity signal (stars, push recency, license, archived state); before it, `quality_score` was near-constant and curation had to do all the ranking. Second, a suggestion with no install path is only half a system.
+
+**Result:** The motivating failure is now a passing test. GitHub's own search ranks the ARCHIVED `atlanhq/camelot` first for "pdf table extraction" and misses docling, MinerU and markitdown entirely; in rdx, camelot is stored, marked deprecated and provably unreachable, while `docling` ranks second on a 3,980-resource index.
+
+**The core assumption was confirmed empirically rather than assumed.** A throwaway hook was registered in a live Claude Code session emitting a sentinel string, and the model read it back — `UserPromptSubmit` → `hookSpecificOutput.additionalContext` genuinely reaches the model. Everything in this project rests on that.
+
+Five more bugs found only by running against real data: (1) `role_forge` screening quarantined the 45k-star `paperless-ngx` because " system:" in "document management system: scan" matched a turn-marker pattern anchored on any whitespace — now anchored on a sentence boundary, with both this and the earlier context7 case as permanent regression fixtures; (2) the curation-first eligibility ordering starved the GitHub funnel completely, 0 of 33 rows eligible, because 1,686 community plugins exhausted the 2,000 cap first — the funnel carrying the best quality data must not lose the tie-break; (3) `quality_score` saturated at 1.0 above ~30k stars, making markitdown (184k) and koreader (30k) indistinguishable; (4) coverage used exact substring matching, so "pdfs" never matched "pdf" and "dataframes" never matched "DataFrames"; (5) the accept-rate query compared SQLite `datetime()` output (space-separated) against stored ISO "T" timestamps, which never matches — it would have reported 0% accept rate forever and made the project look like a failure.
+
+**Performance:** retrieval 2ms on 3,980 rows; hook silent path ~2.8ms; 292 tests in 8s; eval harness in seconds.
+**Breaking changes:** None. Plain `./install.sh` is unchanged; discovery stays opt-in behind `--discovery`.
+**Dependencies:** Still zero runtime dependencies. `GITHUB_TOKEN` is optional and only raises the GitHub search rate limit from 10/min to 30/min.
+---
 ### v2.0 — 2026-09-15 — rdx: agentic resource discovery (Phase 1a)
 **What changed:** Added `discovery/`, the kit's first system rather than a config file: a local SQLite+FTS5 index of MCP servers, Claude Code plugins and skills, and a deterministic `UserPromptSubmit` hook that surfaces a relevant resource at the moment of need. Ships ~1,900 lines across schema (`db.py`), sanitizer (`sanitize.py`), ingest with a pluggable funnel protocol (4 Anthropic marketplace JSONs, the official MCP registry with `updated_since` delta sync, and a local-install scanner), retrieval and a 9-condition gate (`retrieve.py`), an offline eval harness over three corpora (`evalharness.py`), a transcript miner (`mine.py`), statusline, and a `rdx` CLI. `install.sh` gained `--discovery`, `--discovery-uninstall` and `--discovery-off`; its `register_session_hook()` was generalized to `register_hook <EVENT>` and gained `unregister_hook`, closing the "no uninstall mode" gap noted in v1.6. `--plugins` now actually installs.
 

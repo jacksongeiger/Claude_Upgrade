@@ -75,16 +75,26 @@ class MarketplaceFunnel:
         ]
         yield FunnelPage(records=records, etag=resp.etag)
 
+    # The Anthropic-curated marketplaces. A plugin whose source is a bare
+    # relative path lives *inside* one of these repos, which makes it
+    # first-party — the most trustworthy case, not the least. Treating a
+    # string source as red put `serena` and 50-odd other official plugins
+    # behind a type-the-slug confirmation for no reason.
+    FIRST_PARTY = frozenset({"mp_official", "mp_claude_code", "mp_skills"})
+
     def _tier_for(self, source: Any) -> str:
-        """SHA-pinned github/git-subdir sources from a first-party marketplace
-        are yellow (one-keystroke install). Everything else is red."""
+        """SHA-pinned sources, and first-party in-repo plugins, are yellow
+        (one keystroke). Everything else is red."""
         if isinstance(source, dict):
             stype = source.get("source") or source.get("type")
             pinned = bool(source.get("sha") or source.get("ref"))
-            if stype in ("github", "git-subdir") and pinned:
+            if stype in ("github", "git-subdir", "url") and pinned:
                 return self.default_trust_tier
-            if stype in ("url", "git-subdir") and pinned:
-                return self.default_trust_tier
+            return "red"
+
+        # Bare string source: a path relative to the marketplace repo.
+        if isinstance(source, str) and self.name in self.FIRST_PARTY:
+            return self.default_trust_tier
         return "red"
 
     def to_draft(self, rec: RawRecord) -> ResourceDraft | None:

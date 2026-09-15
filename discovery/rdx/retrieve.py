@@ -181,8 +181,32 @@ def coverage_terms(terms: list[str]) -> list[str]:
     return contentful or terms
 
 
+def variants(term: str) -> list[str]:
+    """Cheap morphological variants for matching.
+
+    Exact substring matching missed obvious pairs: a prompt saying "pdfs" never
+    matched a topic tagged "pdf", and "dataframes" never matched "DataFrames".
+    This is deliberately conservative — plural and gerund only, no real stemmer
+    — because an aggressive stemmer creates false matches, and precision is the
+    metric that matters here.
+    """
+    out = [term]
+    if len(term) > 4:
+        if term.endswith("ies"):
+            out.append(term[:-3] + "y")
+        elif term.endswith("es"):
+            out.append(term[:-2])
+            out.append(term[:-1])
+        elif term.endswith("s"):
+            out.append(term[:-1])
+        if term.endswith("ing"):
+            out.append(term[:-3])
+            out.append(term[:-3] + "e")
+    return out
+
+
 def term_coverage(resource: Resource, terms: list[str]) -> float:
-    """Fraction of query terms that literally appear in the resource.
+    """Fraction of query terms that appear in the resource.
 
     This is the only absolute measure of match quality in the pipeline: BM25 is
     min-max normalized across the returned set, so the top hit always scores
@@ -196,7 +220,8 @@ def term_coverage(resource: Resource, terms: list[str]) -> float:
         resource.name.lower(), resource.summary.lower(),
         resource.slug.lower(), " ".join(resource.tags).lower(),
     ])
-    return sum(1 for t in terms if t in haystack) / len(terms)
+    hits = sum(1 for t in terms if any(v in haystack for v in variants(t)))
+    return hits / len(terms)
 
 
 def score_candidates(rows: list[tuple[Resource, float]], cfg: config.Config, *,

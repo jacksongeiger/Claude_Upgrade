@@ -218,6 +218,7 @@ unregister_hook() {
 
 DISCOVERY_DIR="$REPO_DIR/discovery"
 SUGGEST_HOOK="$REPO_DIR/hooks/resource-suggest.sh"
+OBSERVE_HOOK="$REPO_DIR/hooks/tool-observe.sh"
 RDX_STATE="$HOME/.claude/rdx"
 
 install_discovery() {
@@ -254,6 +255,8 @@ install_discovery() {
 
     chmod +x "$SUGGEST_HOOK" 2>/dev/null || true
     register_hook UserPromptSubmit "$SUGGEST_HOOK"
+    chmod +x "$OBSERVE_HOOK" 2>/dev/null || true
+    register_hook PostToolUse "$OBSERVE_HOOK"
 
     # Statusline: the only always-visible surface Claude Code exposes.
     if command -v jq >/dev/null 2>&1; then
@@ -286,6 +289,7 @@ install_discovery() {
 
 uninstall_discovery() {
     unregister_hook UserPromptSubmit "$SUGGEST_HOOK"
+    unregister_hook PostToolUse "$OBSERVE_HOOK"
     if command -v jq >/dev/null 2>&1 && [ -f "$SETTINGS_FILE" ]; then
         local tmp
         tmp=$(mktemp)
