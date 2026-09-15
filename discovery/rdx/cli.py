@@ -175,6 +175,26 @@ def cmd_mine(args) -> int:
 
 def cmd_eval(args) -> int:
     results = []
+
+    if args.behaviour:
+        from . import behaviour as behav
+
+        if not behav.claude_available():
+            print("`claude` not on PATH — the behavioural eval needs the CLI",
+                  file=sys.stderr)
+            return 2
+        if not config.DB_PATH.exists():
+            print("no index; run `rdx sync` first", file=sys.stderr)
+            return 2
+
+        print("Running behavioural eval. This makes real model calls, takes a")
+        print("few minutes, and temporarily registers the hook in settings.json.")
+        print()
+        report = behav.run_behaviour(verbose=True)
+        print()
+        print(evalharness.format_report([behav.to_eval_result(report)]))
+        return 0 if all(r.verdict in ("PASS", "ERROR") for r in report.results) else 1
+
     run_all = args.all or not (args.gate or args.discovery or args.safety)
 
     if run_all or args.safety:
@@ -316,6 +336,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--gate", action="store_true")
     s.add_argument("--discovery", action="store_true")
     s.add_argument("--safety", action="store_true")
+    s.add_argument("--behaviour", "--behavior", action="store_true",
+                   dest="behaviour",
+                   help="does a real model ACT on the envelope? Makes real "
+                        "model calls; not included in --all")
     s.add_argument("--all", action="store_true")
     s.set_defaults(func=cmd_eval)
 

@@ -23,6 +23,7 @@ registries → sanitize → SQLite   →   bash shim → FTS5 → gate → injec
 | Hook + statusline + CLI + installer | done |
 | Install runner, three tiers | done |
 | Measurement + PostToolUse spool | done |
+| Behavioural eval (`--behaviour`) | done, **7/7, surfaced 1.0** |
 | Threshold calibration | provisional defaults shipped; `rdx mine` refines |
 
 **293 unit tests.** Measured on a real 3,980-resource index: retrieval 2ms,
@@ -61,6 +62,21 @@ description is third-party). Same prompt, same index, new framing:
 It gave its own answer *and* surfaced the index, used the right commands,
 relayed the trust tiers, and asked before installing. That is the designed
 behaviour, observed rather than hoped for.
+
+This is now a repeatable test rather than a one-off observation:
+
+```bash
+rdx eval --behaviour     # real model calls, ~5 min, not part of --all
+```
+
+It runs each prompt through a headless `claude -p` with the real hook
+registered, then classifies the outcome three ways — **surfaced**, **ignored**,
+or **rejected**. The third category exists because a model that argues with the
+index is worse than one that quietly ignores it, and it is detected by name.
+
+Current result: **7/7 passed, surfaced rate 1.0, zero rejections** — four
+acquisition prompts surfaced the index, three ordinary-work prompts stayed
+silent.
 
 The envelope tests assert these *properties* rather than any literal phrase,
 because the exact wording turned out to be load-bearing and tunable.

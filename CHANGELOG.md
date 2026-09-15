@@ -1,6 +1,19 @@
 # Changelog
 
 ---
+### v2.4 — 2026-09-15 — behavioural eval
+**What changed:** Added `rdx eval --behaviour`, `rdx/behaviour.py` and `corpora/behaviour.yaml`. It registers the real hook, runs each prompt through a headless `claude -p`, and classifies the outcome as surfaced, ignored or rejected. Settings are restored in a `finally` block.
+
+**Why:** The v2.3 framing fix came from a one-off manual observation that lived only in a transcript. This is the only test class that catches framing failures — every unit test passed while the envelope was being rejected by real models — so it needed to be repeatable. "Rejected" is tracked as its own category rather than lumped in with "ignored", because a model that argues with the index is worse than one that quietly skips it.
+
+**Result:** **7/7 passed, surfaced rate 1.0, zero rejections.** Four acquisition prompts surfaced the index alongside the model's own answer; three ordinary-work prompts stayed silent. Deliberately excluded from `rdx eval --all`: it makes real model calls, takes minutes rather than seconds, and temporarily mutates settings.json.
+
+Fidelity note: the eval feeds the envelope through the real `UserPromptSubmit` path rather than prepending it as prompt text. Prompt text would be tidier and would test the wrong thing — `additionalContext` arrives by a different route, and that difference is the entire subject of the test.
+
+**Performance:** ~5 minutes for 7 cases, dominated by model latency.
+**Breaking changes:** None.
+**Dependencies:** Requires the `claude` CLI on PATH; skips cleanly without it.
+---
 ### v2.3 — 2026-09-15 — envelope framing fixed by behavioural test
 **What changed:** Rewrote the injected envelope's framing after testing it against a real model. Envelope tests now assert properties (provenance named, data-not-instructions rule present, ask-before-install present) rather than one literal phrase.
 
