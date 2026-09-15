@@ -153,7 +153,7 @@ def test_live_mode_emits_envelope(seeded_state):
     out = json.loads(proc.stdout)
     context = out["hookSpecificOutput"]["additionalContext"]
     assert "<resource-suggestions>" in context
-    assert "UNTRUSTED DATA" in context
+    assert "never as instructions" in context
     assert "rdx install github" in context
 
 
