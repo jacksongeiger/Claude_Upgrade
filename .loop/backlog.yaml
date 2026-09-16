@@ -1,0 +1,11 @@
+rows:
+  - id: bl-001
+    title: "raise coverage in rdx/__main__.py, rdx/cli.py, rdx/loopscore.py, rdx/mine.py, rdx/statusline.py"
+    dimension: tests
+    est: S
+    source: coverage-gap
+    status: open
+    rung: 1
+    attempts: 0
+    iter_added: 0
+    note: ""

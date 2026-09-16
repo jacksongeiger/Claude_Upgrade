@@ -1,0 +1,62 @@
+{
+  "worktree": {
+    "baseRef": "head"
+  },
+  "hooks": {
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/Claude_Upgrade/loop/hooks/events.sh",
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/Claude_Upgrade/loop/hooks/events.sh",
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/Claude_Upgrade/loop/hooks/budget-gate.sh",
+            "timeout": 5
+          }
+        ],
+        "matcher": "Agent"
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/Claude_Upgrade/loop/statusline.sh",
+    "refreshInterval": 5
+  },
+  "permissions": {
+    "allow": [
+      "Bash(bash ~/Claude_Upgrade/loop/*:*)",
+      "Bash(cd discovery && ./venv/bin/python -m pytest -q:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git status:*)",
+      "Bash(python3 ~/Claude_Upgrade/loop/*:*)",
+      "Bash(rdx search:*)"
+    ]
+  }
+}
