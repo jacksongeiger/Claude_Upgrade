@@ -357,9 +357,16 @@ class Reducer:
             self.emit_agent_event("agent_start", tid, self.agents[tid]["type"], now_iso())
             self.write_state()
             return True
-        if typ == "system" and obj.get("subtype") in ("task_completed", "task_finished", "task_stopped", "task_failed"):
+        # Observed end-of-agent shapes: task_updated with a terminal status
+        # patch, then task_notification. For a BACKGROUND agent the Agent
+        # call's tool_result arrives immediately ("Async agent launched
+        # successfully") and must not count as the end.
+        if typ == "system" and obj.get("subtype") in ("task_updated", "task_notification",
+                                                      "task_completed", "task_finished", "task_stopped", "task_failed"):
             tid = obj.get("task_id")
-            if tid in self.agents:
+            status = (obj.get("patch") or {}).get("status") or obj.get("status")
+            terminal = obj.get("subtype") != "task_updated" or status in ("completed", "failed", "killed", "cancelled", "error")
+            if tid in self.agents and terminal:
                 a = self.agents.pop(tid)
                 self.emit_agent_event("agent_stop", tid, a.get("type", "unknown"), now_iso())
                 self.write_state()
@@ -367,12 +374,19 @@ class Reducer:
         if typ == "user":
             content = ((obj.get("message") or {}).get("content")) or []
             if isinstance(content, list):
-                done = [c.get("tool_use_id") for c in content if isinstance(c, dict) and c.get("type") == "tool_result"]
-                for tid, a in list(self.agents.items()):
-                    if a.get("tool_use_id") in done:
-                        self.agents.pop(tid)
-                        self.emit_agent_event("agent_stop", tid, a.get("type", "unknown"), now_iso())
-                        self.write_state()
+                for c in content:
+                    if not (isinstance(c, dict) and c.get("type") == "tool_result"):
+                        continue
+                    body = c.get("content")
+                    text = body if isinstance(body, str) else " ".join(
+                        x.get("text", "") for x in (body or []) if isinstance(x, dict))
+                    if "Async agent launched" in text:
+                        continue
+                    for tid, a in list(self.agents.items()):
+                        if a.get("tool_use_id") == c.get("tool_use_id"):
+                            self.agents.pop(tid)
+                            self.emit_agent_event("agent_stop", tid, a.get("type", "unknown"), now_iso())
+                            self.write_state()
         return False
 
     def on_stall(self):

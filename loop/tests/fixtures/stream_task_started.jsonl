@@ -2,5 +2,8 @@
 {"type":"assistant","message":{"model":"claude-fable-5-1","content":[{"type":"tool_use","id":"toolu_1","name":"Agent","input":{"subagent_type":"exec-sonnet","description":"Execute subtask t-1"}}],"usage":{"input_tokens":10,"output_tokens":5,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}
 {"type":"system","subtype":"task_started","task_id":"abc123","tool_use_id":"toolu_1","description":"Execute subtask t-1","subagent_type":"exec-sonnet"}
 {"type":"system","subtype":"task_progress","task_id":"abc123","tool_use_id":"toolu_1","description":"Running tests","subagent_type":"exec-sonnet","usage":{"total_tokens":100}}
-{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"{\"status\":\"done\"}"}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":[{"type":"text","text":"Async agent launched successfully. agentId: abc123"}]}]}}
+{"type":"system","subtype":"task_updated","task_id":"abc123","patch":{"is_backgrounded":true}}
+{"type":"system","subtype":"task_updated","task_id":"abc123","patch":{"status":"completed","end_time":1}}
+{"type":"system","subtype":"task_notification","task_id":"abc123","tool_use_id":"toolu_1","status":"completed"}
 {"type":"result","subtype":"success","total_cost_usd":0.5,"num_turns":3,"duration_ms":100}
