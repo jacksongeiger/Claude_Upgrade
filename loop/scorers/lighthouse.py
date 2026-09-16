@@ -86,7 +86,9 @@ def run_lighthouse(url):
     out = proc.stdout
     start = out.find("{")
     if start < 0:
-        raise RuntimeError("lighthouse printed no JSON (chrome=%s): %s" % (chrome, (proc.stderr or "")[-400:].strip()))
+        err_lines = [l for l in (proc.stderr or "").splitlines() if l.strip() and not l.lstrip().startswith("at ")]
+        reason = next((l for l in err_lines if "error" in l.lower()), err_lines[-1] if err_lines else "")
+        raise RuntimeError("lighthouse printed no JSON (chrome=%s): %s" % (chrome, reason.strip()[:300]))
     data = json.loads(out[start:])
     cats = data["categories"]
     return {

@@ -2,10 +2,11 @@
 """gates.py — screenshot and perf gates (pass/fail), stdlib only.
 
 Usage:
-    gates.py run --check '<json>' [--workdir .]
+    gates.py run --check '<json>' [--workdir .] [--base-url http://127.0.0.1:5173]
                  [--baseline-dir .pipeline/gates/baseline]
                  [--last-dir .pipeline/gates/last]
-        Runs one gate check. `<json>` is either:
+        Runs one gate check. A relative screenshot url ("/", "/settings") is
+        prefixed with --base-url (the served app); without one it is infra. `<json>` is either:
           screenshot: {"name","kind":"screenshot","url","viewport":[w,h],
                        "theme":"light|dark","threshold":0.01,"wait_ms":500}
           perf:       {"name","kind":"perf","cmd","metric","max":N|"min":N}
@@ -31,11 +32,12 @@ Usage:
         Exit 0 on success, 4 if <last-dir>/<name>.png does not exist.
 
     gates.py run-all --index <acceptance-index.json> --milestone <id>
-                     [--workdir .] [--baseline-dir ...] [--last-dir ...]
+                     [--workdir .] [--base-url ...] [--baseline-dir ...] [--last-dir ...]
         Reads the index (`{"<feature-id>": {"milestone": "<id>",
-        "checks": [<gate check dict>, ...]}}`) and runs every check of every
+        "checks": [<acceptance check dict>, ...]}}`) and runs every check
+        of `type: gate` (entries without a `type` count as gates) of every
         feature belonging to --milestone, printing one result line per
-        check (as `run` does). Exit code is the worst of the individual
+        check (as `run` does). Other check types belong to accept.py. Exit code is the worst of the individual
         checks' exit codes (4 > 3 > 2 > 0).
 
 Exit codes overall: 0 ok · 2 fail · 3 needs-human (needs-baseline) ·
@@ -219,11 +221,24 @@ def result(name, kind, ok, detail, diff_frac=None):
     return {"name": name, "kind": kind, "ok": ok, "detail": detail, "diff_fraction": diff_frac}
 
 
-def run_screenshot_check(check, workdir, baseline_dir, last_dir):
+def resolve_url(url, base_url):
+    """A relative url needs the served app's base; an absolute one is left alone."""
+    if not url or url.startswith(("http://", "https://", "file:")):
+        return url
+    if not base_url:
+        return None
+    return base_url.rstrip("/") + "/" + url.lstrip("/")
+
+
+def run_screenshot_check(check, workdir, baseline_dir, last_dir, base_url=None):
     name = check.get("name", "screenshot")
     url = check.get("url")
     if not url:
         return result(name, "screenshot", False, "missing url", None), EXIT_INFRA
+    url = resolve_url(url, base_url)
+    if not url:
+        return result(name, "screenshot", False,
+                      f"relative url {check.get('url')!r} needs --base-url (the served app)", None), EXIT_INFRA
     viewport = check.get("viewport") or [1280, 800]
     theme = check.get("theme", "light")
     threshold = check.get("threshold", DEFAULT_THRESHOLD)
@@ -320,10 +335,10 @@ def run_perf_check(check, workdir, timeout=PERF_TIMEOUT_S):
     return result(name, "perf", ok, detail, None), (EXIT_OK if ok else EXIT_FAIL)
 
 
-def run_check(check, workdir, baseline_dir, last_dir):
+def run_check(check, workdir, baseline_dir, last_dir, base_url=None):
     kind = check.get("kind")
     if kind == "screenshot":
-        return run_screenshot_check(check, workdir, baseline_dir, last_dir)
+        return run_screenshot_check(check, workdir, baseline_dir, last_dir, base_url)
     if kind == "perf":
         return run_perf_check(check, workdir)
     name = check.get("name", "?")
@@ -343,7 +358,7 @@ def cmd_run(args):
     workdir = args.workdir
     baseline_dir = _resolve_dir(args.baseline_dir, workdir)
     last_dir = _resolve_dir(args.last_dir, workdir)
-    res, code = run_check(check, workdir, baseline_dir, last_dir)
+    res, code = run_check(check, workdir, baseline_dir, last_dir, args.base_url)
     print(json.dumps(res))
     return code
 
@@ -382,8 +397,10 @@ def cmd_run_all(args):
         if entry.get("milestone") != args.milestone:
             continue
         for check in entry.get("checks", []):
+            if not isinstance(check, dict) or check.get("type", "gate") != "gate":
+                continue  # test/perf/persona/lighthouse checks are accept.py's
             ran_any = True
-            res, code = run_check(check, workdir, baseline_dir, last_dir)
+            res, code = run_check(check, workdir, baseline_dir, last_dir, args.base_url)
             print(json.dumps(res))
             worst = max(worst, code)
     if not ran_any:
@@ -401,6 +418,7 @@ def build_argparser():
     p_run = sub.add_parser("run", help="run one gate check")
     p_run.add_argument("--check", required=True, help="JSON-encoded gate check")
     p_run.add_argument("--workdir", default=".")
+    p_run.add_argument("--base-url", default=None, help="served app, prefixed to relative screenshot urls")
     p_run.add_argument("--baseline-dir", default=DEFAULT_BASELINE_DIR)
     p_run.add_argument("--last-dir", default=DEFAULT_LAST_DIR)
     p_run.set_defaults(func=cmd_run)
@@ -415,6 +433,7 @@ def build_argparser():
     p_all.add_argument("--index", required=True)
     p_all.add_argument("--milestone", required=True)
     p_all.add_argument("--workdir", default=".")
+    p_all.add_argument("--base-url", default=None, help="served app, prefixed to relative screenshot urls")
     p_all.add_argument("--baseline-dir", default=DEFAULT_BASELINE_DIR)
     p_all.add_argument("--last-dir", default=DEFAULT_LAST_DIR)
     p_all.set_defaults(func=cmd_run_all)

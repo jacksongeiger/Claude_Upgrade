@@ -249,3 +249,43 @@ def test_screenshot_gate_needs_baseline_then_accept_then_pass(tmp_path, static_s
     assert proc3.returncode == 0, proc3.stdout + proc3.stderr
     result3 = json.loads(proc3.stdout.strip().splitlines()[-1])
     assert result3["ok"] is True
+
+
+# ---------------------------------------------------------------------------
+# run-all: only gate checks, relative urls need --base-url
+# ---------------------------------------------------------------------------
+
+def test_resolve_url():
+    assert gates.resolve_url("http://x/y", None) == "http://x/y"
+    assert gates.resolve_url("/", "http://127.0.0.1:5173") == "http://127.0.0.1:5173/"
+    assert gates.resolve_url("settings", "http://127.0.0.1:5173/") == "http://127.0.0.1:5173/settings"
+    assert gates.resolve_url("/", None) is None
+
+
+def test_relative_url_without_base_is_infra(tmp_path):
+    check = {"name": "home", "kind": "screenshot", "url": "/"}
+    proc = run_gates(["run", "--check", json.dumps(check), "--workdir", str(tmp_path)])
+    assert proc.returncode == 4
+    assert "base-url" in json.loads(proc.stdout.strip().splitlines()[-1])["detail"]
+
+
+def test_run_all_skips_non_gate_checks(tmp_path):
+    index = {
+        "f-001": {"milestone": "m1", "checks": [
+            {"type": "test", "cmd": "false", "must": "pass"},
+            {"type": "persona", "task": "do a thing", "max_steps": 3},
+            {"type": "gate", "name": "p", "kind": "perf", "cmd": "echo '{\"ms\": 5}'", "metric": "ms", "max": 10},
+        ]},
+        "f-002": {"milestone": "m2", "checks": [
+            {"type": "gate", "name": "q", "kind": "perf", "cmd": "echo '{\"ms\": 50}'", "metric": "ms", "max": 10},
+        ]},
+    }
+    (tmp_path / "index.json").write_text(json.dumps(index))
+    proc = run_gates(["run-all", "--index", str(tmp_path / "index.json"), "--milestone", "m1",
+                      "--workdir", str(tmp_path)])
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    lines = [json.loads(l) for l in proc.stdout.strip().splitlines()]
+    assert [l["name"] for l in lines] == ["p"]
+    proc = run_gates(["run-all", "--index", str(tmp_path / "index.json"), "--milestone", "m2",
+                      "--workdir", str(tmp_path)])
+    assert proc.returncode == 2

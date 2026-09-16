@@ -118,9 +118,10 @@ AGENTS_JSON=$(python3 "$LOOP_KIT/agents_json.py" --no-ui)
 
 # an accepted milestone closes its spec rows in the loop's backlog (worktree and project)
 mark_rows_done() {
-    for b in "$WT/.loop/backlog.yaml" "$PROJECT/.loop/backlog.yaml"; do
-        [ -f "$b" ] && python3 "$KIT/mark_done.py" --spec "$SPEC" --milestone "$1" --backlog "$b" >>"$RUN/build.log" 2>&1 || true
-    done
+    # the worktree's copy only: the project's copy receives it when the human
+    # merges the build branch (editing both would conflict at that merge)
+    b="$WT/.loop/backlog.yaml"
+    [ -f "$b" ] && python3 "$KIT/mark_done.py" --spec "$SPEC" --milestone "$1" --backlog "$b" >>"$RUN/build.log" 2>&1 || true
     (cd "$WT" && git add -f .loop/backlog.yaml 2>/dev/null; git diff --cached --quiet || git commit -q -m "build: $1 accepted, backlog rows closed") >>"$RUN/build.log" 2>&1 || true
 }
 

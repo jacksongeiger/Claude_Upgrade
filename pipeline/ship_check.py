@@ -129,7 +129,10 @@ def check_git_clean(workdir):
     if status.returncode != 0:
         return {"name": "git-clean", "ok": False, "detail": f"git status failed: {status.stderr.strip()}"}
 
-    offenders = [l for l in status.stdout.splitlines() if l.strip()]
+    # the pipeline's own state (.pipeline/, .loop/) is written by these very
+    # stages; it is not a dirty product tree
+    offenders = [l for l in status.stdout.splitlines() if l.strip()
+                 and not l[3:].startswith((".pipeline/", ".loop/"))]
     cur_branch = branch.stdout.strip() if branch.returncode == 0 else "?"
     if cur_branch not in ("main", "master"):
         offenders.append(f"branch={cur_branch}")
@@ -299,12 +302,36 @@ def check_gates(spec, workdir):
     if not milestones:
         return {"name": "gates", "ok": True, "detail": "no milestones in spec"}
 
+    # screenshot gates need the served app: start it once from spec.stack.serve
+    serve = ((spec.get("stack") or {}).get("serve")) or {}
+    base_args = []
+    server = None
+    if serve.get("cmd") and serve.get("port"):
+        import socket, time, subprocess as _sp
+        server = _sp.Popen(["bash", "-c", serve["cmd"]], cwd=str(workdir), stdout=_sp.DEVNULL,
+                           stderr=_sp.DEVNULL, start_new_session=True)
+        deadline = time.time() + 60
+        while time.time() < deadline:
+            try:
+                with socket.create_connection(("127.0.0.1", int(serve["port"])), timeout=1):
+                    base_args = ["--base-url", f"http://127.0.0.1:{serve['port']}"]
+                    break
+            except OSError:
+                time.sleep(0.5)
     codes = {}
-    for m in milestones:
-        mid = m.get("id")
-        proc = run([sys.executable, str(gates_script), "run-all", "--index", str(index_path),
-                    "--milestone", str(mid)], cwd=str(workdir), timeout=600)
-        codes[mid] = proc.returncode
+    try:
+        for m in milestones:
+            mid = m.get("id")
+            proc = run([sys.executable, str(gates_script), "run-all", "--index", str(index_path),
+                        "--milestone", str(mid)] + base_args, cwd=str(workdir), timeout=600)
+            codes[mid] = proc.returncode
+    finally:
+        if server is not None and server.poll() is None:
+            import os as _os, signal as _sig
+            try:
+                _os.killpg(server.pid, _sig.SIGTERM)
+            except OSError:
+                pass
 
     failed = [mid for mid, c in codes.items() if c == 2]
     baseline = [mid for mid, c in codes.items() if c == 3]
