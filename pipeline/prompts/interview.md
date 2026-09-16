@@ -22,8 +22,9 @@ that does not validate.
 
 **Round 1 — what and for whom.** Name, one-liner, who uses it, the stack
 (propose one from the assessment or from the description; ask only if it
-matters), whether it has a UI, calls an LLM, stores data, and where it will
-be deployed (`stack.deploy.cmd`, or "not yet").
+matters), whether it has a UI, calls an LLM, stores data, how it is served
+locally (`stack.serve = {cmd, port}`; required if it has a UI), and where it
+will be deployed (`stack.deploy.cmd`, or "not yet").
 
 **Round 2 — features and order.** List the features the human wants, then
 group them into milestones with `depends_on`: what must exist before what.
@@ -40,6 +41,9 @@ Refuse adjectives: "fast" becomes `perf` with a metric and a number;
 becomes `lighthouse` minimums plus a `gate` screenshot, and the rest is
 `manual`. `manual` is allowed for at most one entry per feature and at most
 20% of features; say which features are unmeasurable and why that matters.
+Then set `needs` to everything the checks imply (`unit-tests`, `coverage`
+when a success line names it, `persona`, `lighthouse`, `perf`, `evals`)
+plus `ui`, `llm`, `db`, `auth`, `deploy` as the stack requires.
 
 **Round 4 — success, budget, feasibility.** Up to six numbered success
 lines, each measurable and ≤ 120 characters; `budget.build_usd` and

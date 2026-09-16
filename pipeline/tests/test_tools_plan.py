@@ -220,3 +220,27 @@ def test_mark_sets_chosen(project):
     plan = json.loads(project["out"].read_text(encoding="utf-8"))
     gap_needs = {g["need"]: g for g in plan["gaps"]}
     assert gap_needs["perf"]["chosen"] == "write bench/search.js printing one JSON line"
+
+
+def test_perf_is_ready_when_a_perf_check_names_a_bench_command(tmp_path):
+    import json, subprocess, sys
+    from pathlib import Path
+    kit = Path(__file__).resolve().parent.parent
+    spec = {"version": 1, "name": "x", "one_liner": "x", "stack": {"language": "javascript", "ui": False},
+            "needs": ["unit-tests", "perf"],
+            "milestones": [{"id": "m1", "title": "t", "depends_on": []}],
+            "features": [{"id": "f-1", "milestone": "m1", "title": "search",
+                          "acceptance": [{"type": "test", "cmd": "npm test", "must": "pass"},
+                                         {"type": "perf", "cmd": "node bench/search.mjs", "metric": "ms_p95", "max": 30}]}],
+            "success": ["ok"]}
+    assess = {"stack": {"languages": ["javascript"], "package_manager": "npm", "manifests": ["package.json"]},
+              "tests": {"runner": "vitest", "test_cmd": "npm test", "coverage_tool_installed": True},
+              "bench": {"present": False, "cmd": None}, "evals": {"present": False}, "llm_calls": False,
+              "ui": {"present": False}, "gaps": []}
+    (tmp_path / "spec.json").write_text(json.dumps(spec)); (tmp_path / "assess.json").write_text(json.dumps(assess))
+    out = tmp_path / "plan.json"
+    subprocess.run([sys.executable, str(kit / "tools_plan.py"), "--spec", str(tmp_path / "spec.json"),
+                    "--assess", str(tmp_path / "assess.json"), "--out", str(out), "--rdx", "off"], check=True, capture_output=True)
+    plan = json.loads(out.read_text())
+    assert "perf" in plan["ready"]
+    assert plan["unresolved"] == []

@@ -174,6 +174,20 @@ def validate(spec):
     for n in needs:
         if n not in ALLOWED_NEEDS:
             problems.append(f"unknown need: '{n}'")
+    # a check that needs a running app needs a way to run it
+    check_types = {c.get("type") for f in features if isinstance(f, dict)
+                   for c in (f.get("acceptance") or []) if isinstance(c, dict)}
+    stack = spec.get("stack") if isinstance(spec.get("stack"), dict) else {}
+    serve = stack.get("serve") if isinstance(stack.get("serve"), dict) else {}
+    if check_types & {"persona", "lighthouse"} and not (serve.get("cmd") and serve.get("port")):
+        problems.append("stack.serve: {cmd, port} is required when any persona or lighthouse check exists")
+    # needs must name every scorer the checks imply, or nothing ever scores them
+    implied = {"unit-tests"} if "test" in check_types else set()
+    for t in ("persona", "lighthouse", "perf", "evals"):
+        if t in check_types:
+            implied.add(t)
+    for n in sorted(implied - set(needs)):
+        problems.append(f"needs: missing '{n}' (implied by an acceptance check)")
 
     # -- features -------------------------------------------------------------
     n_unmeasurable = 0
@@ -352,7 +366,9 @@ def derive(spec, project_dir):
     # ignore the pipeline's scratch, never its records
     gi = project_dir / ".gitignore"
     wanted = [".pipeline/run/", ".pipeline/wt/", ".pipeline/build/", ".pipeline/ux/*/shots/",
-              ".pipeline/gates/last/", ".pipeline/ledger.jsonl", ".pipeline/events.*", ".pipeline/assess.json"]
+              ".pipeline/gates/last/", ".pipeline/ledger.jsonl", ".pipeline/events.*", ".pipeline/assess.json",
+              ".loop/run/", ".loop/wt/", ".loop/state.json", ".loop/events.*", ".loop/iterations/",
+              ".loop/heartbeat", ".loop/map.json", ".loop/report.*", ".claude/worktrees/"]
     existing = gi.read_text().splitlines() if gi.exists() else []
     missing = [w for w in wanted if w not in existing]
     if missing:

@@ -79,7 +79,7 @@ fi
 mkdir -p "$ITER_DIR"
 printf 'merged: t-fake (bl-001) — %s\nfailed: —\nneeds-human: —\nquestions: 0\n' "$MODE" > "$ITER_DIR/summary.md"
 # the planner edits the backlog at CLOSE; the driver must commit it
-printf '# fake planner touched this (%s)\n' "$MODE" >> "$(dirname "$(dirname "$ITER_DIR")")/backlog.yaml" 2>/dev/null || true
+mkdir -p .loop; printf '# fake planner touched this (%s)\n' "$MODE" >> .loop/backlog.yaml 2>/dev/null || true
 
 emit "{\"type\":\"result\",\"subtype\":\"success\",\"total_cost_usd\":$COST,\"num_turns\":4,\"duration_ms\":1200,\"result\":\"ok\"}"
 exit 0

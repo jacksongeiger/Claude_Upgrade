@@ -42,8 +42,13 @@ def main(argv=None):
     setup_cmd, test_cmd = loop_init.guess_commands(assess)
     tests = assess.get("tests") or {}
     proposed = project / ".pipeline" / "scorers.proposed.json"
-    scorer_names = [s["name"] for s in json.loads(proposed.read_text())] if proposed.exists() else ["tests"]
-    weights = {s["name"]: s.get("weight", 1.0) for s in json.loads(proposed.read_text())} if proposed.exists() else {"tests": 1.0}
+    entries = [{"name": "tests", "weight": 1.0}]
+    if proposed.exists():
+        data = json.loads(proposed.read_text())
+        entries = data.get("scorers", []) if isinstance(data, dict) else data
+        entries = [e if isinstance(e, dict) else {"name": e, "weight": 1.0} for e in entries] or entries
+    scorer_names = [e["name"] for e in entries]
+    weights = {e["name"]: e.get("weight", 1.0) for e in entries}
     serve = (spec.get("stack") or {}).get("serve") or {}
     scorers = []
     for name in scorer_names:

@@ -77,8 +77,9 @@ commands/jg-spec.md … jg-feedback.md
   "name": "Pocket Notes",
   "one_liner": "A single-page notes app that works offline.",
   "stack": {"language": "javascript", "runtime": "node", "ui": true, "llm": false,
-            "data": "localStorage", "deploy": {"kind": "static", "cmd": "npm run build"}},
-  "needs": ["ui", "unit-tests", "coverage", "lighthouse", "persona"],
+            "data": "localStorage", "serve": {"cmd": "npm run dev", "port": 5173},
+            "deploy": {"kind": "static", "cmd": "npm run build"}},
+  "needs": ["ui", "unit-tests", "coverage", "lighthouse", "persona", "perf"],
   "milestones": [
     {"id": "m1", "title": "Create and list notes", "depends_on": []},
     {"id": "m2", "title": "Search and edit",       "depends_on": ["m1"]}
@@ -122,7 +123,9 @@ Rules `spec_check.py` enforces (exit 2 on any violation, one line per problem):
   `lighthouse {url, min:{category:score}}` · `persona {task, max_steps, must:complete}` ·
   `gate {name, kind:screenshot|perf, ...}` · `evals {cmd, min}` · `manual {what}`;
 - milestone ids unique, `depends_on` acyclic, every feature's milestone exists;
-- `needs` ⊆ {ui, unit-tests, coverage, lighthouse, persona, perf, evals, llm, db, auth, deploy};
+- `needs` ⊆ {ui, unit-tests, coverage, lighthouse, persona, perf, evals, llm, db, auth, deploy}, and
+  must include every scorer an acceptance check implies (test→unit-tests, persona, lighthouse, perf, evals);
+- `stack.serve {cmd, port}` is required when any persona or lighthouse check exists;
 - `success` lines ≥ 1, each ≤ 120 chars, numbered in GOAL.md in order.
 
 `spec_check.py --derive` (idempotent) writes:

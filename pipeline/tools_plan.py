@@ -290,10 +290,14 @@ def evaluate_needs(needs, spec, assess):
                 gaps.append({"need": need, "why": "spec needs persona; assess: playwright not resolvable"})
 
         elif need == "perf":
-            if bench.get("present"):
+            # a perf check whose command lives in the repo is a build
+            # deliverable (the executors write the bench), not a tool gap
+            perf_cmds = [c.get("cmd") for f in spec.get("features", []) for c in f.get("acceptance", [])
+                         if isinstance(c, dict) and c.get("type") == "perf" and c.get("cmd")]
+            if bench.get("present") or perf_cmds:
                 ready.append(need)
             else:
-                gaps.append({"need": need, "why": "spec needs perf; assess: no benchmark script"})
+                gaps.append({"need": need, "why": "spec needs perf; assess: no benchmark script and no perf check names one"})
 
         elif need == "evals":
             if evals.get("present") and llm_calls:

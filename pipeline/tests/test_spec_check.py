@@ -217,16 +217,20 @@ def test_derive_scorers_proposed(tmp_path):
     run([str(p), "--derive"], tmp_path)
     scorers = json.loads((tmp_path / ".pipeline" / "scorers.proposed.json").read_text())["scorers"]
     by_name = {s["name"]: s["weight"] for s in scorers}
-    assert set(by_name) == {"tests", "lighthouse", "persona"}
+    assert set(by_name) == {"tests", "lighthouse", "persona", "perf"}
     assert by_name["tests"] == pytest.approx(0.4)
-    assert by_name["lighthouse"] == pytest.approx(0.3)
-    assert by_name["persona"] == pytest.approx(0.3)
+    assert by_name["lighthouse"] == pytest.approx(0.2)
+    assert by_name["persona"] == pytest.approx(0.2)
+    assert by_name["perf"] == pytest.approx(0.2)
     assert sum(by_name.values()) == pytest.approx(1.0)
 
 
 def test_derive_scorers_tests_only(tmp_path):
     spec = load_valid()
     spec["needs"] = ["unit-tests"]
+    # needs must cover the checks, so drop the checks that imply other scorers
+    for f in spec["features"]:
+        f["acceptance"] = [c for c in f["acceptance"] if c["type"] in ("test", "manual")]
     p = write_spec(tmp_path, spec)
     run([str(p), "--derive"], tmp_path)
     scorers = json.loads((tmp_path / ".pipeline" / "scorers.proposed.json").read_text())["scorers"]
@@ -299,3 +303,14 @@ def test_derive_no_duplicate_backlog_rows_when_row_preexists(tmp_path):
     ids = [r["id"] for r in rows]
     assert ids.count("spec-f-001") == 1
     assert "spec-f-002" in ids
+
+
+def test_serve_required_for_persona_and_needs_must_cover_checks(tmp_path):
+    spec = load_valid()
+    del spec["stack"]["serve"]
+    spec["needs"] = ["ui", "unit-tests"]
+    p = write_spec(tmp_path, spec)
+    proc = run([str(p)], tmp_path)
+    assert proc.returncode == 2
+    assert "stack.serve" in proc.stdout
+    assert "missing 'persona'" in proc.stdout and "missing 'lighthouse'" in proc.stdout

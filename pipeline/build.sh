@@ -46,7 +46,7 @@ event() { local name="$1"; shift; printf '%s %s %s\n' "$(ts)" "$name" "$*" >> "$
 cfg() { jq -r "$1" "$CONFIG"; }
 ledger() { jq -cn --arg ts "$(ts)" --arg s "build" --arg id "$1" --argjson c "$2" '{ts:$ts,stage:$s,id:$id,cost_usd:$c}' >> "$LEDGER"; }
 kill_child() { [ -n "${CHILD_PGID:-}" ] || CHILD_PGID=$(cat "$RUN/child.pgid" 2>/dev/null || true); if [ -n "$CHILD_PGID" ]; then kill -TERM -- "-$CHILD_PGID" 2>/dev/null || true; sleep 2; kill -KILL -- "-$CHILD_PGID" 2>/dev/null || true; fi; }
-on_exit() { local rc=$?; trap - EXIT INT TERM; [ -n "$STOP_REASON" ] || { STOP_REASON="crashed-at-$STEP"; event STOP "reason=$STOP_REASON rc=$rc"; }; kill_child; rm -f "$RUN/build.pid" "$LOOP/run/loop.pid" 2>/dev/null; exit 0; }
+on_exit() { local rc=$?; trap - EXIT INT TERM; [ -n "$STOP_REASON" ] || { STOP_REASON="crashed-at-$STEP"; event STOP "reason=$STOP_REASON rc=$rc"; }; kill_child; rm -f "$RUN/build.pid" "$LOOP/run/loop.pid" 2>/dev/null; exit "$rc"; }
 stop() { STOP_REASON="$1"; event STOP "reason=$1 ${2:-}"; note "STOP $1 ${2:-}"; }
 
 if [ "$KILL" = "1" ]; then
