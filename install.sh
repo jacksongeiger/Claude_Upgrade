@@ -293,12 +293,15 @@ install_discovery() {
     echo "  rdx eval --all           # safety + discovery + gate"
     echo "  rdx search \"is there an mcp for linear\"   # see a would-be envelope"
     echo ""
-    chmod +x "$REPO_DIR/loop/run.sh" "$REPO_DIR/loop/hooks/"*.sh "$REPO_DIR/loop/statusline.sh" 2>/dev/null || true
+    chmod +x "$REPO_DIR/loop/run.sh" "$REPO_DIR/loop/hooks/"*.sh "$REPO_DIR/loop/statusline.sh" \
+             "$REPO_DIR/pipeline/"*.sh "$REPO_DIR/pipeline/hooks/"*.sh 2>/dev/null || true
     echo "Watch it in shadow for a few days (\`rdx stats\`), then \`rdx on\`."
     echo ""
     echo "Nightshift (the unattended improvement loop) is installed alongside:"
     echo "  /jg-loop init      # once per project, with you present"
     echo "  /jg-loop dryrun    # one supervised iteration before any unattended run"
+    echo "The project pipeline (idea → Nightshift): /jg-spec, /jg-tools, /jg-build,"
+    echo "  /jg-ux, /jg-ship, /jg-feedback — see pipeline/README.md."
     echo "\`rdx status\` answers 'is it on and is it fresh'. /ard drives it all"
     echo "from inside Claude."
 }

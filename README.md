@@ -74,6 +74,26 @@ so an executor cannot edit its own judge.
 Design and the failure modes it was tested against: `loop/README.md` is the
 contract; the design pages are linked from the CHANGELOG.
 
+## The project pipeline — idea to Nightshift
+
+`pipeline/` puts six commands on one spine, `spec.json`, and reuses every
+Nightshift part (agents, worktrees, guards, allowlist, cost meter, merge):
+
+```bash
+/jg-spec            # the interview: every wish becomes a check; you sign the spec
+/jg-tools           # gaps → pinned candidates; you approve each install
+/jg-build all       # milestones in order: Fable plans, agents build in worktrees,
+                    # reviewers check, merge.sh lands, accept.py decides; you merge to main
+/jg-ux              # a fresh-eyes persona tries the app; a judge grades the trail;
+                    # findings become numbers Nightshift can move
+/jg-ship v0.1.0     # a checklist script; you type "deploy"; a persona smoke run
+/jg-feedback        # FEEDBACK.md and error exports → backlog rows
+```
+
+The contract is `pipeline/README.md`. The human gates: spec signed, every
+install, milestone merge to main, token approval, first screenshot baselines,
+deploy.
+
 ## Per-project templates
 
 Pick the template that matches your stack and copy it into the project root as `CLAUDE.md`, then fill in the placeholders:
