@@ -115,11 +115,23 @@ def _iter_num(name):
         return -1
 
 
+def child_dir(loop_dir):
+    """Where the planner child's artifacts live.
+
+    The child runs inside the loop worktree and native worktree isolation
+    denies writes into the main checkout, so iterations/, backlog.yaml and
+    questions.md are under <project>/.loop/wt/loop/.loop/. The driver's own
+    state (state.json, scores.jsonl, events) stays in <project>/.loop/.
+    """
+    wt = loop_dir / "wt" / "loop" / ".loop"
+    return wt if wt.is_dir() else loop_dir
+
+
 def find_merged_tasks(loop_dir):
     """[(iter_num, task_id, iter_dir), ...] from every iterations/N/summary.md
     'merged: <id> [<id> ...]' line, in iteration order."""
     out = []
-    iterations_dir = loop_dir / "iterations"
+    iterations_dir = child_dir(loop_dir) / "iterations"
     if not iterations_dir.is_dir():
         return out
     for iter_dir in sorted(iterations_dir.iterdir(), key=lambda p: _iter_num(p.name)):
@@ -149,7 +161,7 @@ def gather(project_dir):
 
     state = load_json(loop_dir / "state.json", {}) or {}
     scores = load_jsonl(loop_dir / "scores.jsonl")
-    backlog_rows = load_backlog_rows(loop_dir / "backlog.yaml")
+    backlog_rows = load_backlog_rows(child_dir(loop_dir) / "backlog.yaml")
 
     scores_sorted = sorted(scores, key=lambda r: r.get("iter", 0))
     composites = [(r.get("iter", 0), r.get("composite")) for r in scores_sorted]
@@ -189,7 +201,7 @@ def gather(project_dir):
             "score_gaming_suspected": bool(review.get("score_gaming_suspected")),
         })
 
-    questions_path = loop_dir / "questions.md"
+    questions_path = child_dir(loop_dir) / "questions.md"
     questions_text = questions_path.read_text().strip() if questions_path.exists() else ""
 
     needs_human = [r for r in backlog_rows if r.get("status") == "needs-human"]

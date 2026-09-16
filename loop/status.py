@@ -100,9 +100,21 @@ def heartbeat_age_s(loop_dir: Path):
         return None
 
 
+def child_dir(loop_dir):
+    """Where the planner child's artifacts live.
+
+    The child runs inside the loop worktree and native worktree isolation
+    denies writes into the main checkout, so iterations/, backlog.yaml and
+    questions.md are under <project>/.loop/wt/loop/.loop/. The driver's own
+    state (state.json, scores.jsonl, events) stays in <project>/.loop/.
+    """
+    wt = loop_dir / "wt" / "loop" / ".loop"
+    return wt if wt.is_dir() else loop_dir
+
+
 def latest_iter_dir(loop_dir: Path):
     """The highest-numbered `.loop/iterations/<N>/` directory, or None."""
-    base = loop_dir / "iterations"
+    base = child_dir(loop_dir) / "iterations"
     if not base.is_dir():
         return None
     best = None
@@ -337,7 +349,7 @@ def build_tail(loop_dir: Path) -> str:
 # ---------------------------------------------------------------------------
 
 def build_questions_line(loop_dir: Path) -> str:
-    qfile = loop_dir / "questions.md"
+    qfile = child_dir(loop_dir) / "questions.md"
     if not qfile.exists():
         return "open questions: (no questions.md)"
     text = qfile.read_text(encoding="utf-8", errors="replace")

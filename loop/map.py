@@ -355,11 +355,42 @@ def render_architecture(modules, generated_ts):
     n = len(modules)
     truncated = False
     if n > DIR_COLLAPSE_THRESHOLD:
-        graph_edges = sorted({(_topdir(a), _topdir(b)) for a, b in edges if _topdir(a) != _topdir(b)})
+        # Collapse to the SHALLOWEST directory depth that still fits under the
+        # threshold, not always the top level: an 84-module repo with all its
+        # code under two top-level dirs rendered as an empty graph, because
+        # every edge was a self-edge at depth 1.
+        def at_depth(path, d):
+            parts = path.split("/")
+            return "/".join(parts[:d]) if len(parts) > d else "/".join(parts[:-1]) or "(root)"
         mode = "directory"
+        graph_edges = []
+        for depth in range(1, 6):
+            cand = sorted({(at_depth(a, depth), at_depth(b, depth)) for a, b in edges
+                           if at_depth(a, depth) != at_depth(b, depth)})
+            nodes_at = {x for e in cand for x in e}
+            if len(nodes_at) > DIR_COLLAPSE_THRESHOLD:
+                break
+            graph_edges = cand
+            mode = f"directory(depth {depth})"
+            if len(nodes_at) >= 4:
+                # enough structure to read; go one level deeper only if it still fits
+                deeper = sorted({(at_depth(a, depth + 1), at_depth(b, depth + 1)) for a, b in edges
+                                 if at_depth(a, depth + 1) != at_depth(b, depth + 1)})
+                if len({x for e in deeper for x in e}) > DIR_COLLAPSE_THRESHOLD:
+                    break
     else:
         graph_edges = edges
         mode = "file"
+    # A directory graph with fewer than six nodes says almost nothing. Show
+    # the file-level graph among the most-connected modules instead.
+    if mode.startswith("directory") and len({x for e in graph_edges for x in e}) < 6:
+        deg = {}
+        for a, b in edges:
+            deg[a] = deg.get(a, 0) + 1
+            deg[b] = deg.get(b, 0) + 1
+        keep = set(sorted(deg, key=lambda k: (-deg[k], k))[:DIR_COLLAPSE_THRESHOLD])
+        graph_edges = [(a, b) for a, b in edges if a in keep and b in keep]
+        mode = f"file (top {len(keep)} by degree)"
     if len(graph_edges) > MAX_EDGES:
         graph_edges = graph_edges[:MAX_EDGES]
         truncated = True
