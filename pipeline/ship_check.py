@@ -241,7 +241,14 @@ def check_lighthouse(spec, workdir, skip_set):
     if not script.exists():
         return {"name": "lighthouse", "ok": None, "detail": "loop/scorers/lighthouse.py missing"}
 
-    urls = sorted({u for u, _ in entries if u})
+    # the scorer audits full urls; the spec names paths on the served app
+    base = f"http://localhost:{serve['port']}"
+    full = {}
+    for u, _ in entries:
+        if not u:
+            continue
+        full[u] = u if u.startswith(("http://", "https://")) else base + "/" + u.lstrip("/")
+    urls = sorted(set(full.values()))
     cfg = {"serve_cmd": serve["cmd"], "port": serve["port"], "urls": urls}
     proc = run([sys.executable, str(script), "--config", json.dumps(cfg), "--workdir", str(workdir)],
                cwd=str(workdir), timeout=900)
@@ -261,7 +268,7 @@ def check_lighthouse(spec, workdir, skip_set):
     per_url = (result.get("raw") or {}).get("per_url") or {}
     failures = []
     for url, mins in entries:
-        scores = per_url.get(url)
+        scores = per_url.get(full.get(url, url))
         if scores is None:
             failures.append(f"{url}: no lighthouse data")
             continue

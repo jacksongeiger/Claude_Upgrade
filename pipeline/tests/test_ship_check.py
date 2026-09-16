@@ -405,3 +405,26 @@ def test_gates_missing_index_is_null(tmp_path):
     assert gates_check["ok"] is None
     assert "acceptance-index.json" in gates_check["detail"]
     assert proc.returncode == 0
+
+
+def test_lighthouse_maps_spec_paths_to_served_urls(tmp_path, monkeypatch):
+    """The spec names paths ("/"); the scorer audits full urls. The step must
+    hand the scorer the served url and read the score back under it."""
+    fake_root = tmp_path / "root"
+    (fake_root / "loop" / "scorers").mkdir(parents=True)
+    scorer = fake_root / "loop" / "scorers" / "lighthouse.py"
+    scorer.write_text(textwrap.dedent("""\
+        import json, sys
+        cfg = json.loads(sys.argv[sys.argv.index("--config") + 1])
+        per_url = {u: {"a11y": 95, "perf": 85} for u in cfg["urls"]}
+        print(json.dumps({"ok": True, "raw": {"per_url": per_url, "urls": cfg["urls"]}}))
+    """))
+    monkeypatch.setattr(ship_check, "ROOT", fake_root)
+    spec = dict(MINIMAL_SPEC)
+    spec["needs"] = ["lighthouse"]
+    spec["stack"] = {"serve": {"cmd": "true", "port": 5173}}
+    spec["features"] = [{"id": "f-001", "milestone": "m1", "title": "home",
+                         "acceptance": [{"type": "lighthouse", "url": "/",
+                                         "min": {"accessibility": 90, "performance": 80}}]}]
+    result = ship_check.check_lighthouse(spec, tmp_path, set())
+    assert result == {"name": "lighthouse", "ok": True, "detail": "all minimums met"}, result
