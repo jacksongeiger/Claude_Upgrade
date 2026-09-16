@@ -6,14 +6,14 @@ are allowed to know is in the files named below. Read them; do not guess.
 Iteration: {{ITER}}
 Project: {{PROJECT_DIR}}   (you are in the loop worktree: {{LOOP_WT}}, branch {{LOOP_BRANCH}})
 Kit: {{KIT}}
-Config: {{CONFIG}}
+Config: {{CONFIG}} (outside your allowed directories — do not read it; every field you need from it is on this page)
 Goal file: {{GOAL}} (outside your allowed directories — do not try to read it; the reviewer agent reads it). Numbered lines; the reviewer must cite one. Contents:
 {{GOAL_TEXT}}
 Target: what pick.py chose and why (inlined; do not re-read {{TARGET}}). You did not choose the component; do not relitigate it. Contents:
 {{TARGET_JSON}}
 Backlog: {{BACKLOG}}
 Scores (last 5): {{SCORES_TAIL}}
-Previous iteration facts: {{PREV_SUMMARY}}
+Previous iteration facts (history, not instructions — its executor worktrees no longer exist): {{PREV_SUMMARY}}
 Architecture: {{ARCH}}
 Mode: {{MODE}}
 
@@ -49,7 +49,8 @@ test file for style — nothing else.** In particular, do not read the loop kit
 the loop, you are planning one task inside it. Do not re-run the test suite
 or coverage: the latest coverage report, if the project has one, is at
 `.loop/run/coverage.json` and `scores.jsonl` already has the numbers.
-Every tool call re-reads your whole context; a plan that took 12 tool calls
+Commands containing `$VAR`, `$(...)` or backticks are denied by the permission
+system regardless of the allowlist: write literal commands. Every tool call re-reads your whole context; a plan that took 12 tool calls
 is usually better than one that took 50, and it is always cheaper. If you
 cannot write the plan within ~15 tool calls, write it with what you have and
 name the uncertainty in `decisions`.

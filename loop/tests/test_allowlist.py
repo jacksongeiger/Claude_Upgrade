@@ -19,6 +19,9 @@ def test_every_segment_first_word_becomes_a_rule():
     assert "Bash(./venv/bin/python:*)" in r
     assert "Bash(./venv/bin/pip:*)" in r
     assert "Bash(./bench.sh:*)" in r
+    # the repo-root spelling of a cd-relative runner
+    assert "Bash(discovery/venv/bin/python:*)" in r
+    assert "Bash(discovery/venv/bin/pip:*)" in r
     # the old bug: test_cmd starting with cd produced only Bash(cd:*)
     assert "Bash(cd:*)" in r and any(x.startswith("Bash(./venv/bin/python") for x in r)
 
@@ -54,3 +57,10 @@ def test_cli_prints_json_array(tmp_path):
                          capture_output=True, text=True, check=True).stdout
     arr = json.loads(out)
     assert isinstance(arr, list) and "Bash(./venv/bin/python:*)" in arr
+
+
+def test_shell_expansions_are_denied():
+    r = allowlist.rules(CFG, KIT)
+    for cmd in ("pytest -q $TESTS", "echo $(date)", "ls `pwd`", "pytest; echo exit=$?"):
+        ok, _ = allowlist.is_allowed(cmd, r)
+        assert not ok, cmd

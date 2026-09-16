@@ -93,10 +93,19 @@ def rules(config, kit):
         out += [f"Bash(python3 {kit}/*)", f"Bash(bash {kit}/*)"]
     out += [f"Bash({r}:*)" for r in RUNNERS]
     for cmd in config_commands(config):
+        cwd = ""
         for seg in segments(cmd):
             w = first_word(seg)
-            if w and w not in ("cd",) and re.match(r"^[\w./-]+$", w):
+            if w == "cd":
+                parts = seg.split()
+                cwd = parts[1].rstrip("/") if len(parts) > 1 else ""
+                continue
+            if w and re.match(r"^[\w./-]+$", w):
                 out.append(f"Bash({w}:*)")
+                # `cd discovery && ./venv/bin/python …` is also run from the
+                # repo root as `discovery/venv/bin/python …`; allow that form.
+                if cwd and w.startswith("./"):
+                    out.append(f"Bash({cwd}/{w[2:]}:*)")
     seen, dedup = set(), []
     for r in out:
         if r not in seen:
@@ -126,6 +135,11 @@ def is_allowed(cmd, rule_list):
     pre = _prefixes(rule_list)
     for seg in segments(cmd):
         s = seg.strip()
+        # Claude Code refuses to prefix-match a command containing shell
+        # expansions ("Contains simple_expansion"); with no prompt surface
+        # that is a deny, so it is a deny here too.
+        if re.search(r"\$\(|\$\{?[A-Za-z_?@#]|`", s):
+            return False, seg
         ok = False
         for kind, body in pre:
             if kind == "exact" and s == body:

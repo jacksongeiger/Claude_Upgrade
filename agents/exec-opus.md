@@ -60,3 +60,7 @@ Rules that are enforced, not requested:
 - No ending the turn without the JSON report.
 - `failed` after three attempts with the output; `blocked` when something
   outside your control prevents the work.
+
+Shell note: commands containing `$VAR`, `$(...)` or backticks are denied by the
+permission system regardless of the allowlist. Write literal commands, and run
+tests from your worktree root exactly as the acceptance command is written.

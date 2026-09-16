@@ -1,6 +1,56 @@
 # Changelog
 
 ---
+### v3.0 — 2026-09-16 — Nightshift: the unattended improvement loop
+
+**What changed:** a new `loop/` kit (driver `run.sh`, `pick.py`, `check_plan.py`,
+`merge.sh`, `score.py` + four scorer templates, `tail.py` live cost meter,
+`map.py`, `report.py`, `status.py`, `statusline.sh`, `init.py`, `assess.py`,
+`allowlist.py`), six agent definitions under `agents/`, executor guard hooks,
+the `/jg-loop` command, and a `GOAL.md`. Nothing in `discovery/` changed except
+`rdx.loopscore` (the eval harness exposed as a scorer) and a pinned `pytest-cov`.
+
+**Why:** the design interview settled on a loop where a strong model plans and
+reviews, cheaper models execute in isolated worktrees, and a script — never a
+model — decides what to keep. The point of the build was to find out whether
+that holds up unattended on a real repo with real money, so the kit was
+validated by running it on itself (rdx as the project).
+
+**What the paid dryruns found, in order:**
+
+1. *Planner over-reads.* The first planner burned $5.05 in 49 tool calls
+   reading the loop kit and re-running the test suite before dispatching
+   anything, and the budget gate then refused the spawn. Fix: a read budget in
+   the prompt (row files + imports + one test file, no kit, no re-running
+   tests) and the goal/target inlined so it has nothing to fetch.
+2. *The full path works.* Dryrun 2: plan → one Sonnet executor wrote 882 lines
+   of tests in its own worktree → a fresh reviewer approved citing GOAL line 2
+   → `merge.sh` merged with the tests floor → the driver scored it.
+   Composite 85.08 → 92.33 (tests 322 → 382, coverage 61% → 85.5%), $5.29,
+   main untouched. It also showed the planner writing `summary.md` into the
+   worktree while the driver looked in the main checkout, so every child
+   artifact now lives in the loop worktree.
+3. *The allowlist was wrong in a way no unit test could see.* Dryrun 3 fanned
+   out to three executors and all three were blocked: the child's Bash
+   allowlist took the first word of the test command (`cd discovery && …`) and
+   granted `cd`, never pytest. `allowlist.py` now derives rules from every
+   segment of every configured command plus common runners, `init.py` and
+   `run.sh` share it, and `check_plan.py` rejects an `acceptance_cmd` the
+   executor could not run. The same run showed the guard tripping the whole
+   loop on an executor's read-only `git worktree list`; denies are now tiered
+   (`safety` trips, `scope`/`install` only log) and the trip looks only at the
+   current iteration's events.
+
+**Cost meter:** summing per-line usage from `stream-json` over-counts the
+`result` figure by 8–32% (assistant messages are re-emitted per content
+block); de-duplicating by message id under-counts by 40%. The meter keeps the
+pessimistic sum and the dryrun tolerance is asymmetric, −10% / +35%.
+
+**Numbers:** 158 kit unit tests + 4 shell suites green; rdx eval score 91.68;
+loop score on this repo 92.33 after two paid iterations totalling $10.34.
+
+DRYRUN4_LINE
+
 ### v2.7 — 2026-09-16 — make it usable: global by default, a live switch that survives a GUI launch, `/ard`
 
 **What changed:** `rdx on` / `rdx off` / `rdx status`, `rdx schedule` /

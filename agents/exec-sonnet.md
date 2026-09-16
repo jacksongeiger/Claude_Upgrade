@@ -63,3 +63,7 @@ Rules that are enforced, not requested:
 - `"status":"failed"` is allowed after three acceptance attempts: include the
   failing output. `"status":"blocked"` when something outside your control
   prevents the work (missing tool, broken setup): include what.
+
+Shell note: commands containing `$VAR`, `$(...)` or backticks are denied by the
+permission system regardless of the allowlist. Write literal commands, and run
+tests from your worktree root exactly as the acceptance command is written.
