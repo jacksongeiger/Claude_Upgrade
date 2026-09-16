@@ -74,7 +74,9 @@ scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT
 
 merge_json="$iter_dir/merge.json"
-echo '{"merged":[],"rejected":{}}' > "$merge_json"
+# Cumulative: the planner may merge the first-pass approvals, then a revised
+# subtask later in the same iteration; the record must keep both.
+[ -s "$merge_json" ] && jq -e '.merged and .rejected' "$merge_json" >/dev/null 2>&1 || echo '{"merged":[],"rejected":{}}' > "$merge_json"
 
 # --- helpers --------------------------------------------------------------
 

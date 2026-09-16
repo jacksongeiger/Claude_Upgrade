@@ -246,3 +246,21 @@ def test_agents_tracked_from_real_task_started_shape(tmp_path):
     assert "agent_start id=abc123 type=exec-sonnet" in log
     assert "agent_stop id=abc123 type=exec-sonnet" in log
     assert json.loads(state.read_text())["agents"] == []
+
+
+def test_live_out_writes_remaining_budget(tmp_path):
+    usage = {"input_tokens": 1000, "output_tokens": 500,
+             "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}
+    line = json.dumps({"type": "assistant", "message": {"model": "claude-fable-5-1",
+                       "content": [{"type": "text", "text": "hi"}], "usage": usage}})
+    state = tmp_path / "state.json"
+    live = tmp_path / "wt" / ".loop" / "run" / "live.json"
+    subprocess.run(
+        [sys.executable, str(TAIL_PY), "--state", str(state), "--events", str(tmp_path / "e.jsonl"),
+         "--pricing", str(PRICING_JSON), "--iter", "1", "--live-out", str(live), "--budget", "6"],
+        input=line + "\n", capture_output=True, text=True, timeout=10,
+    )
+    data = json.loads(live.read_text())
+    assert data["budget_usd"] == 6.0
+    assert data["live_spend_usd"] > 0
+    assert abs(data["remaining_usd"] - (6.0 - data["live_spend_usd"])) < 1e-3

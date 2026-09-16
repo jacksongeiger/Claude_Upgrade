@@ -261,6 +261,11 @@ of the allowlist; the prompts say so and check_plan treats them as denied.
   `git worktree list`) and `install` → denied and logged, no trip. The trip
   looks only at events written during the current iteration.
 
+`.loop/run/live.json` (inside the loop worktree, written by tail.py on every
+stream line): `{live_spend_usd, budget_usd, remaining_usd}`. The planner reads
+it before any revision re-dispatch; approved work is merged first, revisions
+only with ≥ $2.5 remaining. `merge.json` is cumulative within an iteration.
+
 `hooks/budget-gate.sh` (PreToolUse on Agent, child-wide): refuses an executor or
 chore spawn when `spent + live + min_iter_usd ≥ cap`; a reviewer (or
 test-assessor / ui-auditor) spawn is refused only when `spent + live ≥ cap`, so

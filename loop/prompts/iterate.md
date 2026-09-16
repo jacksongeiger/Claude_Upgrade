@@ -112,25 +112,36 @@ reason). Then invoke the `reviewer` agent with: the subtask JSON, the path
 `git diff {{LOOP_BRANCH}}...<branch>`. Save its JSON to
 `{{ITER_DIR}}/tasks/<id>/review.json`.
 
-- `revise`: re-dispatch the same executor tier once with `previous_attempt`
-  = report + review reasons. Review again. A second `revise` is a `reject`.
-- `reject`: row `status: failed`, `attempts` +1; leave the branch.
 - `approve`: continue.
+- `reject`: row `status: failed`, `attempts` +1; leave the branch.
+- `revise`: park it. Revisions are handled in step 5b, AFTER the approved
+  work has been merged — never before.
 
-If more than one subtask is approved, invoke the reviewer once more with the
-union diff `git diff {{LOOP_BRANCH}}...<branch-a> <branch-b> ...` (all
+### 5. MERGE (approved work lands before anything else is spent)
+
+5a. If more than one subtask is approved, invoke the reviewer once more with
+the union diff `git diff {{LOOP_BRANCH}}...<branch-a> <branch-b> ...` (all
 approved branches) and the instruction: reject if a change in one subtask
 alters a signature, return type, data shape or contract that another consumes
 or mocks. A reject here rejects all. If the budget gate refuses to spawn this
-reviewer, do not abandon the approved work: run the merge below anyway —
-`merge.sh` re-runs the test command after each branch and enforces the floor.
+reviewer, do not abandon the approved work: merge anyway — `merge.sh` re-runs
+the test command after each branch and enforces the floor.
 
-### 5. MERGE
-
-Run `bash {{KIT}}/merge.sh {{ITER_DIR}} <approved ids...>`. It merges each
+Then run `bash {{KIT}}/merge.sh {{ITER_DIR}} <approved ids...>`. It merges each
 approved branch into the loop branch with `--no-ff`, re-running the test
 command after each, and enforces the tests hard floor. Exit 5 means the floor
 was violated and nothing was kept: set the affected rows `status: failed`.
+
+5b. Revisions, only now. Read `.loop/run/live.json` in your worktree
+(`remaining_usd` = budget minus what this iteration has spent so far,
+updated live). For each parked `revise`:
+- if `remaining_usd` < 2.5 (an executor plus its review): `status: failed`,
+  `attempts` +1, note the reviewer's reasons in `note`, leave the branch —
+  a future iteration can pick it up with the note;
+- otherwise re-dispatch the same executor tier once with `previous_attempt`
+  = report + review reasons, review again, and on `approve` run
+  `bash {{KIT}}/merge.sh {{ITER_DIR}} <id>` for that one (merge.json is
+  cumulative). A second `revise` is a `reject`.
 
 ### 6. CLOSE
 

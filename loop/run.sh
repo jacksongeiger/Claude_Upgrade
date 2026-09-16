@@ -419,6 +419,7 @@ PY
         2>>"$RUN/loop.log"
     ) | tee "$RUN/stream-$ITER.jsonl" \
       | python3 "$KIT/tail.py" --state "$STATE" --events "$EVENTS" --pricing "$KIT/pricing.json" --iter "$ITER" \
+          --live-out "$WT/.loop/run/live.json" --budget "$BUDGET" \
           > "$ITER_DIR/tail.json" 2>>"$RUN/loop.log" &
     PIPE_PID=$!
     for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$RUN/child.pgid" ] && break; sleep 0.5; done

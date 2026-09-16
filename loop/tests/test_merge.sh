@@ -243,6 +243,26 @@ test_all_rejected() {
         && pass "all-rejected: merge.json.merged empty" || fail "all-rejected: merge.json wrong: $(cat "$iter_dir/merge.json")"
 }
 
+test_merge_json_is_cumulative() {
+    # the planner merges first-pass approvals, then a revised subtask later:
+    # the second call must not erase the first record
+    local repo wt1 wt2 iter_dir out
+    repo=$(new_repo)
+    wt1=$(tmp_path); new_branch_wt "$repo" "loop/t-a" "$wt1"
+    printf 'A\n' > "$wt1/a.txt"; git -C "$wt1" add a.txt; git -C "$wt1" commit -qm "a"
+    wt2=$(tmp_path); new_branch_wt "$repo" "loop/t-b" "$wt2"
+    printf 'B\n' > "$wt2/b.txt"; git -C "$wt2" add b.txt; git -C "$wt2" commit -qm "b"
+    iter_dir=$(newtmp)
+    write_config "$iter_dir/config.json" 25
+    write_plan "$iter_dir/plan.json" "t-a:a.txt" "t-b:b.txt"
+    write_report "$iter_dir" "t-a" "loop/t-a" "$wt1"
+    write_report "$iter_dir" "t-b" "loop/t-b" "$wt2"
+    run_merge "$repo" "$iter_dir" t-a >/dev/null
+    run_merge "$repo" "$iter_dir" t-b >/dev/null
+    out=$(jq -c '.merged' "$iter_dir/merge.json")
+    [ "$out" = '["t-a","t-b"]' ] && pass "merge.json cumulative across calls" || fail "merge.json=$out"
+}
+
 # --- bonus coverage (spec items 4/5, beyond the required case list) ------
 
 test_scope_drift() {
@@ -331,6 +351,7 @@ test_all_rejected
 test_scope_drift
 test_tests_removed_without_approval
 test_tests_removed_with_approval
+test_merge_json_is_cumulative
 test_bad_args
 
 if [ "$FAILED" -ne 0 ]; then

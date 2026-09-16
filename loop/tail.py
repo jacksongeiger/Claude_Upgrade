@@ -220,6 +220,19 @@ class Reducer:
         current["malformed_lines"] = self.malformed_lines
         current.update(self.result_fields)
         atomic_write_json(self.state_path, current)
+        # A copy the child is allowed to read (its worktree), so the planner
+        # can gate a re-dispatch on what is actually left of its budget.
+        if getattr(self.args, "live_out", None):
+            budget = float(self.args.budget) if self.args.budget is not None else None
+            try:
+                os.makedirs(os.path.dirname(self.args.live_out), exist_ok=True)
+                atomic_write_json(self.args.live_out, {
+                    "live_spend_usd": round(self.live_spend, 4),
+                    "budget_usd": budget,
+                    "remaining_usd": round(budget - self.live_spend, 4) if budget is not None else None,
+                })
+            except OSError:
+                pass
 
     # ---- events.jsonl / .log ----
 
@@ -432,6 +445,8 @@ def parse_args():
     p.add_argument("--pricing", required=True)
     p.add_argument("--iter", required=True)
     p.add_argument("--stall-seconds", type=float, default=120)
+    p.add_argument("--live-out", help="also write {live_spend_usd,budget_usd,remaining_usd} here (inside the child's worktree)")
+    p.add_argument("--budget", type=float, default=None, help="the child's --max-budget-usd, for remaining_usd")
     return p.parse_args()
 
 
