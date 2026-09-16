@@ -11,6 +11,7 @@
 #   crash     exit 1 without a result event
 #   expensive emit usage worth far more than the cap, no result
 #   deny      simulate an executor safety deny (writes to events.jsonl) then improve
+#   scope     simulate a read-only scope deny (must NOT trip) then improve
 # and FAKE_CLAUDE_COST (result total_cost_usd, default 0.42).
 
 set -euo pipefail
@@ -39,6 +40,13 @@ esac
 
 if [ "$MODE" = "stopfile" ]; then
   mkdir -p "$ROOT/.loop/run"; touch "$ROOT/.loop/run/STOP"; MODE=improve
+fi
+
+if [ "$MODE" = "scope" ]; then
+  ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  printf '{"ts":"%s","event":"deny","kind":"scope","tool":"Bash","reason":"git worktree list"}\n' "$ts" >> "$ROOT/.loop/events.jsonl"
+  printf '%s DENY scope git worktree list\n' "$ts" >> "$ROOT/.loop/events.log"
+  MODE=improve
 fi
 
 if [ "$MODE" = "deny" ]; then

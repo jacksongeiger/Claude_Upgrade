@@ -213,7 +213,8 @@ def test_merge_settings_idempotent_and_preserves_existing(tmp_path):
     assert first["worktree"] == {"baseRef": "head"}
     assert first["statusLine"]["command"].endswith("statusline.sh")
     assert "Bash(ls:*)" in first["permissions"]["allow"]
-    assert "Bash(python3 -m pytest -q:*)" in first["permissions"]["allow"]
+    # derived from test_cmd "python3 -m pytest -q": the first word, not the whole line
+    assert "Bash(python3:*)" in first["permissions"]["allow"]
     assert "Bash(rdx search:*)" in first["permissions"]["allow"]
 
     init.merge_settings(settings_path, config)

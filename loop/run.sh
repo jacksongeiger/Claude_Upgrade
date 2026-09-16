@@ -112,6 +112,12 @@ on_exit() {
     exit 0
 }
 
+build_map() {
+    mkdir -p "$WT/.loop" "$ITER_DIR" 2>/dev/null || true
+    (cd "$WT" && python3 "$KIT/map.py" --repo "$WT" --out "$WT/.loop/map.json" --arch "$LOOP/ARCHITECTURE.md" > "$ITER_DIR/map.out" 2>>"$RUN/loop.log") || note "map.py failed (non-fatal)"
+    cp "$WT/.loop/map.json" "$LOOP/map.json" 2>/dev/null || true
+}
+
 kill_child() {
     if [ -n "${CHILD_PGID:-}" ]; then
         kill -TERM -- "-$CHILD_PGID" 2>/dev/null || true
@@ -229,19 +235,11 @@ beat
 # Child settings: generated fresh so the child never depends on committed state.
 STEP="child-settings"
 CHILD_SETTINGS="$RUN/child-settings.json"
-jq -n --arg kit "$KIT" --arg test "$TEST_CMD" '
+ALLOW_JSON=$(python3 "$KIT/allowlist.py" --config "$CONFIG" --kit "$KIT")
+jq -n --arg kit "$KIT" --argjson allow "$ALLOW_JSON" '
 {
   worktree: {baseRef: "head"},
-  permissions: {
-    allow: (
-      ["Bash(git add:*)","Bash(git commit:*)","Bash(git diff:*)","Bash(git log:*)","Bash(git status:*)",
-       "Bash(git rev-parse:*)","Bash(git show:*)","Bash(git branch --show-current:*)","Bash(git ls-files:*)",
-       ("Bash(python3 " + $kit + "/*)"), ("Bash(bash " + $kit + "/*)"), "Bash(rdx search:*)",
-       "Bash(ls:*)","Bash(cat:*)","Bash(head:*)","Bash(tail:*)","Bash(wc:*)","Bash(grep:*)","Bash(find:*)",
-       "Bash(mkdir:*)","Bash(pwd)","Bash(test:*)","Bash(true)"]
-      + (if $test == "" then [] else ["Bash(" + ($test | split(" ")[0]) + ":*)", "Bash(cd:*)"] end)
-    )
-  },
+  permissions: { allow: $allow },
   hooks: {
     SubagentStart: [{hooks:[{type:"command",command:("bash " + $kit + "/hooks/events.sh"),async:true,timeout:5}]}],
     SubagentStop:  [{hooks:[{type:"command",command:("bash " + $kit + "/hooks/events.sh"),async:true,timeout:5}]}],
@@ -277,6 +275,9 @@ while :; do
     [ "$FAILED" -lt 2 ] || { stop two-failed-iterations ""; break; }
     if [ "$MAX_ITERS" -gt 0 ] && [ "$ITER" -gt "$(( $(jq -r '.iter' "$STATE") + MAX_ITERS - (ITER - 1 - $(jq -r '.iter' "$STATE")) ))" ] 2>/dev/null; then :; fi
     state_set --argjson i "$ITER" '.iter=$i | .phase="PICK" | .step="check" | .agents=[] | .live_spend_usd=0 | .stall=null'
+    # Events written before this line belong to earlier iterations/runs; the
+    # safety trip below looks only at lines after it.
+    EV_MARK=$( [ -f "$EVENTS" ] && wc -l < "$EVENTS" || echo 0 )
     event ITERATION_START
     note "iteration $ITER begins (spent $SPENT/$CAP flat $FLAT)"
 
@@ -321,6 +322,12 @@ for k, v in subs.items():
     t = t.replace("{{" + k + "}}", v)
 dst.write_text(t)
 PY
+
+    # ---- MAP (cheap when unchanged: files_sha gate) ---------------------
+    # check_plan.py reads <repo>/.loop/map.json with repo = the loop worktree,
+    # so the map is written there; the main checkout gets a copy for the UI.
+    STEP="map"; beat
+    build_map
 
     # ---- CHILD ----------------------------------------------------------
     STEP="child"; beat
@@ -403,9 +410,10 @@ PY
     fi
     state_set '.failed_iters = 0'
 
-    # Safety trip: any deny involving push/main/out-of-worktree this iteration.
-    if grep -E '"kind":"safety"' "$EVENTS" 2>/dev/null | tail -n 50 | grep -q "$(date -u +%Y-%m-%dT)" ; then
-        DEN=$(grep -c '"event":"deny"' "$EVENTS" 2>/dev/null || echo 0)
+    # Safety trip: a push/main/out-of-worktree deny during THIS iteration.
+    # Scope denies (read-only wandering) are logged but do not trip.
+    if [ -f "$EVENTS" ] && tail -n +"$((EV_MARK + 1))" "$EVENTS" | grep -q '"kind":"safety"' ; then
+        DEN=$(tail -n +"$((EV_MARK + 1))" "$EVENTS" | grep -c '"event":"deny"' || echo 0)
         state_set --argjson d "$DEN" '.denies=$d'
         stop safety-trip "an executor attempted a denied action — see .loop/events.log"; break
     fi
@@ -504,7 +512,7 @@ PY
     STEP="CLOSE"; beat
     state_set '.phase="CLOSE"'
     if [ "$OUTCOME" = "kept" ]; then
-        (cd "$WT" && python3 "$KIT/map.py" --repo "$WT" --out "$LOOP/map.json" --arch "$LOOP/ARCHITECTURE.md" > "$ITER_DIR/map.out" 2>>"$RUN/loop.log") || note "map.py failed (non-fatal)"
+        build_map
         cp "$LOOP/ARCHITECTURE.md" "$WT/ARCHITECTURE.md" 2>/dev/null || true
         (cd "$WT" && git add -A ARCHITECTURE.md 2>/dev/null && git commit -q -m "nightshift: architecture map after iteration $ITER" 2>/dev/null) || true
     fi

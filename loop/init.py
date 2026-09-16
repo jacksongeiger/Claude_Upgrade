@@ -536,17 +536,11 @@ def merge_settings(settings_path, config):
     }
 
     allow = set((settings.get("permissions") or {}).get("allow", []))
-    test_cmd = config.get("test_cmd") or ""
-    wanted = [f"Bash({test_cmd}:*)"] if test_cmd else []
-    wanted += [
-        "Bash(git add:*)", "Bash(git commit:*)", "Bash(git diff:*)",
-        "Bash(git log:*)", "Bash(git status:*)", "Bash(git rev-parse:*)",
-        f"Bash(python3 {kit}/*:*)",
-        f"Bash(bash {kit}/*:*)",
-        "Bash(python3:*)",
-        "Bash(rdx search:*)",
-    ]
-    allow.update(wanted)
+    # Same rules the driver hands the child: derived from the config's own
+    # commands, so interactive sessions and the loop agree on what may run.
+    sys.path.insert(0, str(Path(kit)))
+    from allowlist import rules as _allow_rules
+    allow.update(_allow_rules(config, kit))
     settings.setdefault("permissions", {})["allow"] = sorted(allow)
 
     settings_path.write_text(json.dumps(settings, indent=2) + "\n")

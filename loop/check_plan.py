@@ -25,6 +25,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import allowlist as _allow  # noqa: E402
+
 RESERVED_DIRS = (".claude", ".loop", ".git")
 VALID_MODELS = ("sonnet", "opus")
 
@@ -116,6 +119,7 @@ def cmd_check(args):
               file=sys.stderr)
 
     max_fanout = 3
+    config = None
     if args.config:
         config, err = _load_json(args.config, "config.json")
         if err:
@@ -152,6 +156,12 @@ def cmd_check(args):
             problems.append(f"subtask {sid}: missing goal")
         if not st.get("acceptance_cmd"):
             problems.append(f"subtask {sid}: missing acceptance_cmd")
+        elif config is not None:
+            # An acceptance command the executor's allowlist would deny is a
+            # subtask that cannot finish; catch it here, not after $2 of work.
+            ok, seg = _allow.is_allowed(st["acceptance_cmd"], _allow.rules(config, Path(__file__).parent))
+            if not ok:
+                problems.append(f"subtask {sid}: acceptance_cmd segment not on the child allowlist: {seg!r}")
         if not st.get("owned_paths"):
             problems.append(f"subtask {sid}: owned_paths empty")
 

@@ -7,9 +7,9 @@ Iteration: {{ITER}}
 Project: {{PROJECT_DIR}}   (you are in the loop worktree: {{LOOP_WT}}, branch {{LOOP_BRANCH}})
 Kit: {{KIT}}
 Config: {{CONFIG}}
-Goal file: {{GOAL}} — numbered lines; the reviewer must cite one. Contents:
+Goal file: {{GOAL}} (outside your allowed directories — do not try to read it; the reviewer agent reads it). Numbered lines; the reviewer must cite one. Contents:
 {{GOAL_TEXT}}
-Target file: {{TARGET}} — what pick.py chose and why. You did not choose the component; do not relitigate it. Contents:
+Target: what pick.py chose and why (inlined; do not re-read {{TARGET}}). You did not choose the component; do not relitigate it. Contents:
 {{TARGET_JSON}}
 Backlog: {{BACKLOG}}
 Scores (last 5): {{SCORES_TAIL}}
@@ -69,9 +69,11 @@ has an `acceptance_cmd` that fails before the work and passes after; `hard: true
 modules, or `est: L`. Make every decision the executor could otherwise have
 to make — interface names, formats, error behaviour — and write it in `goal`.
 
-Then run `python3 {{KIT}}/check_plan.py {{ITER_DIR}}/plan.json` and fix
+Then run `python3 {{KIT}}/check_plan.py --config {{CONFIG}} {{ITER_DIR}}/plan.json` and fix
 anything it reports (exit 2) until it exits 0. It checks the ids, path
-disjointness, import-graph disjointness, acceptance commands and fan-out.
+disjointness, import-graph disjointness, fan-out, and that every
+`acceptance_cmd` is runnable under the child's allowlist (an executor cannot
+run anything else).
 
 ### 2. DISPATCH
 

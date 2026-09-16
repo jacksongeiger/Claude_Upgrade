@@ -29,6 +29,15 @@ denied "$(guard Edit "{\"file_path\":\"rel/inside.py\"}")" && fail "denied relat
 # deny is logged to the project's events stream (parent of the common git dir)
 grep -q '"event":"deny"' "$D/repo/.loop/events.jsonl" && pass "deny logged to events.jsonl" || fail "deny not logged"
 grep -q 'DENY safety' "$D/repo/.loop/events.log" && pass "safety deny in events.log" || fail "safety deny not in log"
+# read-only wandering is denied as "scope", never as a safety trip
+for cmd in "git worktree list" "git -C /elsewhere log --oneline -3"; do
+  out=$(guard Bash "{\"command\":\"$cmd\"}")
+  denied "$out" && pass "deny: $cmd" || fail "allowed: $cmd"
+done
+grep -q '"kind":"scope"' "$D/repo/.loop/events.jsonl" && pass "scope deny logged as scope" || fail "scope deny missing"
+n_safety_before=$(grep -c '"kind":"safety"' "$D/repo/.loop/events.jsonl")
+guard Bash '{"command":"git worktree list"}' >/dev/null
+[ "$(grep -c '"kind":"safety"' "$D/repo/.loop/events.jsonl")" = "$n_safety_before" ] && pass "worktree list is not a safety deny" || fail "worktree list logged as safety"
 # fails closed on garbage
 denied "$(echo 'not json' | bash "$KIT/hooks/guard.sh")" && pass "fails closed on bad input" || fail "failed open"
 

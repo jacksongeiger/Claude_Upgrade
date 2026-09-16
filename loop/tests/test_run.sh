@@ -107,6 +107,24 @@ P=$(mkproject); cd "$P"
 run_driver deny --cap 5 --hours 1
 [ "$(stop_reason)" = "safety-trip" ] && pass "safety deny trips" || fail "stop_reason=$(stop_reason)"
 
+# 6b. child allowlist is derived from the config's commands (test_cmd "bash ./run_tests.sh")
+jq -e '.permissions.allow | index("Bash(bash:*)")' .loop/run/child-settings.json >/dev/null && pass "child allowlist carries the test runner" || fail "runner rule missing from child-settings.json"
+jq -e '.permissions.allow | index("Bash(git push:*)")' .loop/run/child-settings.json >/dev/null && fail "git push allowlisted" || pass "git push not allowlisted"
+[ -f .loop/wt/loop/.loop/map.json ] && pass "map.json written into the loop worktree for check_plan" || fail "no worktree map.json"
+
+# 7b. scope deny (read-only wandering) → logged, not a trip
+P=$(mkproject); cd "$P"
+run_driver scope --cap 5 --hours 1 --iters 1
+[ "$(stop_reason)" = "iters" ] && pass "scope deny does not trip" || fail "stop_reason=$(stop_reason)"
+grep -q '"kind":"scope"' .loop/events.jsonl && pass "scope deny logged" || fail "scope deny not logged"
+
+# 7c. a safety deny from an EARLIER run does not trip a later one
+P=$(mkproject); cd "$P"
+run_driver deny --cap 5 --hours 1
+[ "$(stop_reason)" = "safety-trip" ] || fail "setup: expected safety-trip, got $(stop_reason)"
+run_driver improve --cap 5 --hours 1 --iters 1
+[ "$(stop_reason)" = "iters" ] && pass "old safety deny does not trip a new run" || fail "stop_reason=$(stop_reason)"
+
 # 8. expensive child → live meter kills, stop cap
 P=$(mkproject); cd "$P"
 run_driver expensive --cap 5 --hours 1

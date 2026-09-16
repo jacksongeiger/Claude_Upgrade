@@ -145,8 +145,14 @@ def find_merged_tasks(loop_dir):
             m = re.match(r"^\s*merged:\s*(.+)$", line, re.I)
             if not m:
                 continue
-            for tid in re.split(r"[,\s]+", m.group(1).strip()):
-                if tid:
+            # The summary format is "merged: t-014-a (bl-014) — added 6 tests".
+            # Only the ids before the description are ids; "(bl-014)" is the
+            # row, and everything after the dash is prose ("added" is not an
+            # id). Ids are the plan's "t-<row>-<letter>" shape; a bare "—",
+            # "-" or "none" means nothing merged.
+            head = re.split(r"\s+[—–-]\s+|\(", m.group(1).strip(), maxsplit=1)[0]
+            for tid in re.split(r"[,\s]+", head):
+                if tid and tid not in ("—", "-", "none", "None") and re.match(r"^t-[\w.-]+$", tid):
                     out.append((n, tid, iter_dir))
     return out
 
@@ -183,7 +189,15 @@ def gather(project_dir):
         goal = next(
             (s.get("goal") for s in plan.get("subtasks", []) if s.get("id") == tid), None,
         )
-        prev_iters = [i for i in composite_by_iter if i < n]
+        # The planner writes the whole executor spec into `goal`. The human
+        # wants the first sentence.
+        if goal:
+            first = re.split(r"(?<=[.!?])\s+|\n", goal.strip(), maxsplit=1)[0]
+            goal = (first[:220] + "…") if len(first) > 220 else first
+        # Delta = this iteration's composite against the latest earlier row
+        # with a non-null composite (rows with null composites are stopped
+        # iterations and must not zero the delta).
+        prev_iters = [i for i, c in composite_by_iter.items() if i < n and c is not None]
         prev_c = composite_by_iter.get(max(prev_iters)) if prev_iters else None
         cur_c = composite_by_iter.get(n)
         delta = (cur_c - prev_c) if (cur_c is not None and prev_c is not None) else None

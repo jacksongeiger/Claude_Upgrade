@@ -236,9 +236,12 @@ group when `spent + live_spend ≥ cap`. The dryrun asserts `|result − live| /
 - Bash deny regex: `git push|git checkout (main|master)|git switch (main|master)|git branch -[fDd]|git merge|git rebase|git reset --hard|git worktree|gh pr merge|rdx install|npm i(nstall)?|pip install|uv add|brew |cargo add|curl .*\| *(ba)?sh|sudo |rm -rf (/|~|\$HOME|\.\.)|claude plugin`
 - Write/Edit deny: realpath(file_path) not under `$NIGHTSHIFT_WORKTREE`, or under
   `.claude/`, `.loop/`, `.git/` within it.
-- Every deny appends `{"event":"deny",...}` to events.jsonl. A deny matching
-  push/main/master/out-of-worktree is a `safety-trip`: the driver stops after
-  the child exits.
+- Every deny appends `{"event":"deny","kind":...}` to events.jsonl. Kinds:
+  `safety` (push, main/master, merge/rebase/reset --hard, worktree add/remove,
+  GIT_DIR redirects, writes outside the worktree) → the driver stops with
+  `safety-trip` after the child exits; `scope` (read-only wandering: `git -C`,
+  `git worktree list`) and `install` → denied and logged, no trip. The trip
+  looks only at events written during the current iteration.
 
 `hooks/require-report.sh` (Stop): block until `$NIGHTSHIFT_REPORT` exists and is
 valid JSON with `status`; give up (exit 0) after 3 blocks and let the driver

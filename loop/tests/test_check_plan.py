@@ -524,3 +524,14 @@ def test_backlog_diff_title_edit_fail(tmp_path):
     rc, out, err = run_check(["--backlog-diff", str(before), str(after)])
     assert rc == 2
     assert "title" in out
+
+
+def test_acceptance_cmd_not_on_allowlist_rejected(tmp_path):
+    """An acceptance command the executor could never run is a plan defect."""
+    st = base_subtask(acceptance_cmd="git push origin main && pytest -q")
+    plan_path = write_plan_target(tmp_path, [st], task_ids=["bl-1"])
+    config_path = tmp_path / "config.json"
+    write_json(config_path, {"max_fanout": 3, "test_cmd": "pytest -q"})
+    rc, out, err = run_check([str(plan_path), "--repo", str(tmp_path), "--config", str(config_path)])
+    assert rc == 2
+    assert "not on the child allowlist" in out

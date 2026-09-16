@@ -33,3 +33,5 @@ __pycache__/
 .loop/report.*
 discovery/.coverage
 .loop/stream-*.txt
+.loop/map.json
+.loop/ARCHITECTURE.md

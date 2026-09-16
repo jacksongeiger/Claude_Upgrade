@@ -54,9 +54,16 @@ cwd=$(printf '%s' "$input" | jq -r '.cwd // empty')
 case "$tool" in
   Bash)
     cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
-    # Safety trips: touching main, pushing, leaving the worktree.
-    if printf '%s' "$cmd" | grep -Eq 'git[[:space:]]+push|git[[:space:]]+(checkout|switch)[[:space:]]+(-[^[:space:]]+[[:space:]]+)*(main|master)\b|git[[:space:]]+branch[[:space:]]+-[fDd]|git[[:space:]]+merge\b|git[[:space:]]+rebase\b|git[[:space:]]+reset[[:space:]]+--hard|git[[:space:]]+worktree\b|gh[[:space:]]+pr[[:space:]]+merge|git[[:space:]]+-C[[:space:]]|GIT_DIR=|GIT_WORK_TREE='; then
+    # Safety trips: touching main, pushing, destructive history, redirecting
+    # git at another checkout. These stop the whole run.
+    if printf '%s' "$cmd" | grep -Eq 'git[[:space:]]+push|git[[:space:]]+(checkout|switch)[[:space:]]+(-[^[:space:]]+[[:space:]]+)*(main|master)\b|git[[:space:]]+branch[[:space:]]+-[fDd]|git[[:space:]]+merge\b|git[[:space:]]+rebase\b|git[[:space:]]+reset[[:space:]]+--hard|git[[:space:]]+worktree[[:space:]]+(add|remove|prune|move|lock|unlock)|gh[[:space:]]+pr[[:space:]]+merge|GIT_DIR=|GIT_WORK_TREE='; then
         deny "executors may only commit on their own branch: $cmd" "safety"
+    fi
+    # Scope denies: looking around other checkouts (git -C, worktree list).
+    # Denied — the executor has everything it needs in its own worktree — but
+    # read-only, so logged as "scope" and not a trip.
+    if printf '%s' "$cmd" | grep -Eq 'git[[:space:]]+worktree\b|git[[:space:]]+-C[[:space:]]'; then
+        deny "stay in your own worktree; other checkouts are not yours to read: $cmd" "scope"
     fi
     # Installing the project's own pinned manifest is setup, not acquisition:
     # a fresh worktree has no venv/node_modules and setup_cmd must be able to

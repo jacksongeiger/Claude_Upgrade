@@ -188,3 +188,14 @@ def test_render_svg_chart_needs_two_points():
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))
+
+
+def test_find_merged_tasks_ignores_description_after_dash(tmp_path):
+    loop_dir = tmp_path / ".loop"
+    iter_dir = loop_dir / "iterations" / "2"
+    iter_dir.mkdir(parents=True)
+    (iter_dir / "summary.md").write_text(
+        "merged: t-001-a (bl-001) — added 6 tests for parse_header\nfailed: —\n"
+    )
+    out = report.find_merged_tasks(loop_dir)
+    assert [t for _, t, _ in out] == ["t-001-a"]
