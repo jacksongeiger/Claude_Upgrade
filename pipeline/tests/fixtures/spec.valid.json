@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "name": "Pocket Notes",
+  "one_liner": "A single-page notes app that works offline.",
+  "stack": {"language": "javascript", "runtime": "node", "ui": true, "llm": false,
+            "data": "localStorage", "deploy": {"kind": "static", "cmd": "npm run build"}},
+  "needs": ["ui", "unit-tests", "coverage", "lighthouse", "persona"],
+  "milestones": [
+    {"id": "m1", "title": "Create and list notes", "depends_on": []},
+    {"id": "m2", "title": "Search and edit",       "depends_on": ["m1"]}
+  ],
+  "features": [
+    {"id": "f-001", "milestone": "m1", "title": "Create a note",
+     "description": "A 'New note' button opens an editor; saving adds it to the list.",
+     "acceptance": [
+       {"type": "test", "cmd": "npm test -- notes.create", "must": "pass"},
+       {"type": "persona", "task": "Create a note titled 'groceries' and see it in the list",
+        "max_steps": 4, "must": "complete"},
+       {"type": "lighthouse", "url": "/", "min": {"accessibility": 90, "performance": 80}}
+     ],
+     "priority": 1},
+    {"id": "f-002", "milestone": "m2", "title": "Search notes",
+     "acceptance": [
+       {"type": "test", "cmd": "npm test -- notes.search", "must": "pass"},
+       {"type": "perf", "cmd": "node bench/search.js", "metric": "ms_p95", "max": 50},
+       {"type": "manual", "what": "Search feels instant on 1,000 notes"}
+     ],
+     "priority": 2}
+  ],
+  "success": [
+    "Every feature's acceptance passes",
+    "Coverage of src/ >= 85%",
+    "A new user completes every persona task within its max_steps"
+  ],
+  "budget": {"build_usd": 40, "nightshift_cap_usd": 25},
+  "human_gates": ["spec", "installs", "milestone-merge", "tokens", "deploy"]
+}
