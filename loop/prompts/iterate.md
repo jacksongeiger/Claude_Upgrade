@@ -115,7 +115,9 @@ If more than one subtask is approved, invoke the reviewer once more with the
 union diff `git diff {{LOOP_BRANCH}}...<branch-a> <branch-b> ...` (all
 approved branches) and the instruction: reject if a change in one subtask
 alters a signature, return type, data shape or contract that another consumes
-or mocks. A reject here rejects all.
+or mocks. A reject here rejects all. If the budget gate refuses to spawn this
+reviewer, do not abandon the approved work: run the merge below anyway —
+`merge.sh` re-runs the test command after each branch and enforces the floor.
 
 ### 5. MERGE
 

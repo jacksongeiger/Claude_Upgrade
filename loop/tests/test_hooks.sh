@@ -40,6 +40,16 @@ denied "$(guard Bash "{\"command\":\"git -C $WT/sub log && git -C /elsewhere log
 n_safety_before=$(grep -c '"kind":"safety"' "$D/repo/.loop/events.jsonl")
 guard Bash '{"command":"git worktree list"}' >/dev/null
 [ "$(grep -c '"kind":"safety"' "$D/repo/.loop/events.jsonl")" = "$n_safety_before" ] && pass "worktree list is not a safety deny" || fail "worktree list logged as safety"
+# budget gate: executors keep the min-iteration reserve, reviewers only respect the hard cap
+mkdir -p "$D/repo/.loop/run"; echo 1 > "$D/repo/.loop/run/loop.pid"
+echo '{"spent_usd":3.0,"live_spend_usd":1.6,"min_iter_usd":1.5,"cap_usd":6}' > "$D/repo/.loop/state.json"
+gate() { jq -cn --arg cwd "$WT" --arg a "$1" '{tool_name:"Agent",tool_input:{subagent_type:$a},cwd:$cwd,hook_event_name:"PreToolUse"}' | bash "$KIT/hooks/budget-gate.sh"; }
+denied "$(gate exec-sonnet)" && pass "budget: executor refused inside the reserve" || fail "budget: executor allowed inside the reserve"
+denied "$(gate reviewer)" && fail "budget: reviewer refused below the hard cap" || pass "budget: reviewer allowed below the hard cap"
+echo '{"spent_usd":3.0,"live_spend_usd":3.1,"min_iter_usd":1.5,"cap_usd":6}' > "$D/repo/.loop/state.json"
+denied "$(gate reviewer)" && pass "budget: reviewer refused at the hard cap" || fail "budget: reviewer allowed over the cap"
+rm -f "$D/repo/.loop/run/loop.pid"
+
 # fails closed on garbage
 denied "$(echo 'not json' | bash "$KIT/hooks/guard.sh")" && pass "fails closed on bad input" || fail "failed open"
 

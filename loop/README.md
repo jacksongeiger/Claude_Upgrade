@@ -261,6 +261,11 @@ of the allowlist; the prompts say so and check_plan treats them as denied.
   `git worktree list`) and `install` → denied and logged, no trip. The trip
   looks only at events written during the current iteration.
 
+`hooks/budget-gate.sh` (PreToolUse on Agent, child-wide): refuses an executor or
+chore spawn when `spent + live + min_iter_usd ≥ cap`; a reviewer (or
+test-assessor / ui-auditor) spawn is refused only when `spent + live ≥ cap`, so
+work the executors already produced can still be reviewed and merged.
+
 `hooks/require-report.sh` (Stop): block until `$NIGHTSHIFT_REPORT` exists and is
 valid JSON with `status`; give up (exit 0) after 3 blocks and let the driver
 treat the task as failed.
