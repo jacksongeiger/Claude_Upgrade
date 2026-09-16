@@ -97,10 +97,13 @@ import json,sys,pathlib
 p=pathlib.Path(sys.argv[1]); d=json.loads(p.read_text()) if p.exists() else {}
 d.setdefault("milestones",{}); d["branch"]=sys.argv[2]; p.write_text(json.dumps(d,indent=2))
 PY
-# the worktree needs the spec's derived files and a backlog
+# the worktree reads the spec, goal and tokens from the project: the human
+# edits those between milestones, so they are refreshed at every start;
+# the backlog is the loop's own state and is only seeded once
 mkdir -p "$WT/.loop" "$WT/.loop/run"
-for f in .loop/backlog.yaml GOAL.md spec.json design-tokens.json; do [ -f "$PROJECT/$f" ] && [ ! -f "$WT/$f" ] && cp "$PROJECT/$f" "$WT/$f"; done
-(cd "$WT" && git add -f .loop/backlog.yaml GOAL.md spec.json 2>/dev/null; git diff --cached --quiet || git commit -q -m "build: seed spec, goal and backlog") >>"$RUN/build.log" 2>&1 || true
+for f in spec.json GOAL.md design-tokens.json; do [ -f "$PROJECT/$f" ] && cp "$PROJECT/$f" "$WT/$f"; done
+[ -f "$PROJECT/.loop/backlog.yaml" ] && [ ! -f "$WT/.loop/backlog.yaml" ] && cp "$PROJECT/.loop/backlog.yaml" "$WT/.loop/backlog.yaml"
+(cd "$WT" && git add -f .loop/backlog.yaml GOAL.md spec.json 2>/dev/null; [ -f design-tokens.json ] && git add -f design-tokens.json; git diff --cached --quiet || git commit -q -m "build: refresh spec, goal and backlog from the project") >>"$RUN/build.log" 2>&1 || true
 
 # ---- child settings (same as Nightshift) ------------------------------------
 STEP="child-settings"
