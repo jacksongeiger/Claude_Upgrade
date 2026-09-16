@@ -519,8 +519,11 @@ def merge_settings(settings_path, config):
     settings.setdefault("worktree", {})
     settings["worktree"]["baseRef"] = "head"
 
-    events_cmd = "bash ~/Claude_Upgrade/loop/hooks/events.sh"
-    budget_cmd = "bash ~/Claude_Upgrade/loop/hooks/budget-gate.sh"
+    # The resolved kit path, never "~/Claude_Upgrade": hook commands are not
+    # shell-expanded consistently, and the kit is not always under $HOME.
+    kit = str(Path(__file__).resolve().parent)
+    events_cmd = f"bash {kit}/hooks/events.sh"
+    budget_cmd = f"bash {kit}/hooks/budget-gate.sh"
 
     _add_hook(settings, "SubagentStart", None, events_cmd, {"async": True, "timeout": 5})
     _add_hook(settings, "SubagentStop", None, events_cmd, {"async": True, "timeout": 5})
@@ -528,7 +531,7 @@ def merge_settings(settings_path, config):
 
     settings["statusLine"] = {
         "type": "command",
-        "command": "bash ~/Claude_Upgrade/loop/statusline.sh",
+        "command": f"bash {kit}/statusline.sh",
         "refreshInterval": 5,
     }
 
@@ -538,8 +541,9 @@ def merge_settings(settings_path, config):
     wanted += [
         "Bash(git add:*)", "Bash(git commit:*)", "Bash(git diff:*)",
         "Bash(git log:*)", "Bash(git status:*)", "Bash(git rev-parse:*)",
-        "Bash(python3 ~/Claude_Upgrade/loop/*:*)",
-        "Bash(bash ~/Claude_Upgrade/loop/*:*)",
+        f"Bash(python3 {kit}/*:*)",
+        f"Bash(bash {kit}/*:*)",
+        "Bash(python3:*)",
         "Bash(rdx search:*)",
     ]
     allow.update(wanted)

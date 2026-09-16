@@ -337,6 +337,34 @@ class Reducer:
         hook_name, _ = get_hook_info(obj)
         if hook_name is not None:
             return self.handle_hook_event(obj)
+        # The shape a real `claude -p --verbose` stream actually uses for
+        # subagent lifecycle (observed, not documented): system/task_started
+        # with task_id + subagent_type + description, and the agent's end
+        # arrives as the tool_result for the Agent call in a `user` message.
+        if typ == "system" and obj.get("subtype") == "task_started":
+            tid = obj.get("task_id") or obj.get("tool_use_id") or "agent-%d" % len(self.agents)
+            self.agents[tid] = {"id": tid, "type": obj.get("subagent_type") or "unknown",
+                                "task": (obj.get("description") or "")[:60],
+                                "tool_use_id": obj.get("tool_use_id"), "since": now_iso()}
+            self.emit_agent_event("agent_start", tid, self.agents[tid]["type"], now_iso())
+            self.write_state()
+            return True
+        if typ == "system" and obj.get("subtype") in ("task_completed", "task_finished", "task_stopped", "task_failed"):
+            tid = obj.get("task_id")
+            if tid in self.agents:
+                a = self.agents.pop(tid)
+                self.emit_agent_event("agent_stop", tid, a.get("type", "unknown"), now_iso())
+                self.write_state()
+            return True
+        if typ == "user":
+            content = ((obj.get("message") or {}).get("content")) or []
+            if isinstance(content, list):
+                done = [c.get("tool_use_id") for c in content if isinstance(c, dict) and c.get("type") == "tool_result"]
+                for tid, a in list(self.agents.items()):
+                    if a.get("tool_use_id") in done:
+                        self.agents.pop(tid)
+                        self.emit_agent_event("agent_stop", tid, a.get("type", "unknown"), now_iso())
+                        self.write_state()
         return False
 
     def on_stall(self):

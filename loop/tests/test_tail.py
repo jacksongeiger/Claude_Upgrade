@@ -226,3 +226,23 @@ def test_hook_events_track_agents(tmp_path):
     assert log2.exists()
     assert "agent_start" in log2.read_text()
     assert "agent_stop" in log2.read_text()
+
+
+def test_agents_tracked_from_real_task_started_shape(tmp_path):
+    """The shape a real `claude -p --verbose` stream uses (observed on the
+    first paid dryrun): system/task_started with task_id + subagent_type, and
+    the agent's end is the tool_result for the Agent call in a user message.
+    The documented hook_event shape never appeared."""
+    import shutil
+    fixture = Path(__file__).parent / "fixtures" / "stream_task_started.jsonl"
+    state = tmp_path / "state.json"; state.write_text('{"iter": 1}')
+    events = tmp_path / "events.jsonl"
+    proc = subprocess.run(
+        [sys.executable, str(TAIL_PY), "--state", str(state), "--events", str(events),
+         "--pricing", str(PRICING_JSON), "--iter", "1"],
+        input=fixture.read_text(), capture_output=True, text=True)
+    assert proc.returncode == 0
+    log = (tmp_path / "events.log").read_text()
+    assert "agent_start id=abc123 type=exec-sonnet" in log
+    assert "agent_stop id=abc123 type=exec-sonnet" in log
+    assert json.loads(state.read_text())["agents"] == []
