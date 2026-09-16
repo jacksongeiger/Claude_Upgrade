@@ -201,7 +201,7 @@ def test_stream_txt_mirrors_assistant_text(tmp_path):
     stdin_text = assistant_line("claude-sonnet-5", {"input_tokens": 1}, content=content) + "\n"
     proc, state, events = run_tail(tmp_path, iter_n=3, stdin_text=stdin_text)
     assert proc.returncode == 0
-    mirror = tmp_path / "stream-3.txt"
+    mirror = tmp_path / "run" / "stream-3.txt"
     assert mirror.exists()
     mirrored = mirror.read_text().strip("\n")
     assert mirrored == text[:200]

@@ -42,6 +42,38 @@ cd ~/Claude_Upgrade
 
 Because these are symlinks, any edit you make in the repo is live everywhere immediately — no re-installing. Re-running `install.sh` is safe: it skips links that already point to the right place, replaces stale links, and refuses to overwrite real files.
 
+
+## Nightshift — the unattended improvement loop
+
+`loop/` is a system that improves a project for hours on a hard cost cap
+while you sleep, and cannot touch `main`. Fable plans and reviews; Sonnet
+(Opus for hard tasks) executes in isolated git worktrees; a **script, never a
+model,** measures the result and decides whether to keep it.
+
+```bash
+/jg-loop init      # once per project, with you present: goals, scoreboard, backlog
+/jg-loop dryrun    # one supervised iteration at a small cap; proves the cost meter
+/jg-loop start --cap 40 --hours 6
+/jg-loop status    # or just glance at the statusline
+/jg-loop review    # the morning digest, in plain English
+```
+
+What you see, always, at the bottom of the terminal:
+
+```
+● loop/2026-09-16 · iter 7 · EXEC · score 71.4 ▲2.1 (best 71.4) ▁▂▃▅▆▇ · flat 0/3 · rung 1 · $18.40/$40 ▮▮▮▮▮▮▮▮▮░
+```
+
+The one rule everything hangs on: **a row without a scoreboard dimension is
+not a candidate.** The loop picks the dimension furthest from target, then the
+first row for it; it climbs a ladder (backlog → unfinished threads →
+hypotheses → ask you) only when the rung below is empty; flat or regressed
+iterations are reset, never kept; and the scorers live outside the worktree
+so an executor cannot edit its own judge.
+
+Design and the failure modes it was tested against: `loop/README.md` is the
+contract; the design pages are linked from the CHANGELOG.
+
 ## Per-project templates
 
 Pick the template that matches your stack and copy it into the project root as `CLAUDE.md`, then fill in the placeholders:

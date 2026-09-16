@@ -32,3 +32,4 @@ __pycache__/
 .loop/proposed-config.json
 .loop/report.*
 discovery/.coverage
+.loop/stream-*.txt

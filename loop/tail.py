@@ -88,7 +88,11 @@ def log_path_for(events_path):
 
 def stream_txt_path_for(events_path, iter_n):
     d = os.path.dirname(os.path.abspath(events_path)) or "."
-    return os.path.join(d, "stream-%s.txt" % iter_n)
+    # Under run/ so it is gitignored with the rest of the runtime state and
+    # where status.py --tail looks for it.
+    run_dir = os.path.join(d, "run")
+    os.makedirs(run_dir, exist_ok=True)
+    return os.path.join(run_dir, "stream-%s.txt" % iter_n)
 
 
 def mentions_permission(text):
