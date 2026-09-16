@@ -61,7 +61,8 @@ def main(argv=None):
             entry.update({"serve_cmd": serve.get("cmd"), "port": serve.get("port"),
                           "urls": [f"http://127.0.0.1:{serve.get('port', 0)}{u}" for u in urls]})
         elif name == "persona":
-            tasks = [{"task": c["task"], "max_steps": c.get("max_steps", 6), "persona": c.get("persona", "a first-time user")}
+            tasks = [{"task": c["task"], "max_steps": c.get("max_steps", 6), "persona": c.get("persona", "a first-time user"),
+                      "setup": c.get("setup") or [], "url": c.get("url") or "/"}
                      for f in spec.get("features", []) for c in f.get("acceptance", []) if c.get("type") == "persona"]
             entry.update({"serve_cmd": serve.get("cmd"), "port": serve.get("port"), "tasks": tasks})
         elif name == "perf":

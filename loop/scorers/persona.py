@@ -105,8 +105,9 @@ def run_task(claude_bin, workdir, url, task_cfg, run_idx):
     run_dir = os.path.join(workdir, ".pipeline", "ux", f"{slug}-{run_idx}")
     os.makedirs(run_dir, exist_ok=True)
     runner = KIT_ROOT / "pipeline" / "persona_run.py"
-    cmd = [sys.executable, str(runner), "--url", url, "--task", task, "--max-steps", str(max_steps),
-           "--run-dir", run_dir, "--workdir", workdir]
+    cmd = [sys.executable, str(runner), "--url", url.rstrip("/") + (task_cfg.get("url") or "/"), "--task", task,
+           "--max-steps", str(max_steps), "--run-dir", run_dir, "--workdir", workdir,
+           "--setup", json.dumps(task_cfg.get("setup") or [])]
     if persona:
         cmd += ["--persona", persona]
     env = dict(os.environ)
