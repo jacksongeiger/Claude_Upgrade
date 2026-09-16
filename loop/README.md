@@ -261,6 +261,13 @@ of the allowlist; the prompts say so and check_plan treats them as denied.
   `git worktree list`) and `install` → denied and logged, no trip. The trip
   looks only at events written during the current iteration.
 
+**Kit upgrades and the manifest.** `manifest.sha256` pins `config.json` and
+every scorer script. Changing a scorer in the kit (a bug fix included) makes
+every project's manifest mismatch and the next run stop with
+`score-infra-broken` — by design: a scorer change is a scoring change. After
+pulling a kit update, re-sign each project once:
+`python3 $KIT/score.py --manifest-write ~/.claude/nightshift/<slug>/manifest.sha256 --config ~/.claude/nightshift/<slug>/config.json`.
+
 `.loop/run/live.json` (inside the loop worktree, written by tail.py on every
 stream line): `{live_spend_usd, budget_usd, remaining_usd}`. The planner reads
 it before any revision re-dispatch; approved work is merged first, revisions

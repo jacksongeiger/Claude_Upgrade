@@ -59,15 +59,51 @@ validated by running it on itself (rdx as the project).
    coverage 95.5% → 99.3%), $4.88, live meter −6%, zero denials, its
    `main` untouched.
 
+6. *The Node path, on a real npm + vitest + TypeScript repo* (`eemeli/yaml`,
+   3387 tests, submodule test suites, strict tsconfig). Five dryruns and
+   $26 to get one honest kept iteration, each run buying a fix:
+   - the assessor's coverage command was jest-shaped and required
+     `node_modules` to exist before setup; it now emits vitest's flags and
+     counts a coverage tool when it is declared in package.json (jest built
+     in, `@vitest/coverage-*`, c8/nyc), the scorer counts a test FILE that
+     failed to run as a failure, and the jest/vitest parser runs first when
+     its summary line is present;
+   - the budget gate refused the union reviewer after three executors had
+     run, so approved work was never merged ($5.50 for nothing); reviewers
+     are now gated by the hard cap only;
+   - `--kill` killed the driver but not its `setsid` child, which kept
+     working in the same loop worktree as the next run; the child's pgid is
+     now recorded from inside its session, and both the exit trap and
+     `--kill` take it down (with a driver test);
+   - an executor's scratch write into its own /tmp session directory tripped
+     the run as a safety deny; temp roots are allowed unless the path is
+     inside a git checkout;
+   - the planner spent its budget re-dispatching one `revise` while an
+     approved sibling sat unmerged (twice, $12). Order is now review all →
+     merge approved (union review if more than one) → only then revise, and
+     only when `.loop/run/live.json` (written by tail.py into the worktree)
+     shows ≥ $2.5 remaining; the planner is also told its dollar budget and
+     typical per-agent costs so it sizes fan-out to it;
+   - the run that finally merged reported 96.81 → 99.81, and that was a
+     mirage: `git worktree add` leaves submodules empty, two suite files
+     failed, coverage was never written, and the scorer silently fell back
+     to pass rate. The scorer now fails (`score-infra-broken`) when a
+     configured coverage report is unreadable, worktrees and `setup_cmd`
+     initialise submodules, and the head was re-scored honestly:
+     **96.81 → 97.22** (tests 3387 → 3462, coverage 93.6% → 95.1%).
+   Kit upgrades that touch a scorer invalidate every project's manifest by
+   design; the README now says how to re-sign.
+
 **Cost meter:** summing per-line usage from `stream-json` over-counts the
 `result` figure by 8–32% (assistant messages are re-emitted per content
 block); de-duplicating by message id under-counts by 40%. The meter keeps the
 pessimistic sum and the dryrun tolerance is asymmetric, −10% / +35%.
 
-**Numbers:** 165 kit unit tests + 4 shell suites green; rdx eval score 91.68;
-loop score on this repo 85.08 → 94.90 over three kept iterations, and
-97.77 → 99.67 on prettytable in one; $21.12 paid across five dryruns (one of
-which merged nothing).
+**Numbers:** 172 kit unit tests + 4 shell suites green; rdx eval score 91.68;
+loop score 85.08 → 94.90 on this repo (three kept iterations), 97.77 → 99.67
+on prettytable (one), 96.81 → 97.22 on yaml (one, after five attempts);
+about $47 paid across ten dryruns, six of which merged nothing and each of
+which bought a fix listed above.
 
 4. *Unattended, end to end.* Dryrun 4 with the derived allowlist: plan →
    two Sonnet executors in parallel → two fresh reviewers approved (GOAL
