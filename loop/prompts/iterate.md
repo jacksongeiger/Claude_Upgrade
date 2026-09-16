@@ -7,8 +7,10 @@ Iteration: {{ITER}}
 Project: {{PROJECT_DIR}}   (you are in the loop worktree: {{LOOP_WT}}, branch {{LOOP_BRANCH}})
 Kit: {{KIT}}
 Config: {{CONFIG}}
-Goal: {{GOAL}}  — numbered lines; the reviewer must cite one
-Target: {{TARGET}}  — what pick.py chose and why. You did not choose the component; do not relitigate it.
+Goal file: {{GOAL}} — numbered lines; the reviewer must cite one. Contents:
+{{GOAL_TEXT}}
+Target file: {{TARGET}} — what pick.py chose and why. You did not choose the component; do not relitigate it. Contents:
+{{TARGET_JSON}}
 Backlog: {{BACKLOG}}
 Scores (last 5): {{SCORES_TAIL}}
 Previous iteration facts: {{PREV_SUMMARY}}
@@ -39,8 +41,20 @@ Do not build anything this iteration.
 ### 1. PLAN
 
 The row(s) in `target.task_ids` are your task. You may split one row into up
-to {{MAX_FANOUT}} subtasks; you may not substitute a different row. Read the
-code the row touches. Write `{{ITER_DIR}}/plan.json`:
+to {{MAX_FANOUT}} subtasks; you may not substitute a different row.
+
+**Read budget: the files the row names, what they import, and one existing
+test file for style — nothing else.** In particular, do not read the loop kit
+(`{{KIT}}`, `run.sh`, `merge.sh`, `check_plan.py`); you are not debugging
+the loop, you are planning one task inside it. Do not re-run the test suite
+or coverage: the latest coverage report, if the project has one, is at
+`.loop/run/coverage.json` and `scores.jsonl` already has the numbers.
+Every tool call re-reads your whole context; a plan that took 12 tool calls
+is usually better than one that took 50, and it is always cheaper. If you
+cannot write the plan within ~15 tool calls, write it with what you have and
+name the uncertainty in `decisions`.
+
+Write `{{ITER_DIR}}/plan.json`:
 
 ```
 {"iter":{{ITER}},"task_ids":[...],

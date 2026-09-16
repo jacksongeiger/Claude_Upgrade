@@ -193,8 +193,14 @@ if [ ! -d "$WT/.git" ] && [ ! -f "$WT/.git" ]; then
         (cd "$WT" && bash -c "$SETUP_CMD") >>"$RUN/loop.log" 2>&1 || note "setup_cmd failed (continuing; executors run it again)"
     fi
 fi
+# The loop worktree belongs to the loop. Anything uncommitted in it is debris
+# from a killed child (executors commit in their own worktrees; the driver
+# merges); everything of value is on the loop branch. Clean, note, continue.
 if [ -n "$(git -C "$WT" status --porcelain)" ]; then
-    stop dirty "loop worktree not clean at start"; exit 0
+    note "loop worktree dirty at start — resetting: $(git -C "$WT" status --porcelain | head -5 | tr '\n' ' ')"
+    git -C "$WT" reset --hard -q >>"$RUN/loop.log" 2>&1 || true
+    git -C "$WT" clean -fdq >>"$RUN/loop.log" 2>&1 || true
+    git -C "$WT" checkout -q "$BRANCH" >>"$RUN/loop.log" 2>&1 || true
 fi
 
 # --------------------------------------------------------------------------
@@ -298,6 +304,7 @@ src, dst = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
 subs = {
  "ITER": "$ITER", "PROJECT_DIR": "$PROJECT", "LOOP_WT": "$WT", "LOOP_BRANCH": "$BRANCH",
  "KIT": "$KIT", "CONFIG": "$CONFIG", "GOAL": "$GOAL", "TARGET": "$ITER_DIR/target.json",
+ "GOAL_TEXT": pathlib.Path("$GOAL").read_text(), "TARGET_JSON": pathlib.Path("$ITER_DIR/target.json").read_text(),
  "BACKLOG": "$LOOP/backlog.yaml", "SCORES_TAIL": """$SCORES_TAIL""", "PREV_SUMMARY": "$PREV_SUMMARY",
  "ARCH": "$ARCH", "MODE": "$MODE", "SETUP_CMD": """$SETUP_CMD""", "TEST_CMD": """$TEST_CMD""",
  "MAX_FANOUT": "$MAX_FANOUT", "OPUS_ALLOWED": "$OPUS", "ITER_DIR": "$ITER_DIR", "QUESTIONS": "$LOOP/questions.md",
@@ -360,6 +367,12 @@ PY
     state_set --argjson c "$CHARGE" '.spent_usd = (.spent_usd + $c) | .live_spend_usd=0 | .agents=[]'
     SPENT=$(jq -r '.spent_usd' "$STATE")
     event CHILD_DONE rc="$CHILD_RC" charge="$CHARGE" live="$LIVE" agreement="$AGREE" duration_s="$DURATION"
+    if [ "$DRYRUN" = "1" ]; then
+        DRY_OK=false
+        if [ "$AGREE" != "null" ] && jq -en --argjson a "$AGREE" --argjson r "$RESULT_COST" '$a <= 0.10 and $r > 0' >/dev/null; then DRY_OK=true; fi
+        state_set --argjson ok "$DRY_OK" '.dryrun_ok=$ok'
+        echo "$(ts) DRYRUN cost agreement: result=$RESULT_COST live=$LIVE agreement=$AGREE ok=$DRY_OK" >> "$EVLOG"
+    fi
 
     if [ "${STALLED:-0}" = "1" ]; then
         printf '\n## Iteration %s — permission stall\nThe child waited on a permission prompt. Add the needed allowlist entry.\n' "$ITER" >> "$LOOP/questions.md"
@@ -394,8 +407,8 @@ PY
         if [ "$MODE" = "task" ]; then state_set '.flat += 1'; fi
         state_set '.phase="CLOSE"'
         event ITER_DONE outcome="nothing-merged" spent="$SPENT"
-        [ "$MAX_ITERS" -gt 0 ] && [ "$ITER" -ge "$MAX_ITERS" ] && { DRY_DONE=1; }
-        [ "${DRY_DONE:-0}" = "1" ] && break
+        if [ "$DRYRUN" = "1" ]; then stop dryrun-complete "nothing merged; agreement=$AGREE ok=${DRY_OK:-false}"; break; fi
+        if [ "$MAX_ITERS" -gt 0 ] && [ "$ITER" -ge "$MAX_ITERS" ]; then stop iters "max iterations $MAX_ITERS"; break; fi
         continue
     fi
     state_set '.phase="SCORE"'
@@ -483,14 +496,7 @@ PY
     event ITER_DONE outcome="$OUTCOME" composite="$COMPOSITE" delta="$DELTA" spent="$SPENT"
     note "iteration $ITER done outcome=$OUTCOME composite=$COMPOSITE delta=$DELTA spent=$SPENT"
 
-    if [ "$DRYRUN" = "1" ]; then
-        OK=false
-        if [ "$AGREE" != "null" ] && jq -en --argjson a "$AGREE" '$a <= 0.10' >/dev/null; then OK=true; fi
-        if [ "$RESULT_COST" = "0" ] || [ -z "$RESULT_COST" ]; then OK=false; fi
-        state_set --argjson ok "$OK" '.dryrun_ok=$ok'
-        echo "DRYRUN cost agreement: result=$RESULT_COST live=$LIVE agreement=$AGREE ok=$OK" >> "$EVLOG"
-        stop dryrun-complete "agreement=$AGREE ok=$OK"; break
-    fi
+    if [ "$DRYRUN" = "1" ]; then stop dryrun-complete "agreement=$AGREE ok=${DRY_OK:-false}"; break; fi
     if [ "$MAX_ITERS" -gt 0 ] && [ "$ITER" -ge "$MAX_ITERS" ]; then stop iters "max iterations $MAX_ITERS"; break; fi
 done
 
