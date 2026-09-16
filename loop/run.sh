@@ -132,6 +132,14 @@ prune_executor_worktrees() {
     git -C "$PROJECT" worktree prune >/dev/null 2>&1 || true
 }
 
+# The planner's backlog/questions edits are real state: commit them on the
+# loop branch so the next fresh child (and the human) sees them, whatever the
+# iteration's outcome. (One `git add` per file: a single add with a missing
+# pathspec adds nothing.)
+commit_backlog() {
+    (cd "$WT" && for f in .loop/backlog.yaml .loop/questions.md; do [ -f "$f" ] && git add -f "$f"; done; git diff --cached --quiet || git commit -q -m "nightshift: backlog after iteration $ITER") >>"$RUN/loop.log" 2>&1 || true
+}
+
 build_map() {
     mkdir -p "$WT/.loop" "$ITER_DIR" 2>/dev/null || true
     (cd "$WT" && python3 "$KIT/map.py" --repo "$WT" --out "$WT/.loop/map.json" --arch "$LOOP/ARCHITECTURE.md" > "$ITER_DIR/map.out" 2>>"$RUN/loop.log") || note "map.py failed (non-fatal)"
@@ -468,6 +476,7 @@ PY
         note "nothing merged (mode=$MODE)"
         if [ "$MODE" = "task" ]; then state_set '.flat += 1'; fi
         state_set '.phase="CLOSE"'
+        commit_backlog
         event ITER_DONE outcome="nothing-merged" spent="$SPENT"
         if [ "$DRYRUN" = "1" ]; then stop dryrun-complete "nothing merged; agreement=$AGREE ok=${DRY_OK:-false}"; break; fi
         if [ "$MAX_ITERS" -gt 0 ] && [ "$ITER" -ge "$MAX_ITERS" ]; then stop iters "max iterations $MAX_ITERS"; break; fi
@@ -555,10 +564,7 @@ PY
         cp "$LOOP/ARCHITECTURE.md" "$WT/ARCHITECTURE.md" 2>/dev/null || true
         (cd "$WT" && git add -A ARCHITECTURE.md 2>/dev/null && git commit -q -m "nightshift: architecture map after iteration $ITER" 2>/dev/null) || true
     fi
-    # The planner's backlog/questions edits are real state: commit them on the
-    # loop branch so the next fresh child (and the human) sees them.
-    # (one `git add` per file: a single add with a missing pathspec adds nothing)
-    (cd "$WT" && for f in .loop/backlog.yaml .loop/questions.md; do [ -f "$f" ] && git add -f "$f"; done; git diff --cached --quiet || git commit -q -m "nightshift: backlog after iteration $ITER") >>"$RUN/loop.log" 2>&1 || true
+    commit_backlog
     event ITER_DONE outcome="$OUTCOME" composite="$COMPOSITE" delta="$DELTA" spent="$SPENT"
     note "iteration $ITER done outcome=$OUTCOME composite=$COMPOSITE delta=$DELTA spent=$SPENT"
 

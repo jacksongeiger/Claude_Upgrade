@@ -77,6 +77,11 @@ jq -e '.permissions.allow | index("Bash(git push:*)")' .loop/run/child-settings.
 [ "$(git -C .loop/wt/loop log --format=%s | grep -c "backlog after iteration")" -ge 1 ] && pass "backlog commit present" || fail "no backlog commit"
 [ -f .loop/wt/loop/.loop/iterations/1/goal.md ] && pass "goal.md copied into the iteration dir" || fail "goal.md copy missing"
 
+# 1b. nothing merged (planner wrote no commits) still commits the planner's backlog edits
+P=$(mkproject); cd "$P"
+run_driver nothing --iters 1 --cap 5 --hours 1
+[ "$(git -C .loop/wt/loop log --format=%s | grep -c 'backlog after iteration')" -ge 1 ] && pass "backlog committed after a nothing-merged iteration" || fail "backlog not committed on nothing-merged"
+
 # 2. flat → reset each time; two flats lock the only dimension out → ladder: harvest → hypothesize → needs-human
 P=$(mkproject); cd "$P"
 run_driver flat --cap 5 --hours 1
