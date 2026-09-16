@@ -132,7 +132,18 @@ def run_perf_check(check, workdir, timeout):
     return check_result("perf", ok, detail, "ok" if ok else "failed")
 
 
-def run_gate_check(check, workdir, timeout):
+def run_gate_check(check, workdir, timeout, args=None, spec=None):
+    check = dict(check)
+    url = check.get("url")
+    if check.get("kind") == "screenshot" and url and not url.startswith(("http://", "https://", "file:")):
+        # a relative page path means "the served app": start it like persona does
+        if args is None or spec is None:
+            return check_result("gate", None, "screenshot gate needs the served app (no spec/args)", "infra")
+        serve_cmd, port = _serve_config(check, args, spec)
+        base = SERVER.ensure(serve_cmd, port, workdir)
+        if not base:
+            return check_result("gate", None, "screenshot gate: server did not start (spec.stack.serve)", "infra")
+        check["url"] = base + url
     try:
         proc = subprocess.run(
             [sys.executable, GATES_PY, "run", "--check", json.dumps(check), "--workdir", workdir],
@@ -154,7 +165,10 @@ def run_gate_check(check, workdir, timeout):
         return check_result("gate", True, detail, "ok")
     if proc.returncode == 2:
         return check_result("gate", False, detail, "failed")
-    # 3 (needs-baseline) and 4 (infra) both block acceptance and count as infra here.
+    if proc.returncode == 3:
+        # the human's gate: approve with `gates.py accept <name>` and re-run
+        return check_result("gate", None, "needs-baseline: " + detail, "infra")
+    # 4 (infra) blocks acceptance.
     return check_result("gate", None, detail, "infra")
 
 
@@ -370,7 +384,7 @@ def run_feature(feature, workdir, timeout, args, spec):
         elif ctype == "perf":
             results.append(run_perf_check(check, workdir, timeout))
         elif ctype == "gate":
-            results.append(run_gate_check(check, workdir, timeout))
+            results.append(run_gate_check(check, workdir, timeout, args, spec))
         elif ctype == "lighthouse":
             results.append(run_lighthouse_check(check, workdir, timeout, args, spec))
         elif ctype == "persona":
