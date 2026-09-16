@@ -113,6 +113,9 @@ on_exit() {
         local last; last=$(tail -n 1 "$RUN/loop.log" 2>/dev/null || echo "")
         stop "crashed-at-$STEP" "iter $ITER exit $rc — $last" || true
     fi
+    # Never leave a child spending after the driver is gone.
+    [ -n "${CHILD_PGID:-}" ] || CHILD_PGID=$(cat "$RUN/child.pgid" 2>/dev/null || true)
+    kill_child
     rm -f "$RUN/loop.pid" 2>/dev/null || true
     exit 0
 }
@@ -168,6 +171,14 @@ if [ "$KILL" = "1" ]; then
         pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ' || true)
         [ -n "$pgid" ] && kill -TERM -- "-$pgid" 2>/dev/null || true
         echo "sent TERM to loop process group $pgid"
+        # The child runs in its own session (setsid); the driver's trap kills
+        # it, but if the driver is already dead this is the only path.
+        cpg=$(cat "$RUN/child.pgid" 2>/dev/null || true)
+        if [ -n "$cpg" ] && kill -0 -- "-$cpg" 2>/dev/null; then
+            kill -TERM -- "-$cpg" 2>/dev/null || true; sleep 2
+            kill -0 -- "-$cpg" 2>/dev/null && kill -KILL -- "-$cpg" 2>/dev/null || true
+            echo "sent TERM to child process group $cpg"
+        fi
     else
         echo "no loop running"
     fi
@@ -232,6 +243,11 @@ if [ ! -d "$WT/.git" ] && [ ! -f "$WT/.git" ]; then
         (cd "$WT" && bash -c "$SETUP_CMD") >>"$RUN/loop.log" 2>&1 || note "setup_cmd failed (continuing; executors run it again)"
     fi
 fi
+# A previous run that died mid-child (kill, crash) leaves executor worktrees
+# behind; clear them before this run's ITER is stamped (orphans are tagged).
+ITER=$(jq -r '.iter // 0' "$STATE" 2>/dev/null || echo 0)
+prune_executor_worktrees
+
 # A project whose main branch does not track .loop/backlog.yaml (init wrote it
 # but nobody committed it) would give every child an empty backlog: seed the
 # loop branch from the main checkout's copy.
@@ -390,7 +406,11 @@ PY
     (
       cd "$WT"
       export NIGHTSHIFT_CONFIG="$CONFIG" NIGHTSHIFT_KIT="$KIT" NIGHTSHIFT_ITER_DIR="$ITER_DIR"
-      setsid timeout "${CHILD_TIMEOUT}m" "$CLAUDE_BIN" -p "$(cat "$ITER_DIR/prompt.md")" \
+      rm -f "$RUN/child.pgid"
+      # setsid makes the child its own session leader: its pid is its pgid.
+      # Record it from inside so kill paths never have to guess with pgrep.
+      setsid bash -c 'echo $$ > "$1"; shift; exec "$@"' _ "$RUN/child.pgid" \
+        timeout "${CHILD_TIMEOUT}m" "$CLAUDE_BIN" -p "$(cat "$ITER_DIR/prompt.md")" \
         --model fable --max-budget-usd "$BUDGET" --max-turns "$CHILD_TURNS" \
         --permission-mode acceptEdits --permission-prompts none \
         --settings "$CHILD_SETTINGS" --agents "$AGENTS_JSON" \
@@ -400,8 +420,8 @@ PY
       | python3 "$KIT/tail.py" --state "$STATE" --events "$EVENTS" --pricing "$KIT/pricing.json" --iter "$ITER" \
           > "$ITER_DIR/tail.json" 2>>"$RUN/loop.log" &
     PIPE_PID=$!
-    sleep 1
-    CHILD_PGID=$(pgrep -f "stream-json" -n 2>/dev/null | head -1 | xargs -I{} ps -o pgid= -p {} 2>/dev/null | tr -d ' ' || true)
+    for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$RUN/child.pgid" ] && break; sleep 0.5; done
+    CHILD_PGID=$(cat "$RUN/child.pgid" 2>/dev/null || true)
     # live cost watch: kill the process group if spent + live >= cap
     while kill -0 "$PIPE_PID" 2>/dev/null; do
         sleep 5; beat

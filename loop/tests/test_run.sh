@@ -141,6 +141,22 @@ run_driver deny --cap 5 --hours 1
 run_driver improve --cap 5 --hours 1 --iters 1
 [ "$(stop_reason)" = "iters" ] && pass "old safety deny does not trip a new run" || fail "stop_reason=$(stop_reason)"
 
+# 7d. --kill takes the child's own process group down and charges the spend
+P=$(mkproject); cd "$P"
+# own session, or --kill's TERM to the driver's group would hit this script
+HOME="$(dirname "$PWD")/home" NIGHTSHIFT_CLAUDE="$KIT/tests/fake_claude.sh" FAKE_CLAUDE_MODE=slow \
+  setsid bash "$KIT/run.sh" --project "$PWD" --cap 5 --hours 1 >/dev/null 2>&1 &
+DRV=$!
+for _ in $(seq 1 40); do [ -s .loop/run/child.pgid ] && break; sleep 0.5; done
+CPG=$(cat .loop/run/child.pgid 2>/dev/null || echo "")
+[ -n "$CPG" ] && pass "child pgid recorded" || fail "no child.pgid written"
+bash "$KIT/run.sh" --kill --project "$PWD" >/dev/null 2>&1
+wait $DRV 2>/dev/null || true
+sleep 1
+if [ -n "$CPG" ] && kill -0 -- "-$CPG" 2>/dev/null; then fail "child process group survived --kill"; kill -KILL -- "-$CPG" 2>/dev/null; else pass "--kill took the child down"; fi
+[ "$(stop_reason)" = "crashed-at-child" ] && pass "killed run records crashed-at-child" || fail "stop_reason=$(stop_reason)"
+[ "$(jq -r '.spent_usd >= 2' .loop/state.json)" = "true" ] && pass "killed child charged pessimistically" || fail "spent=$(jq -r .spent_usd .loop/state.json)"
+
 # 8. expensive child → live meter kills, stop cap
 P=$(mkproject); cd "$P"
 run_driver expensive --cap 5 --hours 1

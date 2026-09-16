@@ -9,6 +9,7 @@
 #   regress   commit a change that makes tests fail
 #   nothing   write summary.md only, no commit
 #   crash     exit 1 without a result event
+#   slow      hang for 60s (killed by --kill in the test)
 #   expensive emit usage worth far more than the cap, no result
 #   deny      simulate an executor safety deny (writes to events.jsonl) then improve
 #   scope     simulate a read-only scope deny (must NOT trip) then improve
@@ -28,6 +29,11 @@ emit '{"type":"assistant","message":{"model":"claude-fable-5-1","content":[{"typ
 case "$MODE" in
   crash)
     exit 1 ;;
+  slow)
+    # a child that keeps running until killed (for the --kill test)
+    trap 'exit 143' TERM
+    sleep 60 & wait $!
+    exit 0 ;;
   expensive)
     # 5,000,000 output tokens on fable ≈ $125 — must trip the live meter.
     for i in 1 2 3 4 5; do
