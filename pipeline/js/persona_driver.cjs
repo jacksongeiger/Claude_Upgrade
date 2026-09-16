@@ -35,7 +35,7 @@
 //   {"action":"read"}
 //   {"action":"done","status":"complete|stuck"}
 // `click`/`fill` resolve `target` in this order: a CSS selector, then
-// `getByText(target, {exact:false})`, then `getByRole('button',{name})`.
+// for fill: label → placeholder → textbox name → text; for click: button → link → text → label.
 //
 // Every printed/trailed line:
 //   {"step":n,"action":"..","ok":bool,"error":"..|null","url":"..","title":"..",
@@ -139,20 +139,34 @@ async function collectClickables(page) {
   }
 }
 
-async function resolveLocator(page, target) {
-  try {
-    const loc = page.locator(target);
-    if ((await loc.count()) > 0) return loc.first();
-  } catch (_) {
-    // not a usable CSS selector — fall through
+// Resolve a human target ("New note", "Title") the way a person reads the
+// page: a typing target is a field (label, placeholder, textbox name) before
+// it is a word on the page; a click target is a control before it is text.
+async function firstOf(candidates) {
+  for (const make of candidates) {
+    try {
+      const loc = make();
+      if ((await loc.count()) > 0) return loc.first();
+    } catch (_) {
+      // not applicable — next candidate
+    }
   }
-  try {
-    const loc = page.getByText(target, { exact: false });
-    if ((await loc.count()) > 0) return loc.first();
-  } catch (_) {
-    // fall through
-  }
-  return page.getByRole('button', { name: target }).first();
+  return null;
+}
+
+async function resolveLocator(page, target, intent) {
+  const css = () => page.locator(target);
+  const label = () => page.getByLabel(target, { exact: false });
+  const placeholder = () => page.getByPlaceholder(target, { exact: false });
+  const textbox = () => page.getByRole('textbox', { name: target, exact: false });
+  const button = () => page.getByRole('button', { name: target, exact: false });
+  const link = () => page.getByRole('link', { name: target, exact: false });
+  const text = () => page.getByText(target, { exact: false });
+  const order = intent === 'fill'
+    ? [css, label, placeholder, textbox, text]
+    : [css, button, link, text, label];
+  const loc = await firstOf(order);
+  return loc || page.getByText(target, { exact: false }).first();
 }
 
 async function doAction(page, action) {
@@ -161,12 +175,12 @@ async function doAction(page, action) {
       await page.goto(action.url, { waitUntil: 'load', timeout: 15000 });
       return;
     case 'click': {
-      const loc = await resolveLocator(page, action.target);
+      const loc = await resolveLocator(page, action.target, 'click');
       await loc.click({ timeout: 5000 });
       return;
     }
     case 'fill': {
-      const loc = await resolveLocator(page, action.target);
+      const loc = await resolveLocator(page, action.target, 'fill');
       await loc.fill(action.value === undefined || action.value === null ? '' : String(action.value),
         { timeout: 5000 });
       return;

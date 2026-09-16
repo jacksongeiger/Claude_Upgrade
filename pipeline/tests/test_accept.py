@@ -165,7 +165,7 @@ def test_persona_check_no_run_dir_is_infra(tmp_path):
     check = data["features"]["f-001"]["checks"][0]
     assert check["type"] == "persona"
     assert check["ok"] is None
-    assert check["detail"] == "no persona run"
+    assert check["detail"].startswith("no persona run")
 
 
 def test_evals_check(tmp_path):

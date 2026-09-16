@@ -84,11 +84,43 @@ def claude(prompt, model, budget, cwd, env_extra, agent_names, turns=30, run_dir
             with open(os.path.join(run_dir, f"{tag}.claude.err"), "w") as f:
                 f.write(proc.stderr)
     cost = 0.0
+    result_text = ""
     try:
-        cost = float(json.loads(proc.stdout).get("total_cost_usd") or 0.0)
+        data = json.loads(proc.stdout)
+        cost = float(data.get("total_cost_usd") or 0.0)
+        result_text = data.get("result") or ""
     except Exception:  # noqa: BLE001
         pass
+    if run_dir and result_text:
+        salvage(run_dir, tag, result_text)
     return cost, None
+
+
+def salvage(run_dir, tag, text):
+    """An agent that answered in its final message but could not write its
+    file (a denied path, a missed instruction) still produced the verdict;
+    keep it. Never overwrites a file the agent did write."""
+    want = {"persona": ("result.json", ("status", "steps")), "judge": ("judge.json", ("scores", "total"))}
+    if tag not in want:
+        return
+    fname, keys = want[tag]
+    path = os.path.join(run_dir, fname)
+    if os.path.exists(path):
+        return
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end <= start:
+        return
+    try:
+        obj = json.loads(text[start:end + 1])
+    except json.JSONDecodeError:
+        return
+    if not all(k in obj for k in keys):
+        return
+    with open(path, "w") as f:
+        json.dump(obj, f, indent=2)
+    if tag == "persona" and not os.path.exists(os.path.join(run_dir, "findings.json")):
+        with open(os.path.join(run_dir, "findings.json"), "w") as f:
+            json.dump({"dead_ends": obj.get("dead_ends", []), "confusions": obj.get("confusions", [])}, f, indent=2)
 
 
 def ledger(workdir, stage, ident, cost):
@@ -135,7 +167,10 @@ def main(argv=None):
         return 4
 
     if not a.no_judge:
-        jspec = {"run_dir": run_dir, "task": a.task, "rubric": str(KIT / "prompts" / "rubric.md")}
+        # the judge may only read its run directory: give it the rubric there
+        rubric = os.path.join(run_dir, "rubric.md")
+        shutil.copy(str(KIT / "prompts" / "rubric.md"), rubric)
+        jspec = {"run_dir": run_dir, "task": a.task, "rubric": rubric}
         jprompt = ("Invoke the `persona-judge` agent exactly once with this JSON and nothing else, "
                    "then reply with its final JSON verbatim:\n" + json.dumps(jspec))
         jcost, jerr = claude(jprompt, a.model, min(a.budget, 1.0), cwd, {"PERSONA_RUN_DIR": run_dir},
