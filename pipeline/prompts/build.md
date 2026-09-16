@@ -26,6 +26,20 @@ worktree shows what is left, live.
 Commands containing `$VAR`, `$(...)` or backticks are denied by the
 permission system: write literal commands.
 
+How the acceptance checks are run (so you never have to read the kit):
+- `test {cmd}`: the command exits 0 in the build worktree.
+- `perf {cmd, metric, max|min}`: the command's LAST stdout line is one JSON
+  object with the metric as a key, e.g. `{"ms_p95": 12.4}`; it is compared
+  to `max`/`min`. The bench script is a deliverable of the feature.
+- `persona {task, max_steps, setup}`: a fresh-eyes agent drives the served
+  app by visible text (button labels, headings, field labels, placeholders);
+  `setup` actions run first. Name those exact words in the executor's goal.
+- `lighthouse {url, min}`: categories audited on the served app.
+- `gate {kind: screenshot, name, url, viewport, theme}`: a deterministic
+  screenshot compared to an approved baseline; a missing baseline is a
+  human gate, not your problem.
+- `manual`: recorded, never counted.
+
 ### 1. PLAN
 
 Read budget: the files the features touch or will create, what they import,
