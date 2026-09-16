@@ -115,7 +115,7 @@ run_driver expensive --cap 5 --hours 1
 
 # 9. crash trap: a driver bug must not be silent
 P=$(mkproject); cd "$P"
-chmod -x "$P/run_tests.sh" 2>/dev/null; rm -f "$P/.loop/backlog.yaml"   # pick.py will exit 1
+rm -f "$P/.loop/scores.jsonl"   # pick.py needs a scores row: exit 1
 run_driver improve --cap 5 --hours 1
 case "$(stop_reason)" in crashed-at-*) pass "crash trap writes stop_reason ($(stop_reason))" ;; *) fail "stop_reason=$(stop_reason)" ;; esac
 grep -q "STOP reason=crashed" .loop/events.log && pass "crash visible in events.log" || fail "crash silent"

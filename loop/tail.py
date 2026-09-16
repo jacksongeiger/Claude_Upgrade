@@ -240,6 +240,14 @@ class Reducer:
         message = obj.get("message") or {}
         model = message.get("model")
         usage = message.get("usage") or {}
+        # The stream re-emits one API message once per content block, every
+        # copy carrying identical usage. Measured on the first full dryrun:
+        # summing every line over-estimates the real cost by ~21%, while
+        # pricing each message id once UNDER-estimates it by ~40% (some
+        # subagent cost never appears in the stream at all). This estimate
+        # exists to kill a runaway iteration, so the over-estimate is the safe
+        # side and is kept; the driver's dryrun check bounds it from both
+        # sides. The authoritative figure is always result.total_cost_usd.
         self.live_spend += price_usage(self.pricing, model, usage)
 
         for block in message.get("content") or []:

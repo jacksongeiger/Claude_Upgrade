@@ -196,7 +196,7 @@ fi
 # The loop worktree belongs to the loop. Anything uncommitted in it is debris
 # from a killed child (executors commit in their own worktrees; the driver
 # merges); everything of value is on the loop branch. Clean, note, continue.
-if [ -n "$(git -C "$WT" status --porcelain)" ]; then
+if [ -n "$(git -C "$WT" status --porcelain -- . ':!.loop')" ]; then
     note "loop worktree dirty at start — resetting: $(git -C "$WT" status --porcelain | head -5 | tr '\n' ' ')"
     git -C "$WT" reset --hard -q >>"$RUN/loop.log" 2>&1 || true
     git -C "$WT" clean -fdq >>"$RUN/loop.log" 2>&1 || true
@@ -257,7 +257,14 @@ while :; do
     # ---- pre-iteration checks -------------------------------------------
     STEP="check"; beat
     ITER=$((ITER + 1))
-    ITER_DIR="$LOOP/iterations/$ITER"
+    # Everything the child writes lives INSIDE the loop worktree: native
+    # worktree isolation blocks writes into the main checkout, so a planner
+    # told to write to <project>/.loop/ was denied and wrote into its own cwd
+    # instead -- which the driver then could not find. The driver's own state
+    # (state.json, events, scores) stays in <project>/.loop/.
+    ITER_DIR="$WT/.loop/iterations/$ITER"
+    BACKLOG="$WT/.loop/backlog.yaml"
+    QUESTIONS="$WT/.loop/questions.md"
     mkdir -p "$ITER_DIR/tasks"
     SPENT=$(jq -r '.spent_usd' "$STATE")
     FLAT=$(jq -r '.flat' "$STATE")
@@ -277,7 +284,7 @@ while :; do
     STEP="PICK"; beat
     PRE_SHA=$(git -C "$WT" rev-parse HEAD)
     set +e
-    python3 "$KIT/pick.py" --config "$CONFIG" --backlog "$LOOP/backlog.yaml" --scores "$LOOP/scores.jsonl" \
+    python3 "$KIT/pick.py" --config "$CONFIG" --backlog "$BACKLOG" --scores "$LOOP/scores.jsonl" \
         --state "$STATE" --iter "$ITER" --out "$ITER_DIR/target.json" > "$ITER_DIR/pick.out" 2>>"$RUN/loop.log"
     PICK_RC=$?
     set -e
@@ -295,7 +302,7 @@ while :; do
 
     # ---- PROMPT ---------------------------------------------------------
     STEP="prompt"; beat
-    PREV_SUMMARY="$LOOP/iterations/$((ITER - 1))/summary.md"; [ -f "$PREV_SUMMARY" ] || PREV_SUMMARY="(none)"
+    PREV_SUMMARY="$WT/.loop/iterations/$((ITER - 1))/summary.md"; [ -f "$PREV_SUMMARY" ] || PREV_SUMMARY="(none)"
     ARCH="$LOOP/ARCHITECTURE.md"; [ -f "$ARCH" ] || ARCH="(none yet)"
     SCORES_TAIL=$(tail -n 5 "$LOOP/scores.jsonl" 2>/dev/null | jq -c '{iter,composite,dims:(.dims|map_values(.value)),outcome}' | tr '\n' ' ')
     python3 - "$KIT/prompts/iterate.md" "$ITER_DIR/prompt.md" <<PY
@@ -305,9 +312,9 @@ subs = {
  "ITER": "$ITER", "PROJECT_DIR": "$PROJECT", "LOOP_WT": "$WT", "LOOP_BRANCH": "$BRANCH",
  "KIT": "$KIT", "CONFIG": "$CONFIG", "GOAL": "$GOAL", "TARGET": "$ITER_DIR/target.json",
  "GOAL_TEXT": pathlib.Path("$GOAL").read_text(), "TARGET_JSON": pathlib.Path("$ITER_DIR/target.json").read_text(),
- "BACKLOG": "$LOOP/backlog.yaml", "SCORES_TAIL": """$SCORES_TAIL""", "PREV_SUMMARY": "$PREV_SUMMARY",
+ "BACKLOG": "$BACKLOG", "SCORES_TAIL": """$SCORES_TAIL""", "PREV_SUMMARY": "$PREV_SUMMARY",
  "ARCH": "$ARCH", "MODE": "$MODE", "SETUP_CMD": """$SETUP_CMD""", "TEST_CMD": """$TEST_CMD""",
- "MAX_FANOUT": "$MAX_FANOUT", "OPUS_ALLOWED": "$OPUS", "ITER_DIR": "$ITER_DIR", "QUESTIONS": "$LOOP/questions.md",
+ "MAX_FANOUT": "$MAX_FANOUT", "OPUS_ALLOWED": "$OPUS", "ITER_DIR": "$ITER_DIR", "QUESTIONS": "$QUESTIONS",
 }
 t = src.read_text()
 for k, v in subs.items():
@@ -369,13 +376,19 @@ PY
     event CHILD_DONE rc="$CHILD_RC" charge="$CHARGE" live="$LIVE" agreement="$AGREE" duration_s="$DURATION"
     if [ "$DRYRUN" = "1" ]; then
         DRY_OK=false
-        if [ "$AGREE" != "null" ] && jq -en --argjson a "$AGREE" --argjson r "$RESULT_COST" '$a <= 0.10 and $r > 0' >/dev/null; then DRY_OK=true; fi
+        # Signed: (live - result) / result. An under-estimate means the kill
+        # switch would fire late, so it gets the tight bound; an over-estimate
+        # only stops early. Measured on real runs: +8% with no executors,
+        # +21% with a Sonnet executor and a Fable reviewer in the stream.
+        SIGNED=$(jq -n --argjson l "$LIVE" --argjson r "$RESULT_COST" 'if $r > 0 then (($l - $r) / $r) else null end')
+        if [ "$SIGNED" != "null" ] && jq -en --argjson s "$SIGNED" '$s >= -0.10 and $s <= 0.35' >/dev/null; then DRY_OK=true; fi
+        AGREE="$SIGNED"
         state_set --argjson ok "$DRY_OK" '.dryrun_ok=$ok'
         echo "$(ts) DRYRUN cost agreement: result=$RESULT_COST live=$LIVE agreement=$AGREE ok=$DRY_OK" >> "$EVLOG"
     fi
 
     if [ "${STALLED:-0}" = "1" ]; then
-        printf '\n## Iteration %s — permission stall\nThe child waited on a permission prompt. Add the needed allowlist entry.\n' "$ITER" >> "$LOOP/questions.md"
+        printf '\n## Iteration %s — permission stall\nThe child waited on a permission prompt. Add the needed allowlist entry.\n' "$ITER" >> "$QUESTIONS"
         stop permission-stall "iteration $ITER"; break
     fi
     if [ "${KILLED:-0}" = "1" ]; then stop cap "live spend reached cap mid-iteration $ITER"; break; fi
@@ -384,6 +397,8 @@ PY
         event ITERATION_FAILED rc="$CHILD_RC"
         note "iteration failed rc=$CHILD_RC summary=$([ -f "$ITER_DIR/summary.md" ] && echo yes || echo no)"
         git -C "$WT" reset --hard "$PRE_SHA" >>"$RUN/loop.log" 2>&1 || true
+        if [ "$DRYRUN" = "1" ]; then stop dryrun-complete "iteration failed; agreement=$AGREE ok=${DRY_OK:-false}"; break; fi
+        if [ "$MAX_ITERS" -gt 0 ] && [ "$ITER" -ge "$MAX_ITERS" ]; then stop iters "max iterations $MAX_ITERS"; break; fi
         continue
     fi
     state_set '.failed_iters = 0'
@@ -478,7 +493,7 @@ PY
     fi
     # same-dimension checkpoint from pick.py
     if jq -e '.checkpoint == true' "$ITER_DIR/target.json" >/dev/null 2>&1; then
-        printf '\n## Iteration %s — checkpoint\n%s\n' "$ITER" "$(jq -r '.checkpoint_note' "$ITER_DIR/target.json")" >> "$LOOP/questions.md"
+        printf '\n## Iteration %s — checkpoint\n%s\n' "$ITER" "$(jq -r '.checkpoint_note' "$ITER_DIR/target.json")" >> "$QUESTIONS"
         event ASK kind=checkpoint
     fi
     # picks history for lockout
@@ -493,6 +508,9 @@ PY
         cp "$LOOP/ARCHITECTURE.md" "$WT/ARCHITECTURE.md" 2>/dev/null || true
         (cd "$WT" && git add -A ARCHITECTURE.md 2>/dev/null && git commit -q -m "nightshift: architecture map after iteration $ITER" 2>/dev/null) || true
     fi
+    # The planner's backlog/questions edits are real state: commit them on the
+    # loop branch so the next fresh child (and the human) sees them.
+    (cd "$WT" && git add -f .loop/backlog.yaml .loop/questions.md 2>/dev/null; git diff --cached --quiet || git commit -q -m "nightshift: backlog after iteration $ITER") >>"$RUN/loop.log" 2>&1 || true
     event ITER_DONE outcome="$OUTCOME" composite="$COMPOSITE" delta="$DELTA" spent="$SPENT"
     note "iteration $ITER done outcome=$OUTCOME composite=$COMPOSITE delta=$DELTA spent=$SPENT"
 
