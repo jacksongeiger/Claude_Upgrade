@@ -69,6 +69,14 @@ grep -q "STOP reason=iters" .loop/events.log && pass "STOP line in events.log" |
 [ ! -f .loop/run/loop.pid ] && pass "loop.pid removed" || fail "loop.pid left"
 [ "$(jq -r '.spent_usd' .loop/state.json)" = "0.42" ] && pass "charged result cost" || fail "spent=$(jq -r .spent_usd .loop/state.json)"
 
+# 6b. child allowlist is derived from the config's commands (test_cmd "bash ./run_tests.sh")
+jq -e '.permissions.allow | index("Bash(bash:*)")' .loop/run/child-settings.json >/dev/null && pass "child allowlist carries the test runner" || fail "runner rule missing from child-settings.json"
+jq -e '.permissions.allow | index("Bash(git push:*)")' .loop/run/child-settings.json >/dev/null && fail "git push allowlisted" || pass "git push not allowlisted"
+[ -f .loop/wt/loop/.loop/map.json ] && pass "map.json written into the loop worktree for check_plan" || fail "no worktree map.json"
+[ -z "$(git -C .loop/wt/loop status --short -- .loop/backlog.yaml)" ] && pass "backlog committed at CLOSE" || fail "backlog left uncommitted in the loop worktree"
+[ "$(git -C .loop/wt/loop log --format=%s | grep -c "backlog after iteration")" -ge 1 ] && pass "backlog commit present" || fail "no backlog commit"
+[ -f .loop/wt/loop/.loop/iterations/1/goal.md ] && pass "goal.md copied into the iteration dir" || fail "goal.md copy missing"
+
 # 2. flat → reset each time; two flats lock the only dimension out → ladder: harvest → hypothesize → needs-human
 P=$(mkproject); cd "$P"
 run_driver flat --cap 5 --hours 1
@@ -106,11 +114,6 @@ run_driver stopfile --cap 5 --hours 1
 P=$(mkproject); cd "$P"
 run_driver deny --cap 5 --hours 1
 [ "$(stop_reason)" = "safety-trip" ] && pass "safety deny trips" || fail "stop_reason=$(stop_reason)"
-
-# 6b. child allowlist is derived from the config's commands (test_cmd "bash ./run_tests.sh")
-jq -e '.permissions.allow | index("Bash(bash:*)")' .loop/run/child-settings.json >/dev/null && pass "child allowlist carries the test runner" || fail "runner rule missing from child-settings.json"
-jq -e '.permissions.allow | index("Bash(git push:*)")' .loop/run/child-settings.json >/dev/null && fail "git push allowlisted" || pass "git push not allowlisted"
-[ -f .loop/wt/loop/.loop/map.json ] && pass "map.json written into the loop worktree for check_plan" || fail "no worktree map.json"
 
 # 7b. scope deny (read-only wandering) → logged, not a trip
 P=$(mkproject); cd "$P"

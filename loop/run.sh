@@ -321,6 +321,9 @@ while :; do
     state_set --arg t "$TASK" --argjson r "$RUNG" '.task=$t | .rung=$r | .phase="PLAN"'
     event PICK mode="$MODE" task="$TASK" rung="$RUNG"
 
+    # The goal lives outside the worktree (tamper-evident); the child gets a
+    # per-iteration copy it is allowed to read.
+    cp "$GOAL" "$ITER_DIR/goal.md" 2>/dev/null || true
     # ---- PROMPT ---------------------------------------------------------
     STEP="prompt"; beat
     PREV_SUMMARY="$WT/.loop/iterations/$((ITER - 1))/summary.md"; [ -f "$PREV_SUMMARY" ] || PREV_SUMMARY="(none)"
@@ -331,7 +334,7 @@ import sys, pathlib
 src, dst = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
 subs = {
  "ITER": "$ITER", "PROJECT_DIR": "$PROJECT", "LOOP_WT": "$WT", "LOOP_BRANCH": "$BRANCH",
- "KIT": "$KIT", "CONFIG": "$CONFIG", "GOAL": "$GOAL", "TARGET": "$ITER_DIR/target.json",
+ "KIT": "$KIT", "CONFIG": "$CONFIG", "GOAL": "$ITER_DIR/goal.md", "TARGET": "$ITER_DIR/target.json",
  "GOAL_TEXT": pathlib.Path("$GOAL").read_text(), "TARGET_JSON": pathlib.Path("$ITER_DIR/target.json").read_text(),
  "BACKLOG": "$BACKLOG", "SCORES_TAIL": """$SCORES_TAIL""", "PREV_SUMMARY": "$PREV_SUMMARY",
  "ARCH": "$ARCH", "MODE": "$MODE", "SETUP_CMD": """$SETUP_CMD""", "TEST_CMD": """$TEST_CMD""",
@@ -539,7 +542,8 @@ PY
     fi
     # The planner's backlog/questions edits are real state: commit them on the
     # loop branch so the next fresh child (and the human) sees them.
-    (cd "$WT" && git add -f .loop/backlog.yaml .loop/questions.md 2>/dev/null; git diff --cached --quiet || git commit -q -m "nightshift: backlog after iteration $ITER") >>"$RUN/loop.log" 2>&1 || true
+    # (one `git add` per file: a single add with a missing pathspec adds nothing)
+    (cd "$WT" && for f in .loop/backlog.yaml .loop/questions.md; do [ -f "$f" ] && git add -f "$f"; done; git diff --cached --quiet || git commit -q -m "nightshift: backlog after iteration $ITER") >>"$RUN/loop.log" 2>&1 || true
     event ITER_DONE outcome="$OUTCOME" composite="$COMPOSITE" delta="$DELTA" spent="$SPENT"
     note "iteration $ITER done outcome=$OUTCOME composite=$COMPOSITE delta=$DELTA spent=$SPENT"
 

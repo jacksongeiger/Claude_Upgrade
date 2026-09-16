@@ -46,10 +46,20 @@ validated by running it on itself (rdx as the project).
 block); de-duplicating by message id under-counts by 40%. The meter keeps the
 pessimistic sum and the dryrun tolerance is asymmetric, −10% / +35%.
 
-**Numbers:** 158 kit unit tests + 4 shell suites green; rdx eval score 91.68;
-loop score on this repo 92.33 after two paid iterations totalling $10.34.
+**Numbers:** 159 kit unit tests + 4 shell suites green; rdx eval score 91.68;
+loop score on this repo 85.08 → 94.90 over three kept iterations, $16.24 paid
+across four dryruns (one of which merged nothing).
 
-DRYRUN4_LINE
+4. *Unattended, end to end.* Dryrun 4 with the derived allowlist: plan →
+   two Sonnet executors in parallel → two fresh reviewers approved (GOAL
+   line 2, +36 and +24 tests, nothing weakened) → union review → `merge.sh`
+   kept both → the driver scored, kept, mapped, and stopped `dryrun-complete`
+   with `dryrun_ok: true`. Composite 92.33 → 94.90 (tests 382 → 440,
+   coverage 85.5% → 94.1%), $5.47, live meter +16%, main untouched, executor
+   worktrees pruned. Its close step exposed the last defect: a single
+   `git add` with a missing `questions.md` pathspec added nothing, so the
+   planner's backlog edits were never committed; one add per file now, with
+   a driver test.
 
 ### v2.7 — 2026-09-16 — make it usable: global by default, a live switch that survives a GUI launch, `/ard`
 

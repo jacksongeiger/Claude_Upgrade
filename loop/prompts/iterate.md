@@ -7,7 +7,7 @@ Iteration: {{ITER}}
 Project: {{PROJECT_DIR}}   (you are in the loop worktree: {{LOOP_WT}}, branch {{LOOP_BRANCH}})
 Kit: {{KIT}}
 Config: {{CONFIG}} (outside your allowed directories — do not read it; every field you need from it is on this page)
-Goal file: {{GOAL}} (outside your allowed directories — do not try to read it; the reviewer agent reads it). Numbered lines; the reviewer must cite one. Contents:
+Goal file: {{GOAL}} (a copy inside this iteration's directory; give this path to the reviewer). Numbered lines; the reviewer must cite one. Contents:
 {{GOAL_TEXT}}
 Target: what pick.py chose and why (inlined; do not re-read {{TARGET}}). You did not choose the component; do not relitigate it. Contents:
 {{TARGET_JSON}}
