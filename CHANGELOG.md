@@ -41,14 +41,33 @@ validated by running it on itself (rdx as the project).
    (`safety` trips, `scope`/`install` only log) and the trip looks only at the
    current iteration's events.
 
+5. *A project that is not the kit.* Bootstrapped on a fresh clone of
+   `jazzband/prettytable` (pyproject, src layout, test extras, 95.5%
+   coverage). `init.py --propose` first guessed `pip install -r
+   requirements.txt` for a project with no requirements file, a system-python
+   test command, no coverage command, and a target (95) the project already
+   beat, so the loop would have had nothing to do; the seeded backlog's only
+   row was a TODO with no dimension, which pick.py cannot choose; and a
+   backlog that main does not track never reached the loop worktree. All
+   fixed: editable install with the declared test extras, the venv
+   interpreter everywhere, `src/<pkg>` for `--cov`, pytest-cov counted when
+   declared, targets at least baseline + 5, coverage-gap rows measured
+   against the target, and the driver seeds an untracked backlog onto the
+   loop branch. The guard now allows `pip install -e '.[tests]'` (installing
+   the project itself is setup). Then one dryrun: two executors, two
+   approvals, union review, both merged, 97.77 → 99.67 (tests 338 → 373,
+   coverage 95.5% → 99.3%), $4.88, live meter −6%, zero denials, its
+   `main` untouched.
+
 **Cost meter:** summing per-line usage from `stream-json` over-counts the
 `result` figure by 8–32% (assistant messages are re-emitted per content
 block); de-duplicating by message id under-counts by 40%. The meter keeps the
 pessimistic sum and the dryrun tolerance is asymmetric, −10% / +35%.
 
-**Numbers:** 159 kit unit tests + 4 shell suites green; rdx eval score 91.68;
-loop score on this repo 85.08 → 94.90 over three kept iterations, $16.24 paid
-across four dryruns (one of which merged nothing).
+**Numbers:** 165 kit unit tests + 4 shell suites green; rdx eval score 91.68;
+loop score on this repo 85.08 → 94.90 over three kept iterations, and
+97.77 → 99.67 on prettytable in one; $21.12 paid across five dryruns (one of
+which merged nothing).
 
 4. *Unattended, end to end.* Dryrun 4 with the derived allowlist: plan →
    two Sonnet executors in parallel → two fresh reviewers approved (GOAL

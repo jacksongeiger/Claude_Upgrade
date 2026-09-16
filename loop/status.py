@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -419,6 +420,12 @@ def run(argv=None) -> int:
 def main(argv=None) -> int:
     try:
         return run(argv)
+    except BrokenPipeError:  # `status.py | head` is normal use, not an error
+        try:
+            sys.stdout = open(os.devnull, "w")
+        except OSError:
+            pass
+        return 0
     except Exception as e:  # status.py must never crash the terminal session
         print(f"status.py: unexpected error: {e}", file=sys.stderr)
         return 0

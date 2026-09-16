@@ -228,6 +228,12 @@ if [ ! -f "$WT/.loop/backlog.yaml" ] && [ -f "$LOOP/backlog.yaml" ]; then
     (cd "$WT" && git add -f .loop/backlog.yaml && git commit -q -m "nightshift: seed backlog") >>"$RUN/loop.log" 2>&1 || true
     note "seeded .loop/backlog.yaml on $BRANCH from the main checkout"
 fi
+# The baseline coverage report was produced in the main checkout by init; give
+# the first child a copy so the planner does not re-run coverage to learn what
+# scores.jsonl already knows.
+if [ -f "$LOOP/run/coverage.json" ] && [ ! -f "$WT/.loop/run/coverage.json" ]; then
+    mkdir -p "$WT/.loop/run" && cp "$LOOP/run/coverage.json" "$WT/.loop/run/coverage.json"
+fi
 # The loop worktree belongs to the loop. Anything uncommitted in it is debris
 # from a killed child (executors commit in their own worktrees; the driver
 # merges); everything of value is on the loop branch. Clean, note, continue.
