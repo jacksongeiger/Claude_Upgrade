@@ -116,12 +116,21 @@ jq -n --arg lk "$LOOP_KIT" --argjson allow "$ALLOW_JSON" '{worktree:{baseRef:"he
          PreToolUse:[{matcher:"Agent",hooks:[{type:"command",command:("bash "+$lk+"/hooks/budget-gate.sh"),timeout:5}]}]}}' > "$CHILD_SETTINGS"
 AGENTS_JSON=$(python3 "$LOOP_KIT/agents_json.py" --no-ui)
 
+# an accepted milestone closes its spec rows in the loop's backlog (worktree and project)
+mark_rows_done() {
+    for b in "$WT/.loop/backlog.yaml" "$PROJECT/.loop/backlog.yaml"; do
+        [ -f "$b" ] && python3 "$KIT/mark_done.py" --spec "$SPEC" --milestone "$1" --backlog "$b" >>"$RUN/build.log" 2>&1 || true
+    done
+    (cd "$WT" && git add -f .loop/backlog.yaml 2>/dev/null; git diff --cached --quiet || git commit -q -m "build: $1 accepted, backlog rows closed") >>"$RUN/build.log" 2>&1 || true
+}
+
 # ---- accept-only: re-run the script's verdict on the existing worktree -------
 if [ -n "$ACCEPT_ONLY" ]; then
     STEP="accept"; MS="$ACCEPT_ONLY"; ITER_DIR="$WT/.pipeline/build/$MS"; mkdir -p "$ITER_DIR"
     python3 "$KIT/accept.py" --spec "$SPEC" --milestone "$MS" --workdir "$WT" --out "$ITER_DIR/acceptance.final.json" 2>>"$RUN/build.log"; ARC=$?
     case "$ARC" in
       0) python3 "$KIT/milestone.py" --spec "$SPEC" --state "$STATE" set "$MS" done --note "accepted (accept-only)" >/dev/null
+         mark_rows_done "$MS"
          git -C "$WT" tag -f "build/$MS" >/dev/null 2>&1 || true; event MILESTONE_DONE "id=$MS (accept-only)"; stop complete "accept-only $MS done"; exit 0 ;;
       2) event MILESTONE_BLOCKED "id=$MS (accept-only)"; stop complete "accept-only $MS: checks failed"; exit 3 ;;
       *) event MILESTONE_INFRA "id=$MS exit=$ARC (accept-only)"; stop infra "accept-only $MS exit $ARC"; exit 4 ;;
@@ -220,6 +229,7 @@ PY
     python3 "$KIT/accept.py" --spec "$SPEC" --milestone "$MS" --workdir "$WT" --out "$ITER_DIR/acceptance.final.json" >>"$RUN/build.log" 2>&1; ARC=$?
     case "$ARC" in
       0) python3 "$KIT/milestone.py" --spec "$SPEC" --state "$STATE" set "$MS" done --note "accepted iter $ITER" >/dev/null
+         mark_rows_done "$MS"
          git -C "$WT" tag -f "build/$MS" >/dev/null 2>&1 || true
          event MILESTONE_DONE "id=$MS cost=$CHARGE"; DONE_COUNT=$((DONE_COUNT+1)) ;;
       2) FAILS=$(jq -r '[.features[] | .checks[] | select(.ok==false) | (.type + ":" + (.detail|tostring|.[0:80]))] | join("; ")' "$ITER_DIR/acceptance.final.json" 2>/dev/null || echo "?")
