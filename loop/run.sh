@@ -381,7 +381,7 @@ subs = {
  "KIT": "$KIT", "CONFIG": "$CONFIG", "GOAL": "$ITER_DIR/goal.md", "TARGET": "$ITER_DIR/target.json",
  "GOAL_TEXT": pathlib.Path("$GOAL").read_text(), "TARGET_JSON": pathlib.Path("$ITER_DIR/target.json").read_text(),
  "BACKLOG": "$BACKLOG", "SCORES_TAIL": """$SCORES_TAIL""", "PREV_SUMMARY": "$PREV_SUMMARY",
- "ARCH": "$ARCH", "MODE": "$MODE", "SETUP_CMD": """$SETUP_CMD""", "TEST_CMD": """$TEST_CMD""",
+ "ARCH": "$ARCH", "MODE": "$MODE", "SETUP_CMD": """$SETUP_CMD""", "TEST_CMD": """$TEST_CMD""", "BUDGET": "$BUDGET",
  "MAX_FANOUT": "$MAX_FANOUT", "OPUS_ALLOWED": "$OPUS", "ITER_DIR": "$ITER_DIR", "QUESTIONS": "$QUESTIONS",
 }
 t = src.read_text()

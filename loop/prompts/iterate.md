@@ -21,6 +21,12 @@ Setup command for fresh worktrees: `{{SETUP_CMD}}`
 Test command: `{{TEST_CMD}}`
 Max parallel executors: {{MAX_FANOUT}}
 Opus allowed: {{OPUS_ALLOWED}}
+Budget for this whole iteration: ${{BUDGET}} — you, every executor, every
+reviewer. Observed costs: a Sonnet executor $1.2–2.0, a reviewer $0.3–0.5,
+your own planning $0.5–1.5. An iteration that spends the budget on executors
+and cannot afford their reviews merges nothing, so size the fan-out to what
+the budget covers with reviews and $1 to spare — one well-specified subtask
+that lands beats three that don't.
 
 ## If mode is `harvest` or `hypothesize`
 
