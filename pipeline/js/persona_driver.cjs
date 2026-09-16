@@ -154,8 +154,16 @@ async function firstOf(candidates) {
   return null;
 }
 
+// A plain word ("Title", "New note") is never a CSS selector, even when it
+// happens to be a tag name: `Title` would match the document's <title>.
+function looksLikeCss(target) {
+  // plain prose: letters, spaces, light punctuation, a dot only at the end
+  if (/^[A-Za-z][A-Za-z0-9 ,'’!?-]*[.!?]?$/.test(target)) return false;
+  return /^[#.\[]|[>:\[\]=~*]|^\w+(\.|#)\w/.test(target);
+}
+
 async function resolveLocator(page, target, intent) {
-  const css = () => page.locator(target);
+  const css = () => (looksLikeCss(target) ? page.locator(target) : page.locator('__no_such_selector__'));
   const label = () => page.getByLabel(target, { exact: false });
   const placeholder = () => page.getByPlaceholder(target, { exact: false });
   const textbox = () => page.getByRole('textbox', { name: target, exact: false });
