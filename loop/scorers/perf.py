@@ -93,6 +93,14 @@ def main():
                 continue
             if isinstance(obj, dict) and "metric" in obj and "value" in obj:
                 reported[obj["metric"]] = obj
+            elif isinstance(obj, dict):
+                # the pipeline's bench shape: {"ms_p95": 12.3, ...} — one
+                # numeric key per metric, lower is better unless the config
+                # says otherwise
+                for k, v in obj.items():
+                    if isinstance(v, (int, float)) and not isinstance(v, bool):
+                        reported[k] = {"metric": k, "value": v, "unit": "",
+                                       "lower_is_better": cfg.get("lower_is_better", True)}
 
         metric_scores = {}
         for metric, base_val in baseline.items():

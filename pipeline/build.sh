@@ -172,6 +172,8 @@ PY
 
     STEP="child"
     rm -f "$RUN/child.pgid"
+    # the live meter resumes from state.json: start this child's count at zero
+    [ -f "$LOOP/state.json" ] && jq '.live_spend_usd = 0 | .agents = [] | .phase = "PLAN"' "$LOOP/state.json" > "$LOOP/state.json.tmp" 2>/dev/null && mv "$LOOP/state.json.tmp" "$LOOP/state.json" || echo '{"live_spend_usd":0,"agents":[],"phase":"PLAN"}' > "$LOOP/state.json"
     ( cd "$WT"
       export NIGHTSHIFT_CONFIG="$CONFIG" NIGHTSHIFT_KIT="$LOOP_KIT" NIGHTSHIFT_ITER_DIR="$ITER_DIR"
       setsid bash -c 'echo $$ > "$1"; shift; exec "$@"' _ "$RUN/child.pgid" \

@@ -1,6 +1,61 @@
 # Changelog
 
 ---
+### v3.1 — 2026-09-16 — the project pipeline: idea to Nightshift
+
+**What changed:** a new `pipeline/` kit and six commands — `/jg-spec`,
+`/jg-tools`, `/jg-build`, `/jg-ux`, `/jg-ship`, `/jg-feedback` — on one spine,
+`spec.json`. Two new agents (`persona`, the fresh-eyes user with a browser and
+no code; `persona-judge`, a fixed-rubric grader with fresh context), a
+Playwright driver, an acceptance runner, screenshot and perf gates, a
+tooling planner, a ship checklist, a feedback miner, and a build driver that
+reuses every Nightshift part: agents, worktrees, guards, allowlist, cost
+meter, `check_plan.py`, `merge.sh`.
+
+**Why:** the vision was a building environment that interviews you, sets up
+its tools, builds in parallel worktrees, checks how the product *feels* with
+a user who has never seen it, tests, ships, and then improves itself. Nightshift
+was the last box; this is the rest, built the same way: a script decides at
+every gate, every stage writes a file the next reads with fresh context, and
+the human decides at six named points (spec signed, every install, milestone
+merge to main, token approval, first screenshot baseline, deploy).
+
+**How it was built:** Fable wrote the contract (`pipeline/README.md`) and the
+prompts, agents and drivers; six Sonnet builders wrote the independent
+scripts in parallel against that contract with their own tests (118); an
+integration test runs a synthetic project through the drivers with the fake
+model. Then a real project.
+
+**What the real project found.** A Vite + vitest notes app was interviewed
+(unattended, from a file of the human's answers, $1.48 — the interview even
+measured its own feasibility assumption), tooled, and built. Milestone 1
+landed real code on the first try (an Opus executor: CRUD, localStorage,
+UI, tests at 99% coverage, reviewed and merged, $5.25), and then the
+acceptance script refused to call it done — correctly — which surfaced, in
+order:
+
+- nothing in the build ran the persona: acceptance now runs it itself, with
+  the server from the spec and metered persona + judge children;
+- lighthouse could not find Chrome: it now uses Playwright's Chromium;
+- the persona typed into the browser tab: "Title" is a valid CSS selector
+  for `<title>`, so plain words are never selectors now, and typing targets
+  resolve label → placeholder → textbox before text;
+- the judge could not read its rubric (outside its allowed directories):
+  the rubric is copied into the run dir, and a verdict that only made it
+  into the reply is salvaged into the file;
+- "open the note called groceries" found an empty app, because every
+  walkthrough starts in a fresh browser: persona checks now carry a scripted
+  `setup` that creates the starting state without counting as steps, and a
+  stuck or stale run is set aside rather than reused;
+- the interview left `needs` empty and `stack.serve` unset: `spec_check`
+  now requires both to match the checks, and the interview asks.
+
+After those: create-note passed persona (5 steps, judge 9/10, score 92) and
+lighthouse (accessibility 91), edit-note passed persona (3 steps, judge
+10/10), and milestone 1 was accepted by the script.
+
+PIPELINE_RESULTS
+
 ### v3.0 — 2026-09-16 — Nightshift: the unattended improvement loop
 
 **What changed:** a new `loop/` kit (driver `run.sh`, `pick.py`, `check_plan.py`,

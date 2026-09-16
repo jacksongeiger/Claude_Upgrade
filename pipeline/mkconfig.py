@@ -66,8 +66,17 @@ def main(argv=None):
                      for f in spec.get("features", []) for c in f.get("acceptance", []) if c.get("type") == "persona"]
             entry.update({"serve_cmd": serve.get("cmd"), "port": serve.get("port"), "tasks": tasks})
         elif name == "perf":
-            bench = (assess.get("bench") or {}).get("cmd")
-            entry.update({"cmd": bench or "echo '{\"value\": 0}'", "script": "cmd"})
+            # the spec's perf checks are the bench: their budget stands in for
+            # a baseline until the first measured run replaces it
+            perf_checks = [c for f in spec.get("features", []) for c in f.get("acceptance", []) if c.get("type") == "perf"]
+            if perf_checks:
+                first = perf_checks[0]
+                bound = first.get("max", first.get("min"))
+                entry.update({"bench_cmd": first["cmd"], "baseline": {first["metric"]: bound},
+                              "lower_is_better": "max" in first})
+            else:
+                bench = (assess.get("bench") or {}).get("cmd")
+                entry.update({"cmd": bench or "echo '{\"value\": 0}'", "script": "cmd"})
         elif name == "evals":
             entry.update({"dir": (assess.get("evals") or {}).get("dir") or "evals"})
         scorers.append(entry)
