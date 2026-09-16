@@ -120,7 +120,9 @@ Rules `spec_check.py` enforces (exit 2 on any violation, one line per problem):
   and must be ≤ 20% of features;
 - acceptance types and required fields:
   `test {cmd, must:pass}` · `perf {cmd, metric, max|min}` ·
-  `lighthouse {url, min:{category:score}}` · `persona {task, max_steps, must:complete}` ·
+  `lighthouse {url, min:{category:score}}` · `persona {task, max_steps, must:complete, setup?:[driver actions]}`
+  (every walkthrough starts in a fresh browser; `setup` is the scripted state the
+  task starts from — replayed before every persona action, never counted as steps) ·
   `gate {name, kind:screenshot|perf, ...}` · `evals {cmd, min}` · `manual {what}`;
 - milestone ids unique, `depends_on` acyclic, every feature's milestone exists;
 - `needs` ⊆ {ui, unit-tests, coverage, lighthouse, persona, perf, evals, llm, db, auth, deploy}, and

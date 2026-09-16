@@ -294,9 +294,11 @@ async function main() {
         throw new Error(`--actions must be a JSON array: ${err.message}`);
       }
       const lines = [];
+      let userSteps = 0;
       for (const action of actions) {
         step += 1;
         const line = await runStep(page, args.run, step, action);
+        if (action && action.setup) line.setup = true; else userSteps += 1;
         console.log(JSON.stringify(line));
         lines.push(line);
         if (action && action.action === 'done') {
@@ -305,7 +307,8 @@ async function main() {
         }
       }
       writeTrail(args.run, lines);
-      if (finalStatus) writeResult(args.run, finalStatus, step);
+      // `done` itself is not a step
+      if (finalStatus) writeResult(args.run, finalStatus, Math.max(0, userSteps - 1));
     } else {
       // persistent: one action per stdin line.
       writeTrail(args.run, []);
@@ -329,6 +332,7 @@ async function main() {
         }
         step += 1;
         const line = await runStep(page, args.run, step, action);
+        if (action && action.setup) line.setup = true;
         console.log(JSON.stringify(line));
         appendTrail(args.run, line);
         if (action && action.action === 'done') {

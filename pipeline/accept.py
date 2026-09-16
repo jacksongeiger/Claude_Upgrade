@@ -217,6 +217,21 @@ def run_lighthouse_check(check, workdir, timeout, args, spec):
 PERSONA_RUN_PY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "persona_run.py")
 
 
+def _git_head(workdir):
+    try:
+        return subprocess.run(["git", "rev-parse", "HEAD"], cwd=workdir, capture_output=True, text=True, timeout=10).stdout.strip() or None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def _load_json_file(path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
 class _Server:
     """Start spec.stack.serve once for all persona checks of an accept run."""
 
@@ -259,6 +274,16 @@ def run_persona_check(check, workdir, feature_id, n, timeout, args=None, spec=No
     trail_path = os.path.join(run_dir, "trail.json")
     if not os.path.exists(UX_SCORE_PY):
         return check_result("persona", None, "no persona run", "infra")
+    # A run is reusable only if it completed and was made against this very
+    # tree; a stuck run, or one from before the code changed, is stale and is
+    # kept aside for the record.
+    head = _git_head(workdir)
+    if os.path.exists(trail_path):
+        meta = _load_json_file(os.path.join(run_dir, "run.json")) or {}
+        res = _load_json_file(os.path.join(run_dir, "result.json")) or {}
+        if res.get("status") != "complete" or (head and meta.get("head") and meta.get("head") != head):
+            import time
+            os.rename(run_dir, run_dir + ".stale-" + time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()))
     if not os.path.exists(trail_path):
         # No walkthrough yet: do it now. The server comes from the spec; the
         # persona and judge are metered claude -p children of persona_run.py.
@@ -269,9 +294,13 @@ def run_persona_check(check, workdir, feature_id, n, timeout, args=None, spec=No
         if not base:
             return check_result("persona", None, "no persona run: server did not start (spec.stack.serve)", "infra")
         cmd = [sys.executable, PERSONA_RUN_PY, "--url", base + (check.get("url") or "/"), "--task", check["task"],
-               "--max-steps", str(check.get("max_steps", 6)), "--run-dir", run_dir, "--workdir", workdir]
+               "--max-steps", str(check.get("max_steps", 6)), "--run-dir", run_dir, "--workdir", workdir,
+               "--setup", json.dumps(check.get("setup") or [])]
         if check.get("persona"):
             cmd += ["--persona", check["persona"]]
+        os.makedirs(run_dir, exist_ok=True)
+        with open(os.path.join(run_dir, "run.json"), "w") as f:
+            json.dump({"head": head, "feature": feature_id, "task": check["task"]}, f)
         try:
             subprocess.run(cmd, capture_output=True, text=True, timeout=max(timeout, 1800))
         except (subprocess.TimeoutExpired, OSError) as e:

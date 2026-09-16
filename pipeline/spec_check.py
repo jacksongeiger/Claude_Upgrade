@@ -115,6 +115,10 @@ def _check_acceptance(entry, feat_id, idx):
             problems.append(f"feature {feat_id} acceptance[{idx}] (persona): 'max_steps' must be a positive int")
         if entry.get("must") != "complete":
             problems.append(f"feature {feat_id} acceptance[{idx}] (persona): must must be 'complete'")
+        setup = entry.get("setup")
+        if setup is not None:
+            if not isinstance(setup, list) or not all(isinstance(a, dict) and a.get("action") in ("goto", "click", "fill", "press") for a in setup):
+                problems.append(f"feature {feat_id} acceptance[{idx}] (persona): 'setup' must be a list of driver actions (goto|click|fill|press)")
     elif t == "gate":
         need("name")
         if entry.get("kind") not in ("screenshot", "perf"):

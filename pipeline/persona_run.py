@@ -145,14 +145,20 @@ def main(argv=None):
     ap.add_argument("--model", default="sonnet")
     ap.add_argument("--budget", type=float, default=1.5)
     ap.add_argument("--workdir", default=None)
+    ap.add_argument("--setup", default="[]", help="JSON list of driver actions that create the task's starting state")
     a = ap.parse_args(argv)
+    try:
+        setup = json.loads(a.setup) if a.setup else []
+    except json.JSONDecodeError:
+        print(json.dumps({"ok": False, "error": "--setup is not JSON"}))
+        return 1
     run_dir = str(Path(a.run_dir).resolve())
     os.makedirs(run_dir, exist_ok=True)
     driver = str(KIT / "js" / "persona_driver.cjs")
     cwd = a.workdir or os.path.dirname(run_dir)
 
     spec = {"url": a.url, "task": a.task, "persona": a.persona, "max_steps": a.max_steps,
-            "run_dir": run_dir, "driver": driver}
+            "run_dir": run_dir, "driver": driver, "setup": setup}
     prompt = ("Invoke the `persona` agent exactly once with this JSON and nothing else, "
               "then reply with its final JSON verbatim:\n" + json.dumps(spec))
     cost, err = claude(prompt, a.model, a.budget, cwd,

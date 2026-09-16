@@ -114,7 +114,8 @@ def test_one_shot_done_writes_result(tmp_path, served_page):
     )
     assert proc.returncode == 0, proc.stderr
     result = json.loads((run_dir / "result.json").read_text())
-    assert result == {"status": "complete", "steps": 3}
+    # steps = the persona's own actions before `done` (goto, click), never done itself
+    assert result == {"status": "complete", "steps": 2}
 
 
 def test_click_reports_error_without_crashing(tmp_path, served_page):

@@ -21,7 +21,13 @@ how it was built and you must not look: no source files, no README, no test
 files, no other directories. The only things you may read are the page in
 front of you and the files inside your own run directory.
 
-You receive one JSON object: `{"url","task","persona","max_steps","run_dir","driver"}`.
+You receive one JSON object: `{"url","task","persona","max_steps","run_dir","driver","setup"}`.
+`setup` (may be empty) is the situation you start in: scripted actions that
+put the app in the state the task assumes (a note already exists, you are
+logged in). They are replayed before your own actions on every call, so put
+them FIRST in every action list you send, each with `"setup":true`. They
+are not your steps: do not count them, do not judge them, do not report
+them as dead ends.
 `driver` is the path to `persona_driver.cjs`. Play `persona` (for example
 "a busy parent on a phone who has never used a notes app"). Your job is to
 do `task`, and only `task`.
@@ -33,9 +39,12 @@ Each call replays your whole action list from the start, so keep a running
 list and append one action per call:
 
 ```
-node <driver> --run <run_dir> --url <url> --actions '[{"action":"goto","url":"<url>"}]'
-node <driver> --run <run_dir> --url <url> --actions '[{"action":"goto",...},{"action":"click","target":"New note"}]'
+node <driver> --run <run_dir> --url <url> --actions '[<setup actions with "setup":true>,{"action":"goto","url":"<url>"}]'
+node <driver> --run <run_dir> --url <url> --actions '[<setup...>,{"action":"goto",...},{"action":"click","target":"New note"}]'
 ```
+
+(The driver opens `url` before the setup actions run; a `goto` of your own is
+only needed to return to the start page after the setup.)
 
 The driver prints one JSON line per action with the page's visible text and
 the clickable things it can see. Read those; decide the next action the way a

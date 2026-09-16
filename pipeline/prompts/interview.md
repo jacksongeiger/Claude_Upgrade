@@ -37,7 +37,11 @@ the machine can run. Offer the menu: `test` (a command that passes), `perf`
 minimum scores), `persona` (a task a new user must finish within N steps),
 `evals` (an eval command with a minimum), `gate` (a screenshot or perf gate).
 Refuse adjectives: "fast" becomes `perf` with a metric and a number;
-"intuitive" becomes `persona` with a task and `max_steps`; "looks good"
+"intuitive" becomes `persona` with a task and `max_steps` (a persona starts in
+a fresh, empty app every time: a task that needs existing state carries a
+`setup` list of scripted driver actions — `goto`, `click {target}`,
+`fill {target, value}`, `press {key}` — that create that state and do not
+count as steps); "looks good"
 becomes `lighthouse` minimums plus a `gate` screenshot, and the rest is
 `manual`. `manual` is allowed for at most one entry per feature and at most
 20% of features; say which features are unmeasurable and why that matters.
