@@ -228,12 +228,30 @@ sums `usage` from every assistant message and prices via pricing.json → `live_
 is charged `max(live_spend, per_iter_max_usd)`. `run.sh` refuses to start an
 iteration when `spent + min_iter_usd > cap`, spawns the child with
 `--max-budget-usd min(per_iter_max, cap − spent)`, and kills the child's process
-group when `spent + live_spend ≥ cap`. The dryrun asserts `|result − live| / result ≤ 0.10`.
+group when `spent + live_spend ≥ cap`. The dryrun asserts the signed
+`(live − result) / result` is within [−0.10, +0.35] (the live sum over-counts
+because assistant messages are re-emitted per content block).
+
+## Permissions (what the child may run at all)
+
+The child runs with `--permission-prompts none`, so anything not on the
+allowlist is a deny for the planner and every executor alike. `allowlist.py`
+is the single source: a fixed read-only set, the kit's own scripts, common
+runners, and the first word of every segment of every configured command
+(`setup_cmd`, `test_cmd`, each scorer's `cmd`/`coverage_cmd`), plus the
+repo-root spelling of a `cd X && ./bin` runner. `run.sh` hands it to the child
+via `--settings`; `init.py` writes the same rules into the project's
+`.claude/settings.json`; `check_plan.py` refuses any `acceptance_cmd` an
+executor could not run. No `git push`, no bare `git`, no `Bash(*)`. Commands
+containing `$VAR`, `$(...)` or backticks are denied by Claude Code regardless
+of the allowlist; the prompts say so and check_plan treats them as denied.
 
 ## Guards (subagent-scoped hooks on the executor definitions)
 
 `hooks/guard.sh` (PreToolUse, matcher `Bash|Write|Edit|MultiEdit`):
-- Bash deny regex: `git push|git checkout (main|master)|git switch (main|master)|git branch -[fDd]|git merge|git rebase|git reset --hard|git worktree|gh pr merge|rdx install|npm i(nstall)?|pip install|uv add|brew |cargo add|curl .*\| *(ba)?sh|sudo |rm -rf (/|~|\$HOME|\.\.)|claude plugin`
+- Bash deny, `safety`: `git push|git checkout/switch (main|master)|git branch -[fDd]|git merge|git rebase|git reset --hard|git worktree (add|remove|prune|move|lock|unlock)|gh pr merge|GIT_DIR=|GIT_WORK_TREE=`
+- Bash deny, `scope`: `git worktree …|git -C …` (read-only wandering)
+- Bash deny, `install`: `rdx install|npm i(nstall)?|pip install <pkg>|uv add|brew |cargo add|curl .*\| *(ba)?sh|sudo |rm -rf (/|~|\$HOME|\.\.)|claude plugin|claude mcp`, except the project's own pinned manifest (`pip install -r <file>`, `npm ci`, `uv sync`, `go mod download`, `cargo fetch`)
 - Write/Edit deny: realpath(file_path) not under `$NIGHTSHIFT_WORKTREE`, or under
   `.claude/`, `.loop/`, `.git/` within it.
 - Every deny appends `{"event":"deny","kind":...}` to events.jsonl. Kinds:
