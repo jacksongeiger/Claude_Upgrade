@@ -104,8 +104,18 @@ EOF2
     # realpath -m resolves without requiring existence (GNU); fall back to python.
     real=$(realpath -m "$fp" 2>/dev/null || python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$fp")
     wt=$(realpath -m "$cwd" 2>/dev/null || python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$cwd")
+    # Scratch files in a temp root (the session scratchpad lives under
+    # /tmp/claude-*) are harmless; any other path outside the worktree —
+    # another checkout above all — is a safety trip.
+    tmproot=$(realpath -m "${TMPDIR:-/tmp}" 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}")
     case "$real" in
       "$wt"/*) ;;
+      /tmp/*|/private/tmp/*|/var/folders/*|"$tmproot"/*)
+        # a temp path that is inside some git checkout is another project, not scratch
+        if git -C "$(dirname "$real")" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            deny "write into another checkout: $real" "safety"
+        fi
+        exit 0 ;;
       *) deny "write outside the executor worktree: $real" "safety" ;;
     esac
     rel=${real#"$wt"/}

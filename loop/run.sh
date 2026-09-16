@@ -105,6 +105,11 @@ on_exit() {
     local rc=$?
     trap - EXIT INT TERM
     if [ -z "$STOP_REASON" ]; then
+        # Dying with a child in flight (kill, TERM, crash): the money is spent
+        # even though the COST step never ran — charge it pessimistically.
+        if [ "$STEP" = "child" ] && [ -f "$STATE" ]; then
+            jq --argjson p "${PER_ITER:-0}" '.spent_usd = ((.spent_usd // 0) + ([(.live_spend_usd // 0), $p] | max)) | .live_spend_usd = 0' "$STATE" > "$STATE.tmp" 2>/dev/null && mv "$STATE.tmp" "$STATE" || true
+        fi
         local last; last=$(tail -n 1 "$RUN/loop.log" 2>/dev/null || echo "")
         stop "crashed-at-$STEP" "iter $ITER exit $rc — $last" || true
     fi

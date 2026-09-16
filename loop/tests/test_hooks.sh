@@ -24,7 +24,9 @@ denied "$(guard Write "{\"file_path\":\"$WT/new.py\",\"content\":\"x\"}")" && fa
 denied "$(guard Write "{\"file_path\":\"$D/repo/f\",\"content\":\"x\"}")" && pass "deny write to main checkout" || fail "allowed write to main checkout"
 denied "$(guard Edit "{\"file_path\":\"$WT/.claude/settings.json\"}")" && pass "deny write under .claude/" || fail "allowed .claude/ write"
 denied "$(guard Edit "{\"file_path\":\"$WT/.loop/backlog.yaml\"}")" && pass "deny write under .loop/" || fail "allowed .loop/ write"
-denied "$(guard Edit "{\"file_path\":\"$WT/../escape.txt\"}")" && pass "deny ../ escape" || fail "allowed ../ escape"
+denied "$(guard Edit "{\"file_path\":\"$WT/../repo/escape.txt\"}")" && pass "deny ../ escape into the main checkout" || fail "allowed ../ escape"
+denied "$(guard Write "{\"file_path\":\"/tmp/claude-0/some-session/scratchpad/dbg.mjs\",\"content\":\"x\"}")" && fail "denied a scratchpad write under /tmp" || pass "allow scratch write under /tmp"
+denied "$(guard Write "{\"file_path\":\"$HOME/elsewhere.txt\",\"content\":\"x\"}")" && pass "deny write under \$HOME" || fail "allowed write under \$HOME"
 denied "$(guard Edit "{\"file_path\":\"rel/inside.py\"}")" && fail "denied relative in-worktree path" || pass "allow relative in-worktree path"
 # deny is logged to the project's events stream (parent of the common git dir)
 grep -q '"event":"deny"' "$D/repo/.loop/events.jsonl" && pass "deny logged to events.jsonl" || fail "deny not logged"
