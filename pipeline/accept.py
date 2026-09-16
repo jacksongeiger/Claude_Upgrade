@@ -214,11 +214,70 @@ def run_lighthouse_check(check, workdir, timeout, args, spec):
     return check_result("lighthouse", ok, detail, "ok" if ok else "failed")
 
 
-def run_persona_check(check, workdir, feature_id, n, timeout):
+PERSONA_RUN_PY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "persona_run.py")
+
+
+class _Server:
+    """Start spec.stack.serve once for all persona checks of an accept run."""
+
+    def __init__(self):
+        self.proc = None
+        self.base = None
+
+    def ensure(self, serve_cmd, port, workdir):
+        if self.base or not serve_cmd or not port:
+            return self.base
+        import socket, time
+        self.proc = subprocess.Popen(["bash", "-c", serve_cmd], cwd=workdir, stdout=subprocess.DEVNULL,
+                                     stderr=subprocess.DEVNULL, start_new_session=True)
+        deadline = time.time() + 60
+        while time.time() < deadline:
+            try:
+                with socket.create_connection(("127.0.0.1", int(port)), timeout=1):
+                    self.base = f"http://127.0.0.1:{port}"
+                    return self.base
+            except OSError:
+                time.sleep(0.5)
+        self.stop()
+        return None
+
+    def stop(self):
+        if self.proc and self.proc.poll() is None:
+            import signal
+            try:
+                os.killpg(self.proc.pid, signal.SIGTERM)
+            except OSError:
+                pass
+        self.proc = None
+
+
+SERVER = _Server()
+
+
+def run_persona_check(check, workdir, feature_id, n, timeout, args=None, spec=None):
     run_dir = os.path.join(workdir, ".pipeline", "ux", f"{feature_id}-{n}")
     trail_path = os.path.join(run_dir, "trail.json")
-    if not os.path.exists(UX_SCORE_PY) or not os.path.exists(trail_path):
+    if not os.path.exists(UX_SCORE_PY):
         return check_result("persona", None, "no persona run", "infra")
+    if not os.path.exists(trail_path):
+        # No walkthrough yet: do it now. The server comes from the spec; the
+        # persona and judge are metered claude -p children of persona_run.py.
+        if not os.path.exists(PERSONA_RUN_PY) or args is None or spec is None:
+            return check_result("persona", None, "no persona run", "infra")
+        serve_cmd, port = _serve_config(check, args, spec)
+        base = SERVER.ensure(serve_cmd, port, workdir)
+        if not base:
+            return check_result("persona", None, "no persona run: server did not start (spec.stack.serve)", "infra")
+        cmd = [sys.executable, PERSONA_RUN_PY, "--url", base + (check.get("url") or "/"), "--task", check["task"],
+               "--max-steps", str(check.get("max_steps", 6)), "--run-dir", run_dir, "--workdir", workdir]
+        if check.get("persona"):
+            cmd += ["--persona", check["persona"]]
+        try:
+            subprocess.run(cmd, capture_output=True, text=True, timeout=max(timeout, 1800))
+        except (subprocess.TimeoutExpired, OSError) as e:
+            return check_result("persona", None, f"persona run failed: {e}", "infra")
+        if not os.path.exists(trail_path) and not os.path.exists(os.path.join(run_dir, "result.json")):
+            return check_result("persona", None, "no persona run: the persona produced nothing", "infra")
     try:
         proc = subprocess.run(
             [sys.executable, UX_SCORE_PY, "--check", json.dumps(check), "--run", run_dir],
@@ -272,9 +331,12 @@ def run_evals_check(check, workdir, timeout):
 def run_feature(feature, workdir, timeout, args, spec):
     results = []
     persona_n = 0
+    skip = set((getattr(args, "skip", "") or "").split(",")) - {""}
     for check in feature.get("acceptance", []):
         ctype = check.get("type")
-        if ctype == "test":
+        if ctype in skip:
+            results.append(check_result(ctype, None, "skipped (--skip)", "manual"))
+        elif ctype == "test":
             results.append(run_test_check(check, workdir, timeout))
         elif ctype == "perf":
             results.append(run_perf_check(check, workdir, timeout))
@@ -284,7 +346,7 @@ def run_feature(feature, workdir, timeout, args, spec):
             results.append(run_lighthouse_check(check, workdir, timeout, args, spec))
         elif ctype == "persona":
             persona_n += 1
-            results.append(run_persona_check(check, workdir, feature["id"], persona_n, timeout))
+            results.append(run_persona_check(check, workdir, feature["id"], persona_n, timeout, args, spec))
         elif ctype == "manual":
             results.append(run_manual_check(check))
         elif ctype == "evals":
@@ -301,6 +363,7 @@ def main(argv=None):
     ap.add_argument("--workdir", required=True)
     ap.add_argument("--out", default="acceptance.json")
     ap.add_argument("--serve-cmd", default=None)
+    ap.add_argument("--skip", default="", help="comma-separated check types to record as skipped (e.g. persona,lighthouse)")
     ap.add_argument("--port", type=int, default=None)
     ap.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_S)
     args = ap.parse_args(argv)
@@ -343,6 +406,7 @@ def main(argv=None):
         print(f"{fid}: {status} ({n_ok} ok, {n_failed} failed, {n_infra} infra, {n_manual} manual)")
 
     out["ok"] = not any_failed and not any_infra
+    SERVER.stop()
 
     with open(args.out, "w") as f:
         json.dump(out, f, indent=2)

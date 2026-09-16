@@ -224,3 +224,23 @@ def test_timeout_is_infra(tmp_path):
     check = data["features"]["f-001"]["checks"][0]
     assert check["ok"] is None
     assert "timed out" in check["detail"]
+
+
+def test_skip_records_checks_as_skipped(tmp_path):
+    import json, subprocess, sys
+    from pathlib import Path
+    kit = Path(__file__).resolve().parent.parent
+    spec = {"version": 1, "name": "x", "one_liner": "x", "stack": {"language": "bash", "serve": {"cmd": "true", "port": 1}},
+            "needs": ["unit-tests", "persona"], "milestones": [{"id": "m1", "title": "t", "depends_on": []}],
+            "features": [{"id": "f-1", "milestone": "m1", "title": "t",
+                          "acceptance": [{"type": "test", "cmd": "true", "must": "pass"},
+                                         {"type": "persona", "task": "do it", "max_steps": 3, "must": "complete"}]}],
+            "success": ["ok"]}
+    (tmp_path / "spec.json").write_text(json.dumps(spec))
+    out = tmp_path / "acc.json"
+    proc = subprocess.run([sys.executable, str(kit / "accept.py"), "--spec", str(tmp_path / "spec.json"), "--milestone", "m1",
+                           "--workdir", str(tmp_path), "--out", str(out), "--skip", "persona"], capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    data = json.loads(out.read_text())
+    checks = data["features"]["f-1"]["checks"]
+    assert checks[1]["type"] == "persona" and checks[1]["ok"] is None and "skipped" in checks[1]["detail"]

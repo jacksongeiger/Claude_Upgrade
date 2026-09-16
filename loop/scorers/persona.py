@@ -95,56 +95,36 @@ def build_agents_json():
 
 
 def run_task(claude_bin, workdir, url, task_cfg, run_idx):
+    """One walkthrough + judgment, through pipeline/persona_run.py (the same
+    runner accept.py uses), so Nightshift and the build score UX identically.
+    NIGHTSHIFT_CLAUDE is inherited by the runner as the claude binary."""
     task = task_cfg["task"]
     max_steps = task_cfg.get("max_steps", 6)
     persona = task_cfg.get("persona", "")
     slug = slugify(task)
     run_dir = os.path.join(workdir, ".pipeline", "ux", f"{slug}-{run_idx}")
     os.makedirs(run_dir, exist_ok=True)
-
-    prompt = (
-        f"You are a fresh-eyes user persona: {persona}\n\n"
-        f"Task: {task}\n"
-        f"Drive {url} with pipeline/js/persona_driver.cjs in one-shot mode, "
-        f"deciding one action at a time (max_steps: {max_steps}). Write your "
-        f"trail, screenshots and result into {run_dir}/ "
-        f'(result.json: {{"status","steps"}}; findings.json: '
-        f'{{"dead_ends":[...],"confusions":[...]}}).'
-    )
-
-    cmd = [claude_bin, "-p", prompt, "--model", "sonnet", "--max-turns", "40",
-           "--permission-mode", "acceptEdits", "--permission-prompts", "none",
-           "--output-format", "json"]
-    agents = build_agents_json()
-    if agents is not None:
-        cmd += ["--agents", agents]
-
+    runner = KIT_ROOT / "pipeline" / "persona_run.py"
+    cmd = [sys.executable, str(runner), "--url", url, "--task", task, "--max-steps", str(max_steps),
+           "--run-dir", run_dir, "--workdir", workdir]
+    if persona:
+        cmd += ["--persona", persona]
     env = dict(os.environ)
-    env["PERSONA_RUN_DIR"] = run_dir
-    env["PERSONA_TASK"] = task
-    env["PERSONA_URL"] = url
-
+    if claude_bin and claude_bin != "claude":
+        env["NIGHTSHIFT_CLAUDE"] = claude_bin
     try:
-        subprocess.run(cmd, cwd=workdir, env=env, capture_output=True, text=True,
-                        timeout=CLAUDE_RUN_TIMEOUT_S)
+        proc = subprocess.run(cmd, cwd=workdir, env=env, capture_output=True, text=True, timeout=CLAUDE_RUN_TIMEOUT_S)
     except (subprocess.TimeoutExpired, OSError) as e:
-        return {"run_dir": run_dir, "ok": False, "error": f"claude failed for task {task!r}: {e}"}
-
-    check = json.dumps({"type": "persona", "task": task, "max_steps": max_steps,
-                         "must": "complete"})
-    score_proc = subprocess.run(
-        [sys.executable, str(UX_SCORE), "--run", run_dir, "--check", check],
-        capture_output=True, text=True,
-    )
-    if score_proc.returncode == 4:
-        return {"run_dir": run_dir, "ok": False,
-                "error": f"no result.json for task {task!r} run {run_idx}"}
-
-    lines = [l for l in score_proc.stdout.splitlines() if l.strip()]
+        return {"run_dir": run_dir, "ok": False, "error": f"persona_run failed for task {task!r}: {e}"}
+    if proc.returncode == 4:
+        return {"run_dir": run_dir, "ok": False, "error": f"no result.json for task {task!r} run {run_idx}"}
+    lines = [l for l in proc.stdout.splitlines() if l.strip()]
     if not lines:
-        return {"run_dir": run_dir, "ok": False,
-                "error": f"ux_score.py produced no output for {run_dir}"}
-    score = json.loads(lines[-1])
+        return {"run_dir": run_dir, "ok": False, "error": f"persona_run produced no output for {run_dir}"}
+    try:
+        score = json.loads(lines[-1])
+    except json.JSONDecodeError:
+        return {"run_dir": run_dir, "ok": False, "error": f"unreadable score for {run_dir}: {lines[-1][:120]}"}
     return {"run_dir": run_dir, "ok": True, "score": score}
 
 

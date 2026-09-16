@@ -88,8 +88,10 @@ A second `revise` is a reject.
 
 ### 6. ACCEPT
 
-Run `python3 {{KIT}}/accept.py --spec {{PROJECT_DIR}}/spec.json --milestone {{MILESTONE}} --workdir {{BUILD_WT}} --out {{ITER_DIR}}/acceptance.json {{ACCEPT_EXTRA}}`.
-Exit 0: the milestone is done. Exit 2: read which checks failed; if the
+Run `python3 {{KIT}}/accept.py --spec {{BUILD_WT}}/spec.json --milestone {{MILESTONE}} --workdir {{BUILD_WT}} --out {{ITER_DIR}}/acceptance.json --skip persona,lighthouse {{ACCEPT_EXTRA}}`.
+(The driver runs the persona and lighthouse checks itself after you stop;
+they cost money and need a browser, so you skip them here.)
+Exit 0: the code part is done. Exit 2: read which checks failed; if the
 budget allows one more executor and the failure is in code the plan owns,
 dispatch one fix subtask for exactly those checks, review, merge, and run
 accept once more. Exit 4: an infrastructure problem you must not paper over;

@@ -61,6 +61,13 @@ NIGHTSHIFT_CLAUDE="$LOOP/tests/fake_claude.sh" FAKE_CLAUDE_MODE=nothing bash "$K
 [ "$(jq -r '.milestones.m1.status' .pipeline/build/state.json)" = "blocked" ] && pass "m1 blocked with note" || fail "m1 state: $(jq -c .milestones .pipeline/build/state.json)"
 cd "$P"
 
+# 4b. accept-only re-runs the verdict without a child: fix the tests by hand, then accept-only → done
+cd "$P2"; WT2="$P2/.pipeline/wt/build"; echo "PASS PASS PASS PASS" > "$WT2/tests.txt"; git -C "$WT2" commit -qam "fix tests by hand"
+bash "$KIT/build.sh" --project "$P2" --accept-only m1 > "$D/build3.out" 2>&1; RC=$?
+[ "$RC" = "0" ] && pass "accept-only exits 0 once checks pass" || { fail "accept-only rc=$RC"; tail -3 "$D/build3.out"; }
+[ "$(jq -r '.milestones.m1.status' .pipeline/build/state.json)" = "done" ] && pass "accept-only marks m1 done" || fail "m1 state after accept-only: $(jq -c .milestones .pipeline/build/state.json)"
+cd "$P"
+
 # 5. ship_check on the accepted build worktree (main is untouched, so run it on the worktree checkout)
 WT="$P/.pipeline/wt/build"
 python3 "$KIT/ship_check.py" --spec spec.json --workdir "$WT" --tag v0.1.0 --security-confirmed > "$D/ship.out" 2>&1; SRC=$?

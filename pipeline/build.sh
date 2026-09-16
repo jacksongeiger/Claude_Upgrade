@@ -18,7 +18,7 @@ KIT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 LOOP_KIT="$(cd "$KIT/../loop" && pwd -P)"
 CLAUDE_BIN="${NIGHTSHIFT_CLAUDE:-claude}"
 
-PROJECT="$PWD"; WHICH="next"; CAP=""; PER_MS=""; KILL=0; MAX_MS=0
+PROJECT="$PWD"; WHICH="next"; CAP=""; PER_MS=""; KILL=0; MAX_MS=0; ACCEPT_ONLY=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --project) PROJECT="$2"; shift 2 ;;
@@ -27,6 +27,7 @@ while [ $# -gt 0 ]; do
         --per-milestone) PER_MS="$2"; shift 2 ;;
         --max-milestones) MAX_MS="$2"; shift 2 ;;
         --kill) KILL=1; shift ;;
+        --accept-only) ACCEPT_ONLY="$2"; shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
@@ -111,6 +112,18 @@ jq -n --arg lk "$LOOP_KIT" --argjson allow "$ALLOW_JSON" '{worktree:{baseRef:"he
          SubagentStop:[{hooks:[{type:"command",command:("bash "+$lk+"/hooks/events.sh"),async:true,timeout:5}]}],
          PreToolUse:[{matcher:"Agent",hooks:[{type:"command",command:("bash "+$lk+"/hooks/budget-gate.sh"),timeout:5}]}]}}' > "$CHILD_SETTINGS"
 AGENTS_JSON=$(python3 "$LOOP_KIT/agents_json.py" --no-ui)
+
+# ---- accept-only: re-run the script's verdict on the existing worktree -------
+if [ -n "$ACCEPT_ONLY" ]; then
+    STEP="accept"; MS="$ACCEPT_ONLY"; ITER_DIR="$WT/.pipeline/build/$MS"; mkdir -p "$ITER_DIR"
+    python3 "$KIT/accept.py" --spec "$SPEC" --milestone "$MS" --workdir "$WT" --out "$ITER_DIR/acceptance.final.json" 2>>"$RUN/build.log"; ARC=$?
+    case "$ARC" in
+      0) python3 "$KIT/milestone.py" --spec "$SPEC" --state "$STATE" set "$MS" done --note "accepted (accept-only)" >/dev/null
+         git -C "$WT" tag -f "build/$MS" >/dev/null 2>&1 || true; event MILESTONE_DONE "id=$MS (accept-only)"; stop complete "accept-only $MS done"; exit 0 ;;
+      2) event MILESTONE_BLOCKED "id=$MS (accept-only)"; stop complete "accept-only $MS: checks failed"; exit 3 ;;
+      *) event MILESTONE_INFRA "id=$MS exit=$ARC (accept-only)"; stop infra "accept-only $MS exit $ARC"; exit 4 ;;
+    esac
+fi
 
 # ---- milestones -------------------------------------------------------------
 DONE_COUNT=0; RC_FINAL=0

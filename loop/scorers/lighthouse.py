@@ -51,13 +51,43 @@ def wait_for_port(port, timeout):
     return False
 
 
+def find_chrome():
+    """CHROME_PATH if set, else the Chromium Playwright installed (this is
+    what the persona driver uses too), else whatever is on PATH."""
+    if os.environ.get("CHROME_PATH"):
+        return os.environ["CHROME_PATH"]
+    import glob
+    roots = [os.environ.get("PLAYWRIGHT_BROWSERS_PATH", ""), os.path.expanduser("~/.cache/ms-playwright"), "/opt/pw-browsers"]
+    for r in roots:
+        if not r:
+            continue
+        for pat in ("chromium-*/chrome-linux/chrome", "chromium-*/chrome-mac/Chromium.app/Contents/MacOS/Chromium",
+                    "chromium_headless_shell-*/chrome-linux/headless_shell"):
+            hits = sorted(glob.glob(os.path.join(r, pat)))
+            if hits:
+                return hits[-1]
+    for name in ("google-chrome", "chromium", "chromium-browser", "chrome"):
+        if shutil.which(name):
+            return shutil.which(name)
+    return None
+
+
 def run_lighthouse(url):
+    env = dict(os.environ)
+    chrome = find_chrome()
+    if chrome:
+        env["CHROME_PATH"] = chrome
+    flags = "--headless=new --no-sandbox --disable-gpu"
     proc = subprocess.run(
-        ["npx", "--yes", "lighthouse", url, "--output=json", "--output-path=stdout",
-         "--chrome-flags=--headless=new", "--quiet"],
-        capture_output=True, text=True, timeout=LIGHTHOUSE_RUN_TIMEOUT_S,
+        ["npx", "--no-install", "lighthouse", url, "--output=json", "--output-path=stdout",
+         f"--chrome-flags={flags}", "--quiet"],
+        capture_output=True, text=True, timeout=LIGHTHOUSE_RUN_TIMEOUT_S, env=env,
     )
-    data = json.loads(proc.stdout)
+    out = proc.stdout
+    start = out.find("{")
+    if start < 0:
+        raise RuntimeError("lighthouse printed no JSON (chrome=%s): %s" % (chrome, (proc.stderr or "")[-400:].strip()))
+    data = json.loads(out[start:])
     cats = data["categories"]
     return {
         "a11y": cats["accessibility"]["score"] * 100.0,

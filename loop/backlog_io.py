@@ -79,6 +79,8 @@ def loads(text):
             if _ROWS_HEADER.match(line):
                 saw_header = True
                 continue
+            if line.strip() in ("rows: []", "rows: [ ]"):
+                return []  # an explicitly empty backlog
             raise BacklogParseError(
                 f"line {lineno}: expected top-level 'rows:' header, got {line!r}"
             )
