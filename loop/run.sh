@@ -112,6 +112,26 @@ on_exit() {
     exit 0
 }
 
+# Executor worktrees (.claude/worktrees/agent-*, branch worktree-agent-*) are
+# per-subtask scratch. After the child exits their work is either merged
+# (in the loop branch), rejected (tagged by merge.sh) or abandoned. Anything
+# not reachable from the loop branch or a tag is tagged nightshift/orphan/…
+# first so nothing is lost, then the worktree and branch go.
+prune_executor_worktrees() {
+    local line path br
+    git -C "$PROJECT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print substr($0,10)}' | while read -r path; do
+        case "$path" in */.claude/worktrees/agent-*) ;; *) continue ;; esac
+        br=$(git -C "$path" branch --show-current 2>/dev/null || true)
+        if [ -n "$br" ] && ! git -C "$PROJECT" merge-base --is-ancestor "$br" "$BRANCH" 2>/dev/null \
+           && [ -z "$(git -C "$PROJECT" tag --points-at "$br" 2>/dev/null)" ]; then
+            git -C "$PROJECT" tag "nightshift/orphan/${ITER}-${br#worktree-agent-}" "$br" >/dev/null 2>&1 || true
+        fi
+        git -C "$PROJECT" worktree remove --force "$path" >>"$RUN/loop.log" 2>&1 || rm -rf "$path"
+        [ -n "$br" ] && git -C "$PROJECT" branch -D "$br" >>"$RUN/loop.log" 2>&1 || true
+    done
+    git -C "$PROJECT" worktree prune >/dev/null 2>&1 || true
+}
+
 build_map() {
     mkdir -p "$WT/.loop" "$ITER_DIR" 2>/dev/null || true
     (cd "$WT" && python3 "$KIT/map.py" --repo "$WT" --out "$WT/.loop/map.json" --arch "$LOOP/ARCHITECTURE.md" > "$ITER_DIR/map.out" 2>>"$RUN/loop.log") || note "map.py failed (non-fatal)"
@@ -381,6 +401,7 @@ PY
     state_set --argjson c "$CHARGE" '.spent_usd = (.spent_usd + $c) | .live_spend_usd=0 | .agents=[]'
     SPENT=$(jq -r '.spent_usd' "$STATE")
     event CHILD_DONE rc="$CHILD_RC" charge="$CHARGE" live="$LIVE" agreement="$AGREE" duration_s="$DURATION"
+    prune_executor_worktrees
     if [ "$DRYRUN" = "1" ]; then
         DRY_OK=false
         # Signed: (live - result) / result. An under-estimate means the kill
