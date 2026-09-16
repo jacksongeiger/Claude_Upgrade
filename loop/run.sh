@@ -365,6 +365,8 @@ while :; do
     state_set --arg t "$TASK" --argjson r "$RUNG" '.task=$t | .rung=$r | .phase="PLAN"'
     event PICK mode="$MODE" task="$TASK" rung="$RUNG"
 
+    # The child's budget: per-iteration max, or whatever is left under the cap.
+    BUDGET=$(jq -n --argjson p "$PER_ITER" --argjson c "$CAP" --argjson s "$SPENT" '[$p, ($c - $s)] | min')
     # The goal lives outside the worktree (tamper-evident); the child gets a
     # per-iteration copy it is allowed to read.
     cp "$GOAL" "$ITER_DIR/goal.md" 2>/dev/null || true
@@ -398,7 +400,6 @@ PY
 
     # ---- CHILD ----------------------------------------------------------
     STEP="child"; beat
-    BUDGET=$(jq -n --argjson p "$PER_ITER" --argjson c "$CAP" --argjson s "$SPENT" '[$p, ($c - $s)] | min')
     ITER_START=$(date +%s)
     state_set --argjson b "$BUDGET" '.phase="PLAN" | .iter_budget_usd=$b'
     note "spawning child budget=$BUDGET mode=$MODE"
