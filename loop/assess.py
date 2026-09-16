@@ -167,9 +167,47 @@ def find_venv(manifest_dir_abs):
     return None
 
 
-def find_python_package(manifest_dir_abs, manifest_dir_rel):
-    """Best-effort package name for --cov=<pkg>: first subdir with __init__.py."""
+def manifest_declares(manifest_dir_abs, needles):
+    """True when pyproject.toml / setup.py / requirements*.txt name one of
+    `needles` — a dev tool the setup command will install even though it is
+    not importable yet."""
     try:
+        for fn in os.listdir(manifest_dir_abs):
+            if fn in ("pyproject.toml", "setup.py", "setup.cfg") or re.match(r"^requirements.*\.txt$", fn):
+                text = open(os.path.join(manifest_dir_abs, fn), encoding="utf-8", errors="replace").read()
+                if any(n in text for n in needles):
+                    return True
+    except OSError:
+        pass
+    return False
+
+
+def pyproject_test_extras(manifest_dir_abs):
+    """Names of [project.optional-dependencies] groups that look like test/dev
+    groups, e.g. ["tests"]; [] when none or no pyproject."""
+    path = os.path.join(manifest_dir_abs, "pyproject.toml")
+    if not os.path.isfile(path):
+        return []
+    try:
+        import tomllib
+        with open(path, "rb") as f:
+            data = tomllib.load(f)
+        groups = (data.get("project") or {}).get("optional-dependencies") or {}
+    except Exception:
+        return []
+    wanted = ("test", "tests", "testing", "dev", "develop", "development")
+    return [g for g in groups if g.lower() in wanted]
+
+
+def find_python_package(manifest_dir_abs, manifest_dir_rel):
+    """Best-effort package name for --cov=<pkg>: first subdir with __init__.py
+    (src layout first: src/<pkg>)."""
+    try:
+        src = os.path.join(manifest_dir_abs, "src")
+        if os.path.isdir(src):
+            for entry in sorted(os.listdir(src)):
+                if os.path.isfile(os.path.join(src, entry, "__init__.py")):
+                    return entry
         for entry in sorted(os.listdir(manifest_dir_abs)):
             if entry in SKIP_DIRS or entry.startswith("."):
                 continue
@@ -192,8 +230,11 @@ def detect_python_tests(root, manifest_rel, gaps):
         interpreter = os.path.join(manifest_dir_abs, venv_name, "bin", "python")
         python_bin = "./%s/bin/python" % venv_name
     else:
+        # No venv yet: the proposed setup_cmd creates ./venv, and every command
+        # the loop runs (tests, coverage, executors' acceptance) must use that
+        # interpreter, not whatever python3 is on PATH.
         interpreter = "python3"
-        python_bin = "python3"
+        python_bin = "./venv/bin/python"
 
     pytest_importable = interpreter_can_import(interpreter, "pytest")
     tests_evidence = has_tests_evidence(root, manifest_dir_abs)
@@ -219,7 +260,8 @@ def detect_python_tests(root, manifest_rel, gaps):
     else:
         test_cmd = "%s%s -m unittest discover -q" % (cd_prefix, python_bin)
 
-    coverage_tool_installed = interpreter_can_import(interpreter, "pytest_cov")
+    coverage_tool_installed = interpreter_can_import(interpreter, "pytest_cov") or \
+        manifest_declares(manifest_dir_abs, ("pytest-cov", "pytest_cov"))
 
     coverage_cmd = None
     coverage_file = None
@@ -244,6 +286,7 @@ def detect_python_tests(root, manifest_rel, gaps):
     return {
         "runner": runner, "test_cmd": test_cmd, "coverage_cmd": coverage_cmd,
         "coverage_file": coverage_file, "coverage_tool_installed": coverage_tool_installed,
+        "pyproject_extras": pyproject_test_extras(manifest_dir_abs),
     }
 
 

@@ -219,6 +219,15 @@ if [ ! -d "$WT/.git" ] && [ ! -f "$WT/.git" ]; then
         (cd "$WT" && bash -c "$SETUP_CMD") >>"$RUN/loop.log" 2>&1 || note "setup_cmd failed (continuing; executors run it again)"
     fi
 fi
+# A project whose main branch does not track .loop/backlog.yaml (init wrote it
+# but nobody committed it) would give every child an empty backlog: seed the
+# loop branch from the main checkout's copy.
+if [ ! -f "$WT/.loop/backlog.yaml" ] && [ -f "$LOOP/backlog.yaml" ]; then
+    mkdir -p "$WT/.loop"
+    cp "$LOOP/backlog.yaml" "$WT/.loop/backlog.yaml"
+    (cd "$WT" && git add -f .loop/backlog.yaml && git commit -q -m "nightshift: seed backlog") >>"$RUN/loop.log" 2>&1 || true
+    note "seeded .loop/backlog.yaml on $BRANCH from the main checkout"
+fi
 # The loop worktree belongs to the loop. Anything uncommitted in it is debris
 # from a killed child (executors commit in their own worktrees; the driver
 # merges); everything of value is on the loop branch. Clean, note, continue.

@@ -373,3 +373,43 @@ def test_write_flow_enables_ui_auditor_when_ui_present(tmp_path, monkeypatch):
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))
+
+
+def test_guess_commands_pyproject_uses_editable_install_with_extras():
+    assess_data = {
+        "stack": {"languages": ["python"], "package_manager": "pip", "manifests": ["pyproject.toml"]},
+        "tests": {"test_cmd": None, "pyproject_extras": ["tests"]},
+    }
+    setup_cmd, test_cmd = init.guess_commands(assess_data)
+    assert setup_cmd == "python3 -m venv venv && ./venv/bin/pip install -e '.[tests]'"
+    assert test_cmd == "./venv/bin/python -m pytest -q"
+
+
+def test_guess_commands_pyproject_without_extras_and_in_subdir():
+    assess_data = {
+        "stack": {"languages": ["python"], "package_manager": "pip", "manifests": ["lib/pyproject.toml"]},
+        "tests": {"test_cmd": None, "pyproject_extras": []},
+    }
+    setup_cmd, test_cmd = init.guess_commands(assess_data)
+    assert setup_cmd == "cd lib && python3 -m venv venv && ./venv/bin/pip install -e ."
+    assert test_cmd == "cd lib && ./venv/bin/python -m pytest -q"
+
+
+def test_guess_commands_requirements_txt_still_wins():
+    assess_data = {
+        "stack": {"languages": ["python"], "package_manager": "pip", "manifests": ["requirements.txt", "pyproject.toml"]},
+        "tests": {"test_cmd": None, "pyproject_extras": ["dev"]},
+    }
+    setup_cmd, _ = init.guess_commands(assess_data)
+    assert setup_cmd == "python3 -m venv venv && ./venv/bin/pip install -r requirements.txt"
+
+
+def test_target_rises_above_a_baseline_already_past_the_default(monkeypatch, tmp_path):
+    def stub(name, entry, workdir, kit=init.KIT):
+        return fake_ok(97.8) if name == "tests" else fake_fail(name)
+
+    monkeypatch.setattr(init, "run_scorer", stub)
+    proposal = init.propose(tmp_path, assess_stub(), "raise test coverage", 25, 6)
+    tests_entry = next(s for s in proposal["scorers"] if s["name"] == "tests")
+    assert tests_entry["target"] == 100
+    assert proposal["first_pick"]["headroom"] > 0

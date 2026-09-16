@@ -115,6 +115,14 @@ P=$(mkproject); cd "$P"
 run_driver deny --cap 5 --hours 1
 [ "$(stop_reason)" = "safety-trip" ] && pass "safety deny trips" || fail "stop_reason=$(stop_reason)"
 
+# 6c. main does not track .loop/backlog.yaml (init wrote it, nobody committed) → seeded on the loop branch
+P=$(mkproject); cd "$P"
+git rm -q --cached .loop/backlog.yaml && git commit -q -m "untrack backlog"
+run_driver improve --cap 5 --hours 1 --iters 1
+[ "$(stop_reason)" = "iters" ] && pass "runs with an untracked backlog" || fail "stop_reason=$(stop_reason)"
+[ "$(git -C .loop/wt/loop log --format=%s | grep -c 'seed backlog')" -ge 1 ] && pass "backlog seeded onto the loop branch" || fail "no seed commit"
+[ "$(last_outcome)" = "kept" ] && pass "picked a row from the seeded backlog" || fail "outcome=$(last_outcome)"
+
 # 7b. scope deny (read-only wandering) → logged, not a trip
 P=$(mkproject); cd "$P"
 run_driver scope --cap 5 --hours 1 --iters 1

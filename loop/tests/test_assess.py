@@ -110,8 +110,9 @@ def test_python_project_no_venv(tmp_path):
     assert out["stack"]["manifests"] == ["requirements.txt"]
 
     assert out["tests"]["runner"] == "pytest"
-    assert out["tests"]["test_cmd"] == "python3 -m pytest -q"
-    # no venv on disk -> we never claim a coverage tool is available
+    # no venv yet, but setup_cmd creates ./venv and every loop command uses it
+    assert out["tests"]["test_cmd"] == "./venv/bin/python -m pytest -q"
+    # nothing declares pytest-cov -> we never claim a coverage tool is available
     assert out["tests"]["coverage_cmd"] is None
     assert out["tests"]["coverage_tool_installed"] is False
     assert any("no coverage tool for pytest" in g for g in out["gaps"])
@@ -176,7 +177,7 @@ def test_python_project_in_subdir_is_detected(tmp_path):
     out = run_assess(tmp_path)
     assert out["stack"]["languages"] == ["python"]
     assert out["stack"]["manifests"] == ["backend/requirements.txt"]
-    assert out["tests"]["test_cmd"] == "cd backend && python3 -m pytest -q"
+    assert out["tests"]["test_cmd"] == "cd backend && ./venv/bin/python -m pytest -q"
 
 
 # --------------------------------------------------------------------------
@@ -310,3 +311,28 @@ def test_pick_primary_language_prefers_shallowest():
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))
+
+
+def test_pyproject_src_layout_with_declared_pytest_cov(tmp_path):
+    (tmp_path / "pyproject.toml").write_text(textwrap.dedent("""
+        [project]
+        name = "shiny"
+        version = "0.1"
+        optional-dependencies.tests = ["pytest>=9", "pytest-cov"]
+        [tool.pytest]
+        testpaths = ["tests"]
+    """))
+    pkg = tmp_path / "src" / "shiny"
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").write_text("")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_x.py").write_text("def test_x():\n    assert True\n")
+    out = run_assess(tmp_path)
+    t = out["tests"]
+    assert t["runner"] == "pytest"
+    assert t["test_cmd"] == "./venv/bin/python -m pytest -q"
+    assert t["pyproject_extras"] == ["tests"]
+    # pytest-cov is declared, so the coverage command exists and targets the src package
+    assert t["coverage_tool_installed"] is True
+    assert t["coverage_cmd"] == "./venv/bin/python -m pytest -q --cov=shiny --cov-report=json:.loop/run/coverage.json"
+    assert not any("no coverage tool" in g for g in out["gaps"])

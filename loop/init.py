@@ -177,11 +177,20 @@ def guess_commands(assess_data):
         return None
 
     if pm == "pip" or "python" in languages:
-        d = manifest_dir({"requirements.txt"})
-        base = "python3 -m venv venv && ./venv/bin/pip install -r requirements.txt"
+        names = [os.path.basename(m) for m in manifests]
+        if "requirements.txt" in names:
+            d = manifest_dir({"requirements.txt"})
+            base = "python3 -m venv venv && ./venv/bin/pip install -r requirements.txt"
+        else:
+            # pyproject / setup.py project: install it editable with its test
+            # extras (the guard allows installing the project itself).
+            d = manifest_dir({"pyproject.toml", "setup.py"})
+            extras = tests.get("pyproject_extras") or []
+            target = "'.[%s]'" % ",".join(extras) if extras else "."
+            base = f"python3 -m venv venv && ./venv/bin/pip install -e {target}"
         setup_cmd = f"cd {d} && {base}" if d else base
         if not test_cmd:
-            test_cmd = f"cd {d} && python3 -m pytest -q" if d else "python3 -m pytest -q"
+            test_cmd = f"cd {d} && ./venv/bin/python -m pytest -q" if d else "./venv/bin/python -m pytest -q"
     elif pm in ("npm", "yarn", "pnpm"):
         d = manifest_dir({"package.json"})
         installer = {
@@ -246,8 +255,12 @@ def propose(project_dir, assess_data, goal_text, cap, hours):
             if runs == 3 else ""
         )
         cfg_entry = dict(entry)
+        # A project already at or above the default target would give pick.py
+        # zero headroom and the loop nothing to do; the target is at least
+        # baseline + 5, capped at 100.
+        target = min(100, max(TARGETS[name], round(baseline["mean"] + 5)))
         cfg_entry.update({"weight": BASE_WEIGHTS[name], "runs": runs,
-                           "eps": round(eps, 3), "target": TARGETS[name]})
+                           "eps": round(eps, 3), "target": target})
         enabled.append({
             "entry": cfg_entry,
             "baseline": round(baseline["mean"], 3),
