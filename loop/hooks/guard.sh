@@ -61,8 +61,11 @@ case "$tool" in
     # Installing the project's own pinned manifest is setup, not acquisition:
     # a fresh worktree has no venv/node_modules and setup_cmd must be able to
     # build it. Anything naming a package is still denied below.
-    if printf '%s' "$cmd" | grep -Eq '\bpip3?[[:space:]]+install[[:space:]]+(-q[[:space:]]+)?-r[[:space:]]+[^[:space:]]+(\.txt|\.lock)?([[:space:]]|$)|\bnpm[[:space:]]+ci([[:space:]]|$)|\buv[[:space:]]+sync([[:space:]]|$)|\bgo[[:space:]]+mod[[:space:]]+download|\bcargo[[:space:]]+fetch'; then
-        if ! printf '%s' "$cmd" | grep -Eq '\bpip3?[[:space:]]+install[[:space:]]+(-q[[:space:]]+)?-r[[:space:]]+[^[:space:]]+[[:space:]]+[^-[:space:]]'; then
+    if printf '%s' "$cmd" | grep -Eq '\bpip3?[[:space:]]+install[[:space:]]+(-q[[:space:]]+)?-r[[:space:]]+[^[:space:];|&]+(\.txt|\.lock)?([[:space:];|&]|$)|\bnpm[[:space:]]+ci([[:space:]]|$)|\buv[[:space:]]+sync([[:space:]]|$)|\bgo[[:space:]]+mod[[:space:]]+download|\bcargo[[:space:]]+fetch'; then
+        # A package name after the manifest is acquisition; a redirect, pipe,
+        # separator or flag is not (`-r requirements.txt 2>&1 | tail` was
+        # being denied as if "2>&1" were a package).
+        if ! printf '%s' "$cmd" | grep -Eq '\bpip3?[[:space:]]+install[[:space:]]+(-q[[:space:]]+)?-r[[:space:]]+[^[:space:];|&]+[[:space:]]+[A-Za-z_][^[:space:]]*'; then
             exit 0
         fi
     fi
