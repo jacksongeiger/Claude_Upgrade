@@ -207,3 +207,13 @@ def test_vitest_style_counts_broken_files_as_failures(tmp_path):
     assert out["raw"]["n_tests"] == 967
     assert "tests/json-test-suite.ts" in out["raw"]["failing"]
     assert out["value"] < 100.0
+
+
+def test_configured_coverage_that_is_unreadable_is_an_infra_failure(tmp_path):
+    script = tmp_path / "run.sh"
+    write_script(script, "echo 'Tests: 10 passed, 10 total'\nexit 0\n")
+    out = run_scorer({"name": "tests", "cmd": f"bash {script}", "coverage_cmd": f"bash {script}",
+                      "coverage_file": "coverage/coverage-summary.json"}, tmp_path)
+    assert out["ok"] is False
+    assert "missing or unreadable" in out["error"]
+    assert out["raw"]["passed"] == 10

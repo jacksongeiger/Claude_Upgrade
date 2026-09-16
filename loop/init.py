@@ -214,6 +214,11 @@ def guess_commands(assess_data):
     else:
         setup_cmd = "true"
 
+    # A fresh worktree (the loop's or an executor's) has empty submodules; a
+    # suite that reads them would shrink silently. Objects are local already.
+    if stack.get("submodules"):
+        setup_cmd = "git submodule update --init --recursive && " + setup_cmd
+
     return setup_cmd, test_cmd
 
 

@@ -436,3 +436,12 @@ def test_least_covered_files_reads_istanbul_summary(tmp_path):
     files = init.least_covered_files(tmp_path, proposal)
     assert files[0].endswith("a.ts") and files[1].endswith("c.ts")
     assert not any(f.endswith("b.ts") for f in files)
+
+
+def test_guess_commands_prefixes_submodule_init_when_gitmodules_present():
+    assess_data = {
+        "stack": {"languages": ["javascript"], "package_manager": "npm", "manifests": ["package.json"], "submodules": True},
+        "tests": {"test_cmd": "npm test"},
+    }
+    setup_cmd, _ = init.guess_commands(assess_data)
+    assert setup_cmd == "git submodule update --init --recursive && npm ci"

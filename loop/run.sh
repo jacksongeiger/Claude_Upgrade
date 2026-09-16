@@ -238,6 +238,12 @@ if [ ! -d "$WT/.git" ] && [ ! -f "$WT/.git" ]; then
     mkdir -p "$LOOP/wt"
     git worktree add "$WT" "$BRANCH" >>"$RUN/loop.log" 2>&1
     note "worktree $WT"
+    # `git worktree add` leaves submodules empty; a suite that reads them
+    # would shrink silently. Objects are already local after the main
+    # checkout initialised them, so this needs no network.
+    if [ -f "$WT/.gitmodules" ]; then
+        git -C "$WT" submodule update --init --recursive >>"$RUN/loop.log" 2>&1 || note "submodule init failed (continuing)"
+    fi
     if [ -n "$SETUP_CMD" ]; then
         STEP="setup"
         (cd "$WT" && bash -c "$SETUP_CMD") >>"$RUN/loop.log" 2>&1 || note "setup_cmd failed (continuing; executors run it again)"

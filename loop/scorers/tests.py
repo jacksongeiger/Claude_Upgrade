@@ -240,16 +240,31 @@ def main():
             pass_rate = 1.0 if returncode == 0 else 0.0
 
         coverage_pct = None
+        coverage_error = None
         coverage_cmd = cfg.get("coverage_cmd")
         coverage_file = cfg.get("coverage_file")
         if coverage_cmd and coverage_file:
             try:
                 cov_rc, _cov_out, _cov_err, cov_wall = _run(coverage_cmd, workdir)
                 wall += cov_wall
-                if cov_rc == 0:
-                    coverage_pct = read_coverage_pct(workdir, coverage_file)
-            except (subprocess.TimeoutExpired, OSError):
-                coverage_pct = None
+                # a failing test does not stop the runner from writing the
+                # report, so read it regardless of the exit code
+                coverage_pct = read_coverage_pct(workdir, coverage_file)
+                if coverage_pct is None:
+                    coverage_error = "coverage_cmd exited %s and %s is missing or unreadable" % (cov_rc, coverage_file)
+            except (subprocess.TimeoutExpired, OSError) as e:
+                coverage_error = "coverage_cmd failed: %s" % e
+
+        if coverage_error is not None:
+            # Coverage is part of this dimension's definition. Scoring on pass
+            # rate alone would make a broken environment look like an
+            # improvement (seen on a worktree without submodules: the suite
+            # shrank, coverage vanished, the value went UP). Fail instead.
+            print(json.dumps({"name": cfg.get("name", "tests"), "value": 0.0, "ok": False,
+                              "error": coverage_error,
+                              "raw": {"n_tests": n_tests, "passed": passed, "failed": failed,
+                                      "failing": failing, "duration_s": round(wall, 3)}}))
+            return 0
 
         if coverage_pct is not None:
             value = 100.0 * pass_rate * (0.5 + 0.5 * coverage_pct / 100.0)

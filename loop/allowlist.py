@@ -32,6 +32,7 @@ FIXED = [
     "Bash(git add:*)", "Bash(git commit:*)", "Bash(git diff:*)", "Bash(git log:*)",
     "Bash(git status:*)", "Bash(git rev-parse:*)", "Bash(git show:*)",
     "Bash(git branch --show-current:*)", "Bash(git ls-files:*)", "Bash(git stash:*)",
+    "Bash(git submodule update:*)", "Bash(git submodule status:*)",
     "Bash(rdx search:*)",
     "Bash(ls:*)", "Bash(cat:*)", "Bash(head:*)", "Bash(tail:*)", "Bash(wc:*)", "Bash(grep:*)",
     "Bash(find:*)", "Bash(mkdir:*)", "Bash(pwd)", "Bash(test:*)", "Bash(true)", "Bash(cd:*)",

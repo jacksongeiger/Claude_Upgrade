@@ -633,6 +633,7 @@ def assess(project_dir):
     stack = {
         "languages": languages,
         "package_manager": package_manager,
+        "submodules": os.path.isfile(os.path.join(realpath, ".gitmodules")),
         "manifests": all_manifests,
     }
 
