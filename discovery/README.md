@@ -202,6 +202,41 @@ why `--trials` exists and why a single run is an anecdote.
 The envelope tests assert these *properties* rather than any literal phrase,
 because the exact wording turned out to be load-bearing and tunable.
 
+## Installing and using it across your projects
+
+```bash
+./install.sh --discovery     # one time, from this repo
+rdx sync                     # build the index (~3 min)
+rdx scan                     # exclude what you already have
+rdx schedule                 # keep it fresh nightly
+```
+
+**It is global, not per-project.** The hooks register in
+`~/.claude/settings.json` and the index lives in `~/.claude/rdx`, so every
+project you open is covered with nothing further to install. Verify anywhere
+with `rdx status`.
+
+It starts in **shadow mode**: it evaluates every prompt and logs the decision
+but injects nothing. Watch `rdx stats` for a few days — the suppression
+histogram tells you what it *would* have said — then:
+
+```bash
+rdx on      # live: it now injects
+rdx off     # back to shadow
+rdx status  # is it on, is the index fresh, did a funnel fail
+```
+
+`rdx on` writes a flag file rather than asking you to export an environment
+variable. That is deliberate: a macOS app launched from Spotlight or the Dock
+never reads `~/.zshrc`, so an `RDX_SHADOW=0` there would be silently absent and
+the system would stay quiet with nothing to indicate why. `RDX_SHADOW` still
+wins when explicitly set, so a single run can be forced either way without
+changing your durable setting.
+
+From inside Claude, `/ard` drives all of it — `/ard` alone reports status,
+`/ard <a task>` shows what the gate would surface, `/ard on`, `/ard sync`,
+`/ard install <slug>`.
+
 ## Why this exists
 
 Claude will not go looking for tools. Skills are model-discretionary — there is

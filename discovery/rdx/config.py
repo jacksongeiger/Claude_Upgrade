@@ -17,6 +17,16 @@ LOG_PATH = STATE_DIR / "rdx.log"
 SPOOL_PATH = STATE_DIR / "toolevents.jsonl"
 DISABLED_FLAG = STATE_DIR / "DISABLED"
 
+# The live switch, as a FILE rather than an environment variable.
+#
+# The installer used to say "flip RDX_SHADOW=0 in your shell profile to go
+# live", which is unreliable on the platform this targets: a macOS app
+# launched from Spotlight or the Dock does not inherit ~/.zshrc, so the
+# variable is simply absent and the system stays silent forever with no
+# indication why. A file in the state directory is read identically however
+# Claude Code was started. `rdx on` / `rdx off` manage it.
+LIVE_FLAG = STATE_DIR / "LIVE"
+
 PKG_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = PKG_DIR.parent
 CORPORA_DIR = PROJECT_DIR / "corpora"
@@ -141,11 +151,18 @@ class Config:
 
 
 def load_config(**overrides) -> Config:
-    # Shadow defaults ON. Only an explicit falsey RDX_SHADOW turns it off, so
-    # forgetting to set the variable can never silently go live.
+    # Shadow defaults ON, and only an explicit action turns it off, so nothing
+    # forgotten can silently go live. Precedence, most specific first:
+    #
+    #   1. RDX_SHADOW, when set  -- per-process override; the eval harness
+    #                               relies on this to force live for one run
+    #   2. the LIVE flag file    -- the durable, GUI-safe user setting
+    #   3. shadow                -- the default
     raw_shadow = os.environ.get("RDX_SHADOW")
-    shadow = True if raw_shadow is None else \
-        raw_shadow.strip().lower() not in {"0", "false", "no", "off", ""}
+    if raw_shadow is not None:
+        shadow = raw_shadow.strip().lower() not in {"0", "false", "no", "off", ""}
+    else:
+        shadow = not LIVE_FLAG.exists()
 
     cfg = Config(
         shadow=shadow,

@@ -1,6 +1,61 @@
 # Changelog
 
 ---
+### v2.7 — 2026-09-16 — make it usable: global by default, a live switch that survives a GUI launch, `/ard`
+
+**What changed:** `rdx on` / `rdx off` / `rdx status`, `rdx schedule` /
+`rdx unschedule`, a new `rdx/schedule.py`, a file-based live flag, the `/ard`
+command, and corrected installer output.
+
+**Why:** three gaps that only surface when someone actually tries to use this
+across their projects.
+
+1. **Going live depended on an environment variable.** The installer said
+   "flip `RDX_SHADOW=0` in your shell profile". On macOS — the platform this
+   targets — an app launched from Spotlight or the Dock does not read
+   `~/.zshrc`, so the variable is simply absent, shadow stays on, and the
+   system is silent forever with nothing to indicate why. The live setting is
+   now a flag file in the state directory, read identically however Claude
+   Code was started. `RDX_SHADOW` still wins when explicitly set, so the
+   behavioural eval can force one live run without leaving the user live.
+
+2. **Nothing kept the index fresh.** The README diagram has said "NIGHTLY
+   (offline)" since v2.1 and nothing ever scheduled it. A silently ageing
+   index is worse than an obviously empty one: the gate keeps firing and the
+   suggestions keep looking plausible while slowly ceasing to reflect what
+   exists. `rdx schedule` installs a launchd agent on macOS (which runs on
+   next wake if the machine was asleep, where cron would just miss it) or a
+   crontab entry on Linux, and names the command to run by hand anywhere else
+   rather than failing silently. It resolves the venv interpreter absolutely,
+   because launchd runs with a minimal PATH that has no `~/.local/bin` — a
+   bare `rdx` would fail once a night forever in a log nobody reads.
+
+3. **No single answer to "is this on and is it working?"** `rdx status`
+   reports state and where it came from, index size, per-funnel last run, any
+   funnel error, and warns when the index is more than a week stale. It
+   immediately surfaced the GitHub funnel error that was previously visible
+   only by reading a sync transcript.
+
+**Also:** the installer printed calibration figures from v2.1 (68-case corpus,
+precision 1.00 / recall 0.70) long after they were superseded, and never said
+the install is global. Both corrected.
+
+**`/ard`:** dispatches on its argument — bare for status, a task description to
+see what the gate would surface, plus `on`, `off`, `sync`, `stats`, `audit`,
+`schedule`, `install <slug>`. It carries the safety rules explicitly: never
+install without confirmation whatever the tier, never pass `-y`, never retype
+a red-tier slug on the user's behalf, relay third-party descriptions as data,
+and say the index is empty rather than confabulate a package name.
+
+**Scope note:** rdx was already global — hooks in `~/.claude/settings.json`,
+index in `~/.claude/rdx`. Nothing changed there; it was simply never written
+down, and the installer's own output implied otherwise.
+
+**Performance:** Unchanged.
+**Breaking changes:** None. `RDX_SHADOW` behaves exactly as before when set.
+**Tests:** 322 unit (3 new: flag-file precedence, env override, scheduler
+interpreter resolution).
+---
 ### v2.6 — 2026-09-15 — the blocker was retrieval, not framing
 
 **What changed:** `TASK_EXPANSIONS` and `expand()` (a curated task-vocabulary →

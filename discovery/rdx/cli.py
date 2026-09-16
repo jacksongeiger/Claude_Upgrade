@@ -8,6 +8,9 @@
     rdx mine                  build corpora/gate.yaml from your transcripts
     rdx eval [--gate|...]     run the eval harness
     rdx stats                 injections, suppression histogram, accept rate
+    rdx status                is it on, is the index fresh, did a funnel fail
+    rdx on | rdx off          go live / back to shadow mode
+    rdx schedule              refresh the index nightly (launchd or cron)
     rdx statusline            render the statusline (used by settings.json)
 """
 
@@ -15,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -290,6 +294,101 @@ def cmd_stats(args) -> int:
     return 0
 
 
+def cmd_on(args) -> int:
+    """Go live. Deliberately reports what will change, not just 'ok'."""
+    config.ensure_state_dir()
+    config.LIVE_FLAG.write_text("", encoding="utf-8")
+    cfg = config.load_config()
+    print("rdx is LIVE — it will now inject suggestions into prompts.")
+    print(f"  state file : {config.LIVE_FLAG}")
+    print(f"  asked-for  : score >= {cfg.min_score}, "
+          f"{cfg.min_matched_terms}+ matched term(s)")
+    print(f"  task-shaped: score >= {cfg.min_score_task}, "
+          f"{cfg.min_matched_terms_task}+ matched terms")
+    if os.environ.get("RDX_SHADOW") is not None:
+        print("\n  NOTE: RDX_SHADOW is set in this environment and overrides "
+              "the flag file.\n        Unset it, or this has no effect here.")
+    print("\nTurn it off again with `rdx off`. Watch it with `rdx stats`.")
+    return 0
+
+
+def cmd_off(args) -> int:
+    config.LIVE_FLAG.unlink(missing_ok=True)
+    print("rdx is in SHADOW mode — it evaluates every prompt and logs the")
+    print("decision, but injects nothing. `rdx stats` still fills up.")
+    return 0
+
+
+def cmd_status(args) -> int:
+    """One place that answers 'is this actually on, and is it working?'"""
+    cfg = config.load_config()
+    env_override = os.environ.get("RDX_SHADOW") is not None
+
+    if cfg.disabled:
+        state = "DISABLED"
+    elif cfg.shadow:
+        state = "shadow (logging, injecting nothing)"
+    else:
+        state = "LIVE (injecting)"
+    print(f"state      : {state}")
+    if env_override:
+        print("             (forced by RDX_SHADOW in this environment)")
+    elif not cfg.shadow:
+        print(f"             (via {config.LIVE_FLAG})")
+
+    print(f"index      : {config.DB_PATH}")
+    if not config.DB_PATH.exists():
+        print("             MISSING — run `rdx sync`")
+        return 0
+
+    with db.open_db(config.DB_PATH, readonly=True) as conn:
+        stats = db.counts(conn)
+        print(f"             {stats['eligible']:,} eligible "
+              f"of {stats['total']:,} indexed, "
+              f"{stats['quarantined']} quarantined")
+        rows = conn.execute(
+            "SELECT funnel, last_run_at, last_status, last_error "
+            "FROM funnel_state ORDER BY funnel").fetchall()
+
+    print("funnels    :")
+    for row in rows:
+        mark = "ok " if row["last_status"] == "ok" else "ERR"
+        when = (row["last_run_at"] or "never")[:16].replace("T", " ")
+        line = f"  {mark} {row['funnel']:<16} {when}"
+        if row["last_status"] != "ok" and row["last_error"]:
+            line += f"  {str(row['last_error'])[:60]}"
+        print(line)
+
+    stale = _staleness_days(rows)
+    if stale is not None and stale > 7:
+        print(f"\n  Index is {stale} days old. Run `rdx sync`, or schedule it:")
+        print("      rdx schedule")
+    return 0
+
+
+def _staleness_days(rows) -> int | None:
+    import datetime as _dt
+    stamps = [r["last_run_at"] for r in rows if r["last_run_at"]]
+    if not stamps:
+        return None
+    try:
+        newest = max(_dt.datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S")
+                     for s in stamps)
+    except ValueError:
+        return None
+    return (_dt.datetime.utcnow() - newest).days
+
+
+def cmd_schedule(args) -> int:
+    from . import schedule
+    return schedule.install(hour=args.hour, minute=args.minute)
+
+
+def cmd_unschedule(args) -> int:
+    from . import schedule
+    return schedule.uninstall()
+
+
 def cmd_statusline(args) -> int:
     return statusline.main()
 
@@ -355,6 +454,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("stats", help="injection and accept-rate stats").set_defaults(
         func=cmd_stats)
+    s = sub.add_parser("schedule", help="run `rdx sync` nightly")
+    s.add_argument("--hour", type=int, default=3)
+    s.add_argument("--minute", type=int, default=30)
+    s.set_defaults(func=cmd_schedule)
+
+    sub.add_parser("unschedule", help="remove the nightly sync").set_defaults(
+        func=cmd_unschedule)
+
+    sub.add_parser("on", help="go live (inject suggestions)").set_defaults(
+        func=cmd_on)
+    sub.add_parser("off", help="back to shadow mode").set_defaults(func=cmd_off)
+    sub.add_parser("status", help="is it on, and is the index fresh?"
+                   ).set_defaults(func=cmd_status)
     sub.add_parser("statusline", help="render the statusline").set_defaults(
         func=cmd_statusline)
 

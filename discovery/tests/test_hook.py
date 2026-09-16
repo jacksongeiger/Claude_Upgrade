@@ -384,3 +384,67 @@ def test_genuine_rejection_is_still_caught():
                "with an embedded reference marker that looks like a "
                "prompt-injection test rather than a genuine recommendation.")
     assert behaviour.detect_rejection(ref_inj, surfaced=False) is True
+
+
+# --------------------------------------------------------------------------
+# The live switch must not depend on the shell environment
+# --------------------------------------------------------------------------
+
+def test_live_flag_works_without_any_env_var(tmp_path, monkeypatch):
+    """`rdx on` has to survive a GUI launch.
+
+    The installer used to say "flip RDX_SHADOW=0 in your shell profile". A
+    macOS app started from Spotlight or the Dock never reads ~/.zshrc, so the
+    variable is simply absent, shadow stays on, and the system is silent
+    forever with nothing to indicate why.
+    """
+    import importlib
+    from rdx import config
+
+    monkeypatch.delenv("RDX_SHADOW", raising=False)
+    monkeypatch.setenv("RDX_STATE_DIR", str(tmp_path))
+    importlib.reload(config)
+    try:
+        assert config.load_config().shadow is True, "must default to shadow"
+
+        config.LIVE_FLAG.write_text("")
+        assert config.load_config().shadow is False, "flag file must go live"
+
+        config.LIVE_FLAG.unlink()
+        assert config.load_config().shadow is True
+    finally:
+        monkeypatch.undo()
+        importlib.reload(config)
+
+
+def test_env_var_overrides_the_flag_file(tmp_path, monkeypatch):
+    """Per-process override still wins -- the behavioural eval forces one live
+    run with RDX_SHADOW=0 and must not be able to leave the user live."""
+    import importlib
+    from rdx import config
+
+    monkeypatch.setenv("RDX_STATE_DIR", str(tmp_path))
+    monkeypatch.delenv("RDX_SHADOW", raising=False)
+    importlib.reload(config)
+    try:
+        config.LIVE_FLAG.write_text("")
+        monkeypatch.setenv("RDX_SHADOW", "1")
+        assert config.load_config().shadow is True, "env must win over the file"
+    finally:
+        monkeypatch.undo()
+        importlib.reload(config)
+
+
+def test_scheduler_uses_an_absolute_interpreter(tmp_path):
+    """A launchd job runs with a minimal PATH that has no ~/.local/bin, so a
+    bare `rdx` would fail once a night forever in a log nobody reads."""
+    from rdx import schedule
+
+    cmd = schedule._rdx_command()
+    assert Path(cmd[0]).is_absolute()
+    assert cmd[1:] == ["-m", "rdx.cli", "sync"]
+
+    body = schedule._plist_body(3, 30)
+    assert "<key>StartCalendarInterval</key>" in body
+    assert "<integer>3</integer>" in body and "<integer>30</integer>" in body
+    assert schedule.LABEL in body
