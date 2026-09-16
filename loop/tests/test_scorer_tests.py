@@ -189,3 +189,21 @@ def test_scorer_always_exits_zero_even_on_bad_config(tmp_path):
     assert proc.returncode == 0
     out = json.loads(proc.stdout.strip().splitlines()[-1])
     assert out["ok"] is False
+
+
+def test_vitest_style_counts_broken_files_as_failures(tmp_path):
+    script = tmp_path / "run_vitest.sh"
+    write_script(script, "cat <<'EOF'\n"
+                 " FAIL  tests/json-test-suite.ts [ tests/json-test-suite.ts ]\n"
+                 "Error: ENOENT: no such file or directory\n"
+                 " Test Files  2 failed | 21 passed (23)\n"
+                 "      Tests  965 passed (965)\n"
+                 "   Duration  3.47s\n"
+                 "EOF\nexit 1\n")
+    out = run_scorer({"name": "tests", "cmd": f"bash {script}"}, tmp_path)
+    assert out["ok"] is True
+    assert out["raw"]["passed"] == 965
+    assert out["raw"]["failed"] == 2
+    assert out["raw"]["n_tests"] == 967
+    assert "tests/json-test-suite.ts" in out["raw"]["failing"]
+    assert out["value"] < 100.0

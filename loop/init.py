@@ -606,7 +606,11 @@ def least_covered_files(project_dir, proposal):
         return []
     try:
         data = json.loads(path.read_text())
-        files = data.get("files") or {}
+        files = data.get("files")
+        if not files:
+            # istanbul/vitest coverage-summary.json: one top-level key per
+            # file plus "total"
+            files = {k: v for k, v in data.items() if k != "total" and isinstance(v, dict)}
         entries = []
         for fname, info in files.items():
             summary = info.get("summary") or {}
@@ -615,6 +619,12 @@ def least_covered_files(project_dir, proposal):
                 pct = (info.get("lines") or {}).get("pct")
             # a fully covered file is not a gap
             if pct is not None and float(pct) < 100.0:
+                # istanbul keys files by absolute path; rows name project-relative files
+                if os.path.isabs(fname):
+                    try:
+                        fname = os.path.relpath(fname, str(project_dir))
+                    except ValueError:
+                        pass
                 entries.append((float(pct), fname))
         entries.sort(key=lambda x: x[0])
         return [f for _, f in entries[:5]]

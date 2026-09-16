@@ -334,14 +334,29 @@ def detect_node_tests(root, manifest_rel, gaps):
 
     test_cmd = "%s%s" % (cd_prefix, pm_run)
 
-    coverage_tool_installed = has_bin("vitest") or has_bin("jest") or has_bin("c8")
+    # A coverage tool counts when it is DECLARED (node_modules may not exist
+    # before setup_cmd runs). jest brings its own; vitest needs a provider
+    # package; anything else needs c8/nyc.
+    dev = dict(pkg_json.get("devDependencies") or {})
+    dev.update(pkg_json.get("dependencies") or {})
+    if runner == "vitest":
+        coverage_tool_installed = any(k.startswith("@vitest/coverage-") for k in dev) or has_bin("c8")
+        coverage_flags = "--coverage --coverage.reporter=json-summary"
+    elif runner == "jest":
+        coverage_tool_installed = "jest" in dev or has_bin("jest")
+        coverage_flags = "--coverage --coverageReporters=json-summary"
+    else:
+        coverage_tool_installed = "c8" in dev or "nyc" in dev or has_bin("c8")
+        coverage_flags = "--coverage --coverageReporters=json-summary"
     coverage_cmd = None
     coverage_file = None
     if coverage_tool_installed:
-        coverage_cmd = "%s -- --coverage --coverageReporters=json-summary" % test_cmd
+        coverage_cmd = "%s -- %s" % (test_cmd, coverage_flags)
         coverage_file = "coverage/coverage-summary.json"
     else:
-        gaps.append("no coverage tool for %s" % runner)
+        gaps.append("no coverage tool for %s (%s)" % (
+            runner, "add @vitest/coverage-v8 as a pinned devDependency" if runner == "vitest"
+            else "add c8 or nyc as a pinned devDependency"))
 
     return {
         "runner": runner, "test_cmd": test_cmd, "coverage_cmd": coverage_cmd,

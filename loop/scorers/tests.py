@@ -83,10 +83,17 @@ def _parse_jest(text):
         return None
     passed = counts.get("passed", 0)
     failed = counts.get("failed", 0)
+    # vitest/jest report a test FILE that could not run ("Test Files 2 failed")
+    # separately from test counts; a broken file is a failure, not a pass.
+    mf = re.search(r"^\s*Test (?:Files|Suites):?\s+(.+)$", text, re.MULTILINE)
+    if mf:
+        mm = re.search(r"(\d+)\s+failed", mf.group(1))
+        if mm:
+            failed += int(mm.group(1))
     n_tests = counts.get("total", passed + failed + counts.get("skipped", 0))
     failing = re.findall(r"^\s*(?:✕|✗)\s+(.+)$", text, re.MULTILINE)
     if not failing:
-        failing = re.findall(r"^FAIL\s+(\S+)", text, re.MULTILINE)
+        failing = re.findall(r"^\s*FAIL\s+(\S+)", text, re.MULTILINE)
     return {"n_tests": n_tests, "passed": passed, "failed": failed, "failing": failing}
 
 
@@ -113,7 +120,13 @@ def _parse_go(text):
 
 
 def parse_output(text):
-    for parser in (_parse_pytest, _parse_jest, _parse_go):
+    # jest/vitest summaries ("Tests: 1 failed, 12 passed" / "Test Files 2 failed")
+    # also satisfy the looser pytest regexes, so the specific parser goes first
+    # when its signature is present.
+    order = (_parse_pytest, _parse_jest, _parse_go)
+    if re.search(r"^\s*(?:Tests:|Test (?:Files|Suites))\s", text, re.MULTILINE):
+        order = (_parse_jest, _parse_pytest, _parse_go)
+    for parser in order:
         result = parser(text)
         if result is not None:
             return result

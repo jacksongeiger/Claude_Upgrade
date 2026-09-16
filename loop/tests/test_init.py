@@ -422,3 +422,17 @@ def test_target_rises_above_a_baseline_already_past_the_default(monkeypatch, tmp
     tests_entry = next(s for s in proposal["scorers"] if s["name"] == "tests")
     assert tests_entry["target"] == 100
     assert proposal["first_pick"]["headroom"] > 0
+
+
+def test_least_covered_files_reads_istanbul_summary(tmp_path):
+    (tmp_path / "coverage").mkdir()
+    (tmp_path / "coverage" / "coverage-summary.json").write_text(json.dumps({
+        "total": {"lines": {"total": 100, "covered": 90, "pct": 90}},
+        "/abs/src/a.ts": {"lines": {"total": 10, "covered": 5, "pct": 50}},
+        "/abs/src/b.ts": {"lines": {"total": 10, "covered": 10, "pct": 100}},
+        "/abs/src/c.ts": {"lines": {"total": 10, "covered": 8, "pct": 80}},
+    }))
+    proposal = {"scorers": [{"name": "tests", "coverage_file": "coverage/coverage-summary.json"}]}
+    files = init.least_covered_files(tmp_path, proposal)
+    assert files[0].endswith("a.ts") and files[1].endswith("c.ts")
+    assert not any(f.endswith("b.ts") for f in files)

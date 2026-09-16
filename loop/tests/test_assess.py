@@ -188,6 +188,7 @@ def test_node_project_vitest(tmp_path):
     package_json = {
         "name": "demo",
         "scripts": {"test": "vitest run", "dev": "vite"},
+        "devDependencies": {"vitest": "4.0.0", "@vitest/coverage-v8": "4.0.0"},
     }
     (tmp_path / "package.json").write_text(json.dumps(package_json))
     (tmp_path / "vite.config.js").write_text("export default {}\n")
@@ -204,7 +205,8 @@ def test_node_project_vitest(tmp_path):
     assert out["tests"]["runner"] == "vitest"
     assert out["tests"]["test_cmd"] == "npm test"
     assert out["tests"]["coverage_tool_installed"] is True
-    assert out["tests"]["coverage_cmd"] == "npm test -- --coverage --coverageReporters=json-summary"
+    # vitest flag shape, not jest's
+    assert out["tests"]["coverage_cmd"] == "npm test -- --coverage --coverage.reporter=json-summary"
     assert out["tests"]["coverage_file"] == "coverage/coverage-summary.json"
 
     assert out["ui"]["present"] is True
@@ -336,3 +338,20 @@ def test_pyproject_src_layout_with_declared_pytest_cov(tmp_path):
     assert t["coverage_tool_installed"] is True
     assert t["coverage_cmd"] == "./venv/bin/python -m pytest -q --cov=shiny --cov-report=json:.loop/run/coverage.json"
     assert not any("no coverage tool" in g for g in out["gaps"])
+
+
+def test_node_project_vitest_without_provider_is_a_gap(tmp_path):
+    package_json = {"name": "demo4", "scripts": {"test": "vitest run"}, "devDependencies": {"vitest": "4.0.0"}}
+    (tmp_path / "package.json").write_text(json.dumps(package_json))
+    out = run_assess(tmp_path)
+    assert out["tests"]["runner"] == "vitest"
+    assert out["tests"]["coverage_tool_installed"] is False
+    assert any("@vitest/coverage-v8" in g for g in out["gaps"])
+
+
+def test_node_project_jest_declared_counts_before_install(tmp_path):
+    package_json = {"name": "demo5", "scripts": {"test": "jest"}, "devDependencies": {"jest": "30.0.0"}}
+    (tmp_path / "package.json").write_text(json.dumps(package_json))
+    out = run_assess(tmp_path)
+    assert out["tests"]["coverage_tool_installed"] is True
+    assert out["tests"]["coverage_cmd"] == "npm test -- --coverage --coverageReporters=json-summary"
