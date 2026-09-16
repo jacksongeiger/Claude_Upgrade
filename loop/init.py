@@ -613,7 +613,8 @@ def least_covered_files(project_dir, proposal):
             pct = summary.get("percent_covered")
             if pct is None:
                 pct = (info.get("lines") or {}).get("pct")
-            if pct is not None:
+            # a fully covered file is not a gap
+            if pct is not None and float(pct) < 100.0:
                 entries.append((float(pct), fname))
         entries.sort(key=lambda x: x[0])
         return [f for _, f in entries[:5]]
@@ -683,12 +684,15 @@ def seed_backlog(project_dir, proposal):
     if tests_baseline:
         raw = tests_baseline.get("raw") or {}
         cov = raw.get("coverage_pct")
-        if cov is not None and cov < 90:
+        # The gap is measured against the scorer's target, not a fixed 90:
+        # a project at 95% with a target of 100 still has a row to work.
+        tests_target = next((sc.get("target", 95) for sc in proposal.get("scorers", []) if sc.get("name") == "tests"), 95)
+        if cov is not None and cov < tests_target:
             files = least_covered_files(project_dir, proposal)
             if files:
                 title = f"raise coverage in {', '.join(files[:5])}"
             else:
-                title = f"raise coverage below 90% (currently {cov:.1f}%)"
+                title = f"raise coverage below {tests_target}% (currently {cov:.1f}%)"
             rows.append(backlog_row(next_id(), title, "tests", "S", "coverage-gap", 1))
 
     return rows

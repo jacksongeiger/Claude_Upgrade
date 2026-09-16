@@ -272,6 +272,15 @@ def test_seed_backlog_coverage_gap_least_covered_files(tmp_path):
     assert cov_rows[0]["title"].index("a.py") < cov_rows[0]["title"].index("b.py")
 
 
+def test_seed_backlog_coverage_gap_when_below_target_even_above_90(tmp_path):
+    git_init(tmp_path)
+    proposal = {"scorers": [{"name": "tests", "target": 100}],
+                "scorer_baselines": {"tests": {"raw": {"coverage_pct": 95.5}}}}
+    rows = init.seed_backlog(tmp_path, proposal)
+    gap = [r for r in rows if r["source"] == "coverage-gap"]
+    assert len(gap) == 1 and gap[0]["dimension"] == "tests"
+
+
 def test_seed_backlog_no_coverage_gap_row_above_90(tmp_path):
     proposal = {
         "scorers": [],
