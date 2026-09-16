@@ -62,8 +62,23 @@ case "$tool" in
     # Scope denies: looking around other checkouts (git -C, worktree list).
     # Denied — the executor has everything it needs in its own worktree — but
     # read-only, so logged as "scope" and not a trip.
-    if printf '%s' "$cmd" | grep -Eq 'git[[:space:]]+worktree\b|git[[:space:]]+-C[[:space:]]'; then
+    if printf '%s' "$cmd" | grep -Eq 'git[[:space:]]+worktree\b'; then
         deny "stay in your own worktree; other checkouts are not yours to read: $cmd" "scope"
+    fi
+    # `git -C <own worktree>` is just a verbose way of saying `git`; any other
+    # -C target is another checkout.
+    if printf '%s' "$cmd" | grep -Eq 'git[[:space:]]+-C[[:space:]]'; then
+        own=$(realpath -m "$cwd" 2>/dev/null || printf '%s' "$cwd")
+        while read -r target; do
+            [ -n "$target" ] || continue
+            t=$(realpath -m "$target" 2>/dev/null || printf '%s' "$target")
+            case "$t" in
+              "$own"|"$own"/*) ;;
+              *) deny "stay in your own worktree; other checkouts are not yours to read: $cmd" "scope" ;;
+            esac
+        done <<EOF2
+$(printf '%s' "$cmd" | grep -oE 'git[[:space:]]+-C[[:space:]]+[^[:space:]]+' | awk '{print $3}' | tr -d '"'"'"'')
+EOF2
     fi
     # Installing the project's own pinned manifest is setup, not acquisition:
     # a fresh worktree has no venv/node_modules and setup_cmd must be able to

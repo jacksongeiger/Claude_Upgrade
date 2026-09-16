@@ -35,6 +35,8 @@ for cmd in "git worktree list" "git -C /elsewhere log --oneline -3"; do
   denied "$out" && pass "deny: $cmd" || fail "allowed: $cmd"
 done
 grep -q '"kind":"scope"' "$D/repo/.loop/events.jsonl" && pass "scope deny logged as scope" || fail "scope deny missing"
+denied "$(guard Bash "{\"command\":\"git -C $WT branch --show-current\"}")" && fail "denied git -C on own worktree" || pass "allow git -C <own worktree>"
+denied "$(guard Bash "{\"command\":\"git -C $WT/sub log && git -C /elsewhere log\"}")" && pass "deny git -C mixing in another checkout" || fail "allowed git -C to another checkout"
 n_safety_before=$(grep -c '"kind":"safety"' "$D/repo/.loop/events.jsonl")
 guard Bash '{"command":"git worktree list"}' >/dev/null
 [ "$(grep -c '"kind":"safety"' "$D/repo/.loop/events.jsonl")" = "$n_safety_before" ] && pass "worktree list is not a safety deny" || fail "worktree list logged as safety"
