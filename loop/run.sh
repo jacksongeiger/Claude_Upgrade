@@ -295,8 +295,23 @@ fi
 # Spend is per run, not per project lifetime.
 state_set '.spent_usd=0'
 ITER=$(jq -r '.iter // 0' "$STATE")
-LAST_SCORE=$(jq -s 'map(select(.composite != null)) | last | .composite // null' "$LOOP/scores.jsonl" 2>/dev/null || echo null)
-BEST=$(jq -s 'map(select(.composite != null) | .composite) | max // null' "$LOOP/scores.jsonl" 2>/dev/null || echo null)
+# A project that came through the pipeline (mkconfig, not init) has no
+# baseline row yet: score it once in the fresh worktree, so the first
+# iteration's delta is against a measurement and not against 0.
+if [ ! -s "$LOOP/scores.jsonl" ]; then
+    STEP="baseline"
+    note "no scores.jsonl — scoring the baseline (iter 0) first"
+    state_set '.phase="SCORE"'
+    if ! python3 "$KIT/score.py" --config "$CONFIG" --workdir "$WT" --iter 0 --commit "$(git -C "$WT" rev-parse HEAD)" \
+        --cost 0 --duration 0 --task none --outcome baseline \
+        --out "$LOOP/scores.jsonl" --manifest "$MANIFEST" > "$RUN/baseline-score.json" 2>>"$RUN/loop.log"; then
+        stop score-infra-broken "$(jq -r '.error // "baseline scorer failed"' "$RUN/baseline-score.json" 2>/dev/null)"
+        exit 1
+    fi
+    event BASELINE composite="$(jq -r '.composite' "$RUN/baseline-score.json")"
+fi
+LAST_SCORE=$(jq -s 'map(select(.composite != null)) | last | .composite // null' "$LOOP/scores.jsonl" 2>/dev/null) || LAST_SCORE=null
+BEST=$(jq -s 'map(select(.composite != null) | .composite) | max // null' "$LOOP/scores.jsonl" 2>/dev/null) || BEST=null
 [ -n "$LAST_SCORE" ] || LAST_SCORE=null; [ -n "$BEST" ] || BEST=null
 state_set --argjson s "${LAST_SCORE:-null}" --argjson b "${BEST:-null}" '.score=$s | .best=$b'
 event RUN_START cap="$CAP" hours="$HOURS" branch="$BRANCH"

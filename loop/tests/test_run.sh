@@ -165,10 +165,19 @@ run_driver expensive --cap 5 --hours 1
 
 # 9. crash trap: a driver bug must not be silent
 P=$(mkproject); cd "$P"
-rm -f "$P/.loop/scores.jsonl"   # pick.py needs a scores row: exit 1
+echo 'not json' > "$P/.loop/scores.jsonl"   # pick.py cannot read its scores: exit 1
 run_driver improve --cap 5 --hours 1
 case "$(stop_reason)" in crashed-at-*) pass "crash trap writes stop_reason ($(stop_reason))" ;; *) fail "stop_reason=$(stop_reason)" ;; esac
 grep -q "STOP reason=crashed" .loop/events.log && pass "crash visible in events.log" || fail "crash silent"
+
+# 9b. no scores.jsonl (a pipeline project: mkconfig, never init) → the driver
+# scores the baseline itself and the first delta is against it, not against 0
+P=$(mkproject); cd "$P"
+rm -f "$P/.loop/scores.jsonl"
+run_driver improve --cap 5 --hours 1 --iters 1
+[ "$(head -n 1 .loop/scores.jsonl | jq -r '.outcome')" = "baseline" ] && pass "missing scores.jsonl → baseline row scored first" || fail "first row: $(head -n 1 .loop/scores.jsonl | head -c 120)"
+grep -q "BASELINE" .loop/events.log && pass "baseline event logged" || fail "no BASELINE event"
+[ "$(last_outcome)" = "kept" ] && pass "iteration after a self-scored baseline is kept" || fail "outcome=$(last_outcome) stop=$(stop_reason)"
 
 # 10. dryrun → dryrun_ok when agreement within 10%
 P=$(mkproject); cd "$P"
