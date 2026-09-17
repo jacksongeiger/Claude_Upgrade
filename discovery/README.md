@@ -17,8 +17,8 @@ registries → sanitize → SQLite   →   bash shim → FTS5 → gate → injec
 |---|---|
 | Schema + FTS5 index | done |
 | Sanitizer + adversarial corpus | done, 39/39 |
-| Funnels: 4 marketplaces, MCP registry, local scan, **GitHub** | done |
-| Retrieval + 10-condition gate | done, **precision 0.905 / recall 0.679** |
+| Funnels: 4 marketplaces, MCP registry, local scan, **GitHub**, **npm** | done |
+| Retrieval + 12-condition gate | done, **precision 1.0 / recall 0.75** |
 | Eval harness (gate / discovery / safety / poison) | done, **123 labelled gate cases** |
 | Hook + statusline + CLI + installer | done |
 | Install runner, three tiers | done |
@@ -26,7 +26,7 @@ registries → sanitize → SQLite   →   bash shim → FTS5 → gate → injec
 | Behavioural eval (`--behaviour`) | done, **surfaced 1.0, 0 rejections** |
 | Threshold calibration | provisional defaults shipped; `rdx mine` refines |
 
-**319 unit tests.** Measured on a real 32,217-resource index: retrieval 2-5ms,
+**353 unit tests.** Measured on a real 36,178-resource index: retrieval 2-5ms,
 silent-path hook ~2.8ms, safety 39/39, discovery 9/9 (3 skipped — they need
 the GitHub funnel, whose search API is unreachable from a repo-scoped
 sandbox), poison test 22 malicious rows stored and none reachable.
@@ -382,9 +382,21 @@ Kill switches, in order of bluntness: `touch ~/.claude/rdx/DISABLED`,
   embeddings later.
 - **The GitHub funnel is fixture-tested, not live-tested.** This repo's cloud
   sessions bind the GitHub API to their configured repositories, so search
-  returns 403 from inside one. The code path is exercised against frozen
-  captures of real API responses; the first live `rdx sync --funnel github` on
-  an unrestricted machine is still worth watching.
+  returns 403 from inside one (every request, token or not; the proxy answers
+  for api.github.com and the github.com search pages alike). The code path is
+  exercised against frozen captures of real API responses; the first live
+  `rdx sync --funnel github` on an unrestricted machine is still worth watching.
+- **The npm funnel is the OSS source that works from anywhere.** First live
+  run 2026-09-17 from a cloud session: 27 keyword queries, 6,500 seen, 4,797
+  stored, 5 quarantined by the sanitizer (two `instr_override`, two `exfil`),
+  37 seconds. Download counts are gameable, so yellow needs license, repository
+  link, freshness and a floor together, and the recipe is recorded, never run.
+  Its arrival exposed two things that are now fixed and tested: eligibility
+  was a single global sort, so 3,957 rows with download counts evicted every
+  marketplace plugin (now a per-funnel share cap, 40%, with backfill); and the
+  task-path gate fired on two shared words out of seven (now a coverage floor
+  of 0.5, format words are not content, and naming the tool you already use
+  stays silent).
 - **HN and Bluesky funnels are not built.** Both endpoints were unverifiable
   from a sandbox with allowlisted egress.
 - **PostToolUse attribution only works for MCP servers**, which namespace their

@@ -315,7 +315,7 @@ def mark_stale_deprecated(conn: sqlite3.Connection, funnel: str, run_ts: str) ->
 #
 # Tier 1 is "we have a real reason to trust this": either first-party curation
 # (the Anthropic marketplaces) or a genuine popularity-and-freshness signal
-# (the GitHub funnel). Putting github in the ELSE bucket starved it completely
+# (the GitHub and npm funnels). Putting github in the ELSE bucket starved it completely
 # — measured: 0 of 33 rows eligible, because the 2,000 cap was exhausted by
 # 1,686 community plugins first. The funnel carrying the best quality data must
 # not be the one that loses the tie-break.
@@ -326,36 +326,83 @@ FUNNEL_PRIORITY_SQL = """
     WHEN 'mp_claude_code' THEN 1
     WHEN 'mp_skills'      THEN 1
     WHEN 'github'         THEN 1
+    WHEN 'npm'            THEN 1
     WHEN 'mp_community'   THEN 2
     ELSE 3
   END
 """
 
 
-def recompute_eligibility(conn: sqlite3.Connection, max_eligible: int) -> int:
+# No single funnel may hold more than this share of the eligible set.
+#
+# Measured the day the npm funnel landed: 3,957 npm rows arrived carrying real
+# download counts, so every one of them outscored every marketplace plugin
+# (which have no popularity signal at all) and the eligible set became 2,000
+# npm packages and nothing else. The official `github`, `playwright`, `serena`
+# and `context7` plugins vanished from retrieval and four discovery cases
+# failed. A quota keeps one loud source from silencing the rest; within its
+# share a funnel still sends its best rows.
+FUNNEL_SHARE_CAP = 0.4
+
+
+def recompute_eligibility(conn: sqlite3.Connection, max_eligible: int,
+                          share_cap: float = FUNNEL_SHARE_CAP) -> int:
     """Only active, non-archived, non-quarantined rows with a usable summary
-    compete; the best `max_eligible` become injectable.
+    compete; the best `max_eligible` become injectable, and no funnel takes
+    more than `share_cap` of them.
 
     The cap exists so `rdx audit` stays short enough for a human to read.
     """
+    per_funnel = max(1, int(max_eligible * share_cap))
     conn.execute("UPDATE resource SET eligible = 0")
     cur = conn.execute(
         """
         UPDATE resource SET eligible = 1
         WHERE id IN (
-          SELECT id FROM resource
-          WHERE status = 'active'
-            AND archived = 0
-            AND blocking_flags = '[]'
-            AND summary IS NOT NULL
-            AND length(summary) >= 10
+          SELECT id FROM (
+            SELECT id, funnel, quality_score, stars,
+                   ROW_NUMBER() OVER (
+                     PARTITION BY funnel
+                     ORDER BY quality_score DESC, stars DESC, id
+                   ) AS rank_in_funnel
+            FROM resource
+            WHERE status = 'active'
+              AND archived = 0
+              AND blocking_flags = '[]'
+              AND summary IS NOT NULL
+              AND length(summary) >= 10
+          )
+          WHERE rank_in_funnel <= ?
           ORDER BY """ + FUNNEL_PRIORITY_SQL + """, quality_score DESC, stars DESC
           LIMIT ?
         )
         """,
-        (max_eligible,),
+        (per_funnel, max_eligible),
     )
-    return cur.rowcount
+    n = cur.rowcount
+    # Backfill: the quota guarantees every funnel its share, it must not leave
+    # slots empty when few funnels exist (an index with one funnel would
+    # otherwise stop at 40%). Remaining slots go by the same global order.
+    if n < max_eligible:
+        cur = conn.execute(
+            """
+            UPDATE resource SET eligible = 1
+            WHERE id IN (
+              SELECT id FROM resource
+              WHERE eligible = 0
+                AND status = 'active'
+                AND archived = 0
+                AND blocking_flags = '[]'
+                AND summary IS NOT NULL
+                AND length(summary) >= 10
+              ORDER BY """ + FUNNEL_PRIORITY_SQL + """, quality_score DESC, stars DESC
+              LIMIT ?
+            )
+            """,
+            (max_eligible - n,),
+        )
+        n += cur.rowcount
+    return n
 
 
 def _row_to_resource(row: sqlite3.Row) -> Resource:

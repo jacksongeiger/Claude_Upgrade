@@ -119,6 +119,9 @@ class Config:
     # suppressor existed, 0.55 looked reckless.
     min_score_task: float = 0.55
     min_matched_terms_task: int = 2
+    # Fraction of the prompt's contentful terms the top hit must cover on the
+    # task path. 0.5: half of what was said, measured against the corpus.
+    min_coverage_task: float = 0.5
 
     max_suggestions: int = 2
     second_item_ratio: float = 0.85  # show a 2nd only if within 15% of the top

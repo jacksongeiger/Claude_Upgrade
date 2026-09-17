@@ -1,6 +1,42 @@
 # Changelog
 
 ---
+### v3.2 — 2026-09-17 — rdx: the npm funnel, and what 4,000 packages taught the gate
+
+**What changed:** a fifth funnel, `discovery/rdx/funnels/npm.py`, indexes the
+public npm registry: 27 curated keyword queries, the registry's own popularity
+ranking, monthly downloads as the usage signal, and dedupe against the GitHub
+funnel through the package's repository link. It is the open-source source
+that works from a cloud session, where the GitHub search API answers 403 to
+everything (the sandbox proxy scopes api.github.com to the session's one
+repository; the funnel's error now says so instead of a bare status code).
+
+**What the live run found.** 6,500 packages seen, 4,797 stored, 5 quarantined
+by the sanitizer, 37 seconds. Then two regressions, both measured, both fixed:
+
+- Eligibility was one global sort by quality. Every npm row carries a download
+  count and every marketplace plugin carries none, so the 2,000-row eligible
+  set became 2,000 npm packages and the official `github`, `playwright`,
+  `serena` and `context7` plugins vanished from retrieval. Now no funnel takes
+  more than 40% of the set, with backfill so a one-funnel index still fills.
+  The download curve is also wider (divisor 7, not 5): at 5, a quarter of the
+  packages saturated at 1.0.
+- Gate precision fell from 0.905 to 0.786: six false fires, all npm rows,
+  all on the task path, matching two words of a seven-word sentence ("write a
+  test that covers the empty input case for the parser" found a contract-
+  testing plugin on "case" and "parser"). Three rules, each with a test: the
+  task path needs the hit to cover half the contentful terms; formats and
+  containers (json, csv, config, directory, file) are not content; and a
+  prompt that names the tool it already uses ("with argparse") stays silent.
+  Corpus after: precision 1.0, recall 0.75, from 0.905 / 0.679 before npm.
+
+**Also:** `ux_score.py` closes a task's stale persona rows on a clean
+walkthrough; ship-stage lighthouse audits the served url; Nightshift scores
+its own baseline for pipeline projects (see v3.1's last lines).
+
+**Tests:** discovery 353, all green; `rdx eval` gate / discovery / safety /
+poison all pass.
+
 ### v3.1 — 2026-09-16 — the project pipeline: idea to Nightshift
 
 **What changed:** a new `pipeline/` kit and six commands — `/jg-spec`,

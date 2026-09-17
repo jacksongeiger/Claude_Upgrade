@@ -189,3 +189,33 @@ def test_tags_roundtrip(conn):
     db.recompute_eligibility(conn, 100)
     res, _ = db.candidates(conn, "pdfs")[0]
     assert res.tags == ["has:mcp", "pdf"]
+
+
+def test_no_funnel_takes_more_than_its_share(conn):
+    """The day npm landed, 3,957 rows with real download counts outscored
+    every marketplace plugin and the eligible set became one funnel. A quota
+    keeps the curated rows reachable; within its share the loud funnel still
+    sends its best."""
+    for i in range(50):
+        db.upsert_resource(conn, draft(f"library:npm:{i}", funnel="npm", rtype="library"),
+                           now=NOW, quality_score=0.9 + i / 1000)
+    for i in range(5):
+        db.upsert_resource(conn, draft(f"plugin:mp_official:{i}", funnel="mp_official", rtype="plugin"),
+                           now=NOW, quality_score=0.15)
+    n = db.recompute_eligibility(conn, 20, share_cap=0.5)
+    # quota pass: npm 10 + official 5; backfill: 5 more npm, since nothing
+    # else is left. The guarantee is that the official rows are all in and
+    # npm's rows are its best, not that slots stay empty.
+    assert n == 20
+    by_funnel = dict(conn.execute(
+        "SELECT funnel, COUNT(*) FROM resource WHERE eligible = 1 GROUP BY funnel").fetchall())
+    assert by_funnel == {"npm": 15, "mp_official": 5}
+    best = conn.execute(
+        "SELECT MIN(quality_score) FROM resource WHERE eligible = 1 AND funnel = 'npm'").fetchone()[0]
+    assert best >= 0.935  # the top fifteen of the fifty, not an arbitrary fifteen
+
+
+def test_quota_does_not_starve_a_single_funnel_index(conn):
+    for i in range(10):
+        db.upsert_resource(conn, draft(f"mcp:test:{i}"), now=NOW, quality_score=i / 10)
+    assert db.recompute_eligibility(conn, 3) == 3

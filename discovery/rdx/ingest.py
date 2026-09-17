@@ -66,7 +66,11 @@ def quality_score(*, stars: int | None = None, pushed_at: str | None = None,
     if stars:
         popularity = max(popularity, min(1.0, math.log10(1 + stars) / 6.0))
     if install_count:
-        popularity = max(popularity, min(1.0, math.log10(1 + install_count) / 5.0))
+        # Divisor 7.0, not 5.0: monthly npm downloads run far higher than
+        # stars, and at 5.0 every package above 100k/month saturated at 1.0
+        # (1,058 of 3,957 rows on the first live run). 7.0 spreads the curve:
+        # 100k -> 0.71, 1M -> 0.86, 10M -> 1.0.
+        popularity = max(popularity, min(1.0, math.log10(1 + install_count) / 7.0))
     if not stars and not install_count:
         popularity = 0.25  # unknown, not zero: most registry entries have no stars
 

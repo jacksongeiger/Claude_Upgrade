@@ -7,7 +7,7 @@ makes someone disable the system - after which the recall is zero forever.
 Ten conditions, each logging a named suppression reason so the histogram can
 be tuned against real data instead of guesses:
 
-    trivial | no_intent | in_codebase | no_match | below_threshold
+    trivial | no_intent | in_codebase | has_tool | no_match | below_threshold
     weak_coverage | flat_distribution | cooldown | snoozed | shadow
 
 The two that do the most work are `no_intent` and `in_codebase`, and both are
@@ -215,6 +215,29 @@ TASK_RE = re.compile(r"""\b(?:
 )\b""", re.I | re.X)
 
 
+NAMED_TOOL_RE = re.compile(r"\b(?:with|using|via|through|in)\s+([a-z0-9@][a-z0-9@._/-]{2,})", re.I)
+
+
+def _named_tool(prompt: str, conn: sqlite3.Connection | None) -> str | None:
+    """The slug of an indexed tool the prompt says it is already using."""
+    if conn is None:
+        return None
+    names = {m.group(1).lower().rstrip(".,;:") for m in NAMED_TOOL_RE.finditer(prompt)}
+    names = {n for n in names if len(n) >= 3}
+    if not names:
+        return None
+    placeholders = ",".join("?" for _ in names)
+    try:
+        row = conn.execute(
+            f"SELECT slug FROM resource WHERE slug IN ({placeholders}) "
+            f"AND status = 'active' AND eligible = 1 LIMIT 1",
+            tuple(names),
+        ).fetchone()
+    except sqlite3.Error:
+        return None
+    return str(row[0]) if row else None
+
+
 def has_intent(prompt: str, conn: sqlite3.Connection | None = None) -> tuple[bool, str]:
     """Classify why a prompt might warrant a suggestion.
 
@@ -265,7 +288,12 @@ tool tools plugin plugins mcp server servers library libraries package packages
 api apis app apps thing things stuff way ways data best good new any some
 claude code integration support access simple easy quick
 automating taking querying working running getting adding
+json yaml csv xml config configs file files folder directory string text
 """.split())
+# The last line arrived with the npm funnel: formats and containers are not
+# capabilities. "export this config as json" fired on a JSON-to-CSV converter
+# because json and config counted as content; "crawl the directory tree" fired
+# on a directory watcher. Measured on the 124-case corpus (see evalharness).
 
 
 def coverage_terms(terms: list[str]) -> list[str]:
@@ -625,6 +653,15 @@ def evaluate(prompt: str, conn: sqlite3.Connection, *, cfg: config.Config,
     if CODEBASE_RE.search(stripped):
         return done(False, "in_codebase", kind=kind)
 
+    # Gate 2c: the user named the tool they are using ("parse the arguments
+    # with argparse", "scrape it using playwright"). Offering an alternative
+    # to a stated choice is the most annoying thing a hook can do, and with
+    # npm in the index there is an alternative for everything. Explicit asks
+    # ("is there a faster alternative to pandas") are not "with pandas".
+    named = _named_tool(stripped, conn)
+    if named and kind != "verb":
+        return done(False, "has_tool", kind=kind)
+
     # An unasked-for suggestion must clear a higher bar than a requested one.
     min_score = cfg.min_score_task if kind == "task" else cfg.min_score
     min_matched = (cfg.min_matched_terms_task if kind == "task"
@@ -649,6 +686,14 @@ def evaluate(prompt: str, conn: sqlite3.Connection, *, cfg: config.Config,
     if scored[0].matched < min_matched:
         return done(False, "weak_coverage", top=top, margin=margin,
                     n=len(scored), query=query)
+    # On the task path the hit must also cover most of what was said, not two
+    # words of seven. With 4,000 npm rows in the index there is a package
+    # whose summary shares two words with almost any sentence ("write a test
+    # that covers the empty input case for the parser" found a contract-
+    # testing plugin on "case" and "parser"). Explicit asks keep the lower bar.
+    if kind == "task" and scored[0].coverage < cfg.min_coverage_task:
+        return done(False, "weak_coverage", top=top, margin=margin,
+                    n=len(scored), query=query, kind=kind)
 
     # Gate 4: absolute quality
     if top < min_score:

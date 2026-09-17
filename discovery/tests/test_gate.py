@@ -360,3 +360,57 @@ def test_codebase_deixis_suppresses_with_named_reason(conn):
                           conn, cfg=live_cfg())
     assert not d.inject
     assert d.reason == "in_codebase"
+
+
+# --------------------------------------------------------------------------
+# What the npm funnel taught the gate (measured on the 124-case corpus the
+# day 4,000 packages landed: precision 0.905 -> 0.786 -> 1.0 after these)
+# --------------------------------------------------------------------------
+
+def _seed_library(conn, slug, summary):
+    ingest.sanitize_and_store(conn, ResourceDraft(
+        id=f"library:npm:{slug}", type="library", name=slug, slug=slug,
+        funnel="npm", source_ref="https://example.test/x", summary=summary,
+        url=f"https://example.test/{slug}", trust_tier="yellow", install_count=50_000,
+    ), now=NOW)
+    conn.commit()
+    db.recompute_eligibility(conn, 1000)
+    conn.commit()
+
+
+def test_task_path_needs_the_hit_to_cover_most_of_the_prompt(conn):
+    _seed_library(conn, "contract-case-plugin-base",
+                  "Plugin framework for writing plugins for the ContractCase parser")
+    d = retrieve.evaluate("write a test that covers the empty input case for the parser",
+                          conn, cfg=live_cfg(min_score_task=0.3))
+    assert not d.inject
+    assert d.reason == "weak_coverage"
+
+
+def test_explicit_ask_keeps_the_lower_coverage_bar(conn):
+    d = retrieve.evaluate("is there an mcp server for querying github issues and pull requests",
+                          conn, cfg=live_cfg())
+    assert d.inject and d.items[0].resource.slug == "github"
+
+
+def test_naming_the_tool_in_use_stays_silent(conn):
+    _seed_library(conn, "argparse", "CLI arguments parser. Native port of python's argparse.")
+    _seed_library(conn, "type-flag", "Typed command-line arguments parser")
+    d = retrieve.evaluate("parse the command line arguments with argparse",
+                          conn, cfg=live_cfg(min_score_task=0.3))
+    assert not d.inject
+    assert d.reason == "has_tool"
+
+
+def test_asking_for_an_alternative_is_not_naming_a_tool(conn):
+    _seed_library(conn, "pandas", "Data analysis library with dataframes")
+    _seed_library(conn, "polars", "A faster alternative to pandas for large dataframes")
+    d = retrieve.evaluate("is there a faster alternative to pandas for large dataframes",
+                          conn, cfg=live_cfg())
+    assert d.reason != "has_tool"
+
+
+def test_format_words_do_not_count_as_content():
+    terms = retrieve.coverage_terms(retrieve.query_terms("export this config as json"))
+    assert "json" not in terms and "config" not in terms
+    assert "export" in terms
