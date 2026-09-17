@@ -40,6 +40,29 @@ class HttpResponse:
         return json.loads(self.body.decode("utf-8"))
 
 
+def _reason(exc: "urllib.error.HTTPError") -> str:
+    """The server's own one-line explanation of a 4xx/5xx, if it gave one.
+
+    A bare "HTTP 403" from api.github.com told us nothing for a day: the body
+    said the sandbox's GitHub proxy only allows the session's own repository.
+    Keep the message short and on one line; it lands in `rdx status`."""
+    try:
+        body = exc.read(2048).decode("utf-8", "replace")
+    except Exception:  # noqa: BLE001 - a diagnostic must never raise
+        return ""
+    msg = ""
+    try:
+        obj = json.loads(body)
+        if isinstance(obj, dict):
+            msg = str(obj.get("message") or obj.get("error") or "")
+    except ValueError:
+        msg = body.strip()
+    msg = " ".join(msg.split())
+    if not msg:
+        return ""
+    return ": " + (msg[:157] + "..." if len(msg) > 160 else msg)
+
+
 class HttpClient:
     """Minimal stdlib HTTP client with conditional-GET support.
 
@@ -69,7 +92,7 @@ class HttpClient:
         except urllib.error.HTTPError as exc:
             if exc.code == 304:
                 return HttpResponse(status=304, body=b"", etag=etag)
-            raise HttpError(f"{url} -> HTTP {exc.code}") from exc
+            raise HttpError(f"{url} -> HTTP {exc.code}{_reason(exc)}") from exc
         except urllib.error.URLError as exc:
             raise HttpError(f"{url} -> {exc.reason}") from exc
 

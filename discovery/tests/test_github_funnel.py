@@ -230,3 +230,39 @@ def test_one_failing_query_does_not_abandon_the_crawl(payload):
     assert report.status == "ok"
     assert report.n_upserted > 0
     c.close()
+
+
+def test_http_error_carries_the_servers_message(monkeypatch):
+    """A 403 from a proxy that explains itself must reach `rdx status` as
+    that explanation, not as a bare status code."""
+    import io
+    import urllib.error
+    import urllib.request
+    from rdx.funnels.base import HttpClient, HttpError
+
+    body = b'{"message":"GitHub access to this repository is not enabled for this session. Use add_repo.","documentation_url":"x"}'
+
+    def fake_urlopen(req, timeout=0):
+        raise urllib.error.HTTPError(req.full_url, 403, "Forbidden", {}, io.BytesIO(body))
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    with pytest.raises(HttpError) as exc:
+        HttpClient().get("https://api.github.com/search/repositories?q=x")
+    text = str(exc.value)
+    assert "HTTP 403: GitHub access to this repository is not enabled" in text
+    assert "\n" not in text
+
+
+def test_http_error_without_a_body_is_still_short(monkeypatch):
+    import io
+    import urllib.error
+    import urllib.request
+    from rdx.funnels.base import HttpClient, HttpError
+
+    def fake_urlopen(req, timeout=0):
+        raise urllib.error.HTTPError(req.full_url, 502, "Bad Gateway", {}, io.BytesIO(b""))
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    with pytest.raises(HttpError) as exc:
+        HttpClient().get("https://api.github.com/x")
+    assert str(exc.value).endswith("-> HTTP 502")
