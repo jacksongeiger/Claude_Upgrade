@@ -239,7 +239,10 @@ progress), or at `max_steps × 2`. Final message: JSON
 - `score.json`: `value = 100 × (0.5·completed + 0.3·step_ratio + 0.2·judge/10)`;
   without judge.json the judge share is redistributed and `judged: false`;
 - non-numeric findings (`confusions`, `dead_ends`) become backlog rows
-  `dimension: persona, source: persona` via backlog_io, deduplicated by title.
+  `dimension: persona, source: persona` via backlog_io, deduplicated by title;
+  a later walkthrough of the same task that completes with no findings marks
+  that task's open `ux-*` rows done (`note: … superseded: clean walkthrough
+  <run>`), so a stale finding cannot cost Nightshift a night.
 
 `loop/scorers/persona.py` (Nightshift scorer): config `{name: persona,
 serve_cmd, port, tasks: [{task, max_steps, persona}], runs}`; starts the
@@ -305,8 +308,19 @@ Human gate: **the deploy**.
 
 ## Stage 7 — Nightshift
 
-Unchanged. `spec_check --derive` keeps its backlog fed; `persona.py` gives it
-a UX dimension.
+Unchanged in the loop; the handoff is three facts:
+
+- the config is the one `/jg-build` wrote with `mkconfig.py` (perf checks
+  become the perf scorer's `bench_cmd` + `baseline`, persona checks its
+  tasks with their `setup`); re-run `mkconfig.py` after the spec changes,
+  it re-signs the manifest;
+- `run.sh` finds no `scores.jsonl` (the project never ran `/jg-loop init`)
+  and scores the baseline itself as iter 0 before the first iteration;
+- the backlog already holds the spec rows, the persona rows from every
+  walkthrough (`ux-*`) and the inbox rows (`fb-*`), so `pick.py` has a
+  measured target from the first night.
+
+`bash loop/run.sh --dryrun --cap 8 --project <dir>` is the proving run.
 
 ## Stage 8 — /jg-feedback
 

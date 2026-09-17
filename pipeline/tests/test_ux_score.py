@@ -123,3 +123,41 @@ def test_backlog_untouched_without_findings(tmp_path):
     proc = run(tmp_path, check, backlog=backlog)
     assert proc.returncode == 0, proc.stderr
     assert not backlog.exists()
+
+
+def test_clean_walkthrough_closes_stale_rows_for_same_task(tmp_path):
+    """A finding raised on task T is closed when a later walkthrough of T
+    completes with no findings; rows for other tasks stay open."""
+    sys.path.insert(0, str(KIT.parent))
+    from loop import backlog_io
+
+    first = tmp_path / "create-note-1"; first.mkdir()
+    write_json(first / "result.json", {"status": "complete", "steps": 4})
+    write_json(first / "findings.json", {"dead_ends": ["Could not type into Title"], "confusions": []})
+    backlog = tmp_path / "backlog.yaml"
+    check = {"type": "persona", "task": "create a note", "max_steps": 4, "must": "complete"}
+    assert run(first, check, backlog=backlog).returncode == 0
+
+    other = tmp_path / "search-1"; other.mkdir()
+    write_json(other / "result.json", {"status": "complete", "steps": 2})
+    write_json(other / "findings.json", {"dead_ends": ["Search box hidden"], "confusions": []})
+    assert run(other, {"type": "persona", "task": "find a note", "max_steps": 3, "must": "complete"},
+               backlog=backlog).returncode == 0
+    assert {r["status"] for r in backlog_io.load(backlog)} == {"open"}
+
+    # a stuck re-run of the same task closes nothing
+    stuck = tmp_path / "create-note-2"; stuck.mkdir()
+    write_json(stuck / "result.json", {"status": "stuck", "steps": 6})
+    write_json(stuck / "findings.json", {"dead_ends": [], "confusions": []})
+    run(stuck, check, backlog=backlog)
+    assert {r["status"] for r in backlog_io.load(backlog)} == {"open"}
+
+    # a clean re-run of the same task closes its row only
+    clean = tmp_path / "create-note-3"; clean.mkdir()
+    write_json(clean / "result.json", {"status": "complete", "steps": 3})
+    write_json(clean / "findings.json", {"dead_ends": [], "confusions": []})
+    assert run(clean, check, backlog=backlog).returncode == 0
+    rows = {r["title"]: r for r in backlog_io.load(backlog)}
+    assert rows["Could not type into Title"]["status"] == "done"
+    assert "superseded: clean walkthrough create-note-3" in rows["Could not type into Title"]["note"]
+    assert rows["Search box hidden"]["status"] == "open"

@@ -88,6 +88,8 @@ Nightshift part (agents, worktrees, guards, allowlist, cost meter, merge):
                     # findings become numbers Nightshift can move
 /jg-ship v0.1.0     # a checklist script; you type "deploy"; a persona smoke run
 /jg-feedback        # FEEDBACK.md and error exports → backlog rows
+/jg-loop dryrun     # then Nightshift: it scores the baseline itself and picks
+                    # from the spec, persona and feedback rows
 ```
 
 The contract is `pipeline/README.md`. The human gates: spec signed, every

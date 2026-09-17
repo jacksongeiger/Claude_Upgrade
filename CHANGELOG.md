@@ -54,7 +54,45 @@ After those: create-note passed persona (5 steps, judge 9/10, score 92) and
 lighthouse (accessibility 91), edit-note passed persona (3 steps, judge
 10/10), and milestone 1 was accepted by the script.
 
-PIPELINE_RESULTS
+Milestones 2 and 3 followed without a driver change: search (a bench
+script the executor wrote, `ms_p95` 0.35 ms against a 30 ms budget; persona
+found the note that mentions eggs in one step, judge 9/10) and dark mode
+(persona 2 steps, judge 9/10; lighthouse met every minimum; the first
+screenshot gate needed a human — the dark-mode render was viewed and approved
+as the baseline, after which the gate diffed at 0.0000). Build cost by
+milestone, Opus planner + Sonnet/Opus executors + reviewers: $5.25, $3.65,
+$3.32. The whole pipeline on the project, interview to shipped: $18.45.
+
+Then the rest of the spine, each stage catching something:
+
+- `/jg-ux` tokens extracted a design-tokens file from the built CSS; the
+  inspiration stage reported, correctly, that it had no web access and said
+  so in its file instead of inventing galleries;
+- `/jg-feedback` turned four inbox bullets into `fb-*` rows with dimensions;
+- `/jg-ship` first said the tree was dirty (pipeline state is now ignored),
+  that every gate exited 4 (`run-all` ran test and persona entries as gates
+  and had no served base url), and that lighthouse had an invalid url (the
+  spec names paths, the scorer wants urls). After those three fixes the ship
+  report on `main` is green on every machine row; `security-review` is the
+  one human line;
+- the merge to `main` conflicted on `.loop/backlog.yaml` because the driver
+  marked rows done in both checkouts; it edits the build worktree only now;
+- Nightshift, handed the project, crashed at state setup: no `scores.jsonl`,
+  because the project never ran `/jg-loop init`. The driver now scores the
+  baseline itself (iter 0) when the file is missing.
+
+The proving run, `run.sh --dryrun --cap 8` on the shipped app: baseline
+97.80 (tests 99.65, perf 100, lighthouse 93.05, persona 96.63 across four
+walkthroughs with their setups), `pick.py` chose a persona row, the child
+merged a focus-ring and editor-rebuild fix with three new tests, the cost
+meter agreed with the bill within 5% ($2.86), and the iteration scored 97.94.
+One wrinkle worth its own line: the row it picked was a stale finding from
+a walkthrough made while the driver still had its selector bug; the planner
+reported honestly that it could not reproduce it. `ux_score.py` now closes a
+task's open persona rows when a later walkthrough of that task is clean.
+
+**Tests:** pipeline 123 (pytest) + 26 (integration); Nightshift 173 + hooks
++ driver suites, all green.
 
 ### v3.0 — 2026-09-16 — Nightshift: the unattended improvement loop
 

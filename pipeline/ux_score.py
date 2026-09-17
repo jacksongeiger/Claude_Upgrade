@@ -82,6 +82,32 @@ def compute_score(result: dict, check: dict, judge: dict | None) -> dict:
     }
 
 
+def close_superseded(run_dir: str, backlog_path: str, task: str) -> int:
+    """Mark open `ux-*` rows raised for this task as done when a later
+    walkthrough completed without findings. Returns the number closed."""
+    result_path = os.path.join(run_dir, "result.json")
+    if not task or not os.path.exists(backlog_path) or not os.path.exists(result_path):
+        return 0
+    try:
+        with open(result_path, "r", encoding="utf-8") as f:
+            if json.load(f).get("status") != "complete":
+                return 0
+    except (OSError, ValueError):
+        return 0
+    rows = backlog_io.load(backlog_path)
+    tag = f'task "{task}"'
+    closed = 0
+    for row in rows:
+        if (str(row.get("id", "")).startswith("ux-") and row.get("status") == "open"
+                and str(row.get("note", "")).startswith(tag)):
+            row["status"] = "done"
+            row["note"] = f"{row.get('note', '')}; superseded: clean walkthrough {os.path.basename(run_dir)}"
+            closed += 1
+    if closed:
+        backlog_io.dump(rows, backlog_path)
+    return closed
+
+
 def feed_backlog(run_dir: str, backlog_path: str, task: str) -> int:
     """Append dead_ends/confusions from <run_dir>/findings.json to the
     backlog, deduplicated by id. Returns the number of rows added."""
@@ -93,6 +119,11 @@ def feed_backlog(run_dir: str, backlog_path: str, task: str) -> int:
 
     titles = list(findings.get("dead_ends") or []) + list(findings.get("confusions") or [])
     if not titles:
+        # A clean walkthrough of this task closes the open persona rows an
+        # earlier walkthrough of the same task raised: the product (or the
+        # driver) no longer shows the problem, and a night spent on a stale
+        # finding is a night wasted.
+        close_superseded(run_dir, backlog_path, task)
         return 0
 
     rows = backlog_io.load(backlog_path) if os.path.exists(backlog_path) else []
