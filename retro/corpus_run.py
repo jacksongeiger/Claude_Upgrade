@@ -16,6 +16,8 @@ kinds:
                  runs pipeline/validate.py freeze and checks the frozen numbers
     verdict      {"band_usd": N, "claims", "plan", "skeptic"?, "ledger": [...], "judge"?: {...}, "expect": "GO|PIVOT|NO-GO|INFRA"}
                  runs validate.py freeze + verdict --no-refetch
+    schema       {"file": "plan|skeptic|claims|judge", "claims"?, "plan"?, "obj": {...}, "expect": "ok"|"reject", "reject_match": "<substring>"}
+                 runs validate.py schema on the file (claims/plan supplied so the cross-checks have context)
     gate_silent  {"prompt": "..."}  and  gate_fire {"prompt": "...", "expect_slug": "..."}
                  run discovery's retrieve.evaluate against the real index when present, else skipped
 Prints one JSON line: {"ok", "passed", "failed", "skipped", "cases": [...]}.
@@ -137,7 +139,22 @@ def case_gate(c, tmp, fire):
     return not out["inject"], json.dumps(out)
 
 
-RUNNERS = {"check_plan": case_check_plan, "ux_supersede": case_ux_supersede, "freeze": case_freeze, "verdict": case_verdict,
+def case_schema(c, tmp):
+    """{"file": "claims|plan|skeptic|judge", "claims"?, "plan"?, "skeptic"?, "obj": <the file under test>, "expect": "ok"|"reject", "reject_match": "..."}"""
+    d, _ = _validate_dir({**c, "claims": c.get("claims") or c["obj"], "plan": c.get("plan") or {"claims": []}}, tmp) if c["file"] != "claims" else _validate_dir({**c, "claims": c["obj"], "plan": {"claims": []}}, tmp)
+    w(d / f"{c['file']}.json", c["obj"])
+    proc = sh([sys.executable, str(PIPE / "validate.py"), "schema", "--dir", str(d), "--file", c["file"]])
+    try:
+        out = json.loads(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return False, proc.stdout[:200] + proc.stderr[:200]
+    problems = " | ".join(out.get("problems") or [])
+    if c["expect"] == "ok":
+        return bool(out.get("ok")), problems[:200] or "ok"
+    return (not out.get("ok")) and c.get("reject_match", "") in problems, problems[:200]
+
+
+RUNNERS = {"check_plan": case_check_plan, "schema": case_schema, "ux_supersede": case_ux_supersede, "freeze": case_freeze, "verdict": case_verdict,
            "gate_silent": lambda c, t: case_gate(c, t, False), "gate_fire": lambda c, t: case_gate(c, t, True)}
 
 
