@@ -1,0 +1,500 @@
+{
+  "generated_at": "2026-09-18T04:32:39Z",
+  "label": "v3.3-final",
+  "projects": [
+    {
+      "build": {
+        "accepted_after_retry": 0,
+        "accepted_first_try": 3,
+        "attempts_total": 0,
+        "blocked": 0,
+        "cost_per_accepted_milestone": 4.0737,
+        "cost_usd": 12.2211,
+        "milestones": 3
+      },
+      "feedback": {
+        "by_dimension": {
+          "none": 2,
+          "perf": 1,
+          "tests": 1
+        },
+        "duplicates_skipped": 0,
+        "rows": 4
+      },
+      "human_overrides": {},
+      "ledger": {
+        "stages": {
+          "build": {
+            "n": 3,
+            "usd": 12.2211
+          },
+          "persona": {
+            "n": 12,
+            "usd": 1.12
+          },
+          "persona-judge": {
+            "n": 12,
+            "usd": 1.2418
+          },
+          "spec": {
+            "n": 1,
+            "usd": 1.4792
+          },
+          "ux-inspire": {
+            "n": 1,
+            "usd": 0.2652
+          }
+        }
+      },
+      "name": "pocket-notes",
+      "nightshift": {
+        "agreement_max_abs": 0.0468,
+        "baseline_rows": 1,
+        "cost_usd": 2.855,
+        "denies": {},
+        "iterations": 1,
+        "kept": 0,
+        "last_stop_reason": "dryrun-complete",
+        "reset_flat": 1,
+        "reset_regressed": 0,
+        "stop_reasons": {
+          "crashed-at-state": 1,
+          "dryrun-complete": 1
+        }
+      },
+      "path": "/tmp/claude-0/-home-user-Claude-Upgrade/f233027a-f654-5cf6-8d4d-2c7bd1bfa37c/scratchpad/foreign/pocket-notes",
+      "persona": {
+        "completed": 12,
+        "findings": 11,
+        "findings_deduped": 0,
+        "rows_resolved_judged": 0,
+        "rows_resolved_rule": 0,
+        "walkthroughs": 12
+      },
+      "ship": {
+        "reports": 1,
+        "rows_failed": {}
+      },
+      "validation": {
+        "cost_usd": 0.0,
+        "feedback_contradictions": 0,
+        "overrules": 0,
+        "runs": 0,
+        "verdicts": {}
+      }
+    },
+    {
+      "build": {
+        "accepted_after_retry": 0,
+        "accepted_first_try": 0,
+        "attempts_total": 0,
+        "blocked": 0,
+        "cost_per_accepted_milestone": null,
+        "cost_usd": 0.0,
+        "milestones": 0
+      },
+      "feedback": {
+        "by_dimension": {},
+        "duplicates_skipped": 0,
+        "rows": 0
+      },
+      "human_overrides": {},
+      "ledger": {
+        "stages": {
+          "validate": {
+            "n": 10,
+            "usd": 4.093
+          }
+        }
+      },
+      "name": "validate-small",
+      "nightshift": {
+        "agreement_max_abs": null,
+        "baseline_rows": 0,
+        "cost_usd": 0.0,
+        "denies": {},
+        "iterations": 0,
+        "kept": 0,
+        "last_stop_reason": null,
+        "reset_flat": 0,
+        "reset_regressed": 0,
+        "stop_reasons": {}
+      },
+      "path": "/tmp/claude-0/-home-user-Claude-Upgrade/f233027a-f654-5cf6-8d4d-2c7bd1bfa37c/scratchpad/foreign/validate-small",
+      "persona": {
+        "completed": 0,
+        "findings": 0,
+        "findings_deduped": 0,
+        "rows_resolved_judged": 0,
+        "rows_resolved_rule": 0,
+        "walkthroughs": 0
+      },
+      "ship": {
+        "reports": 0,
+        "rows_failed": {}
+      },
+      "validation": {
+        "cost_usd": 4.093,
+        "feedback_contradictions": 0,
+        "overrules": 0,
+        "runs": 2,
+        "verdicts": {
+          "NO-GO": 1,
+          "PIVOT": 1
+        }
+      }
+    },
+    {
+      "build": {
+        "accepted_after_retry": 0,
+        "accepted_first_try": 0,
+        "attempts_total": 0,
+        "blocked": 0,
+        "cost_per_accepted_milestone": null,
+        "cost_usd": 0.0,
+        "milestones": 0
+      },
+      "feedback": {
+        "by_dimension": {},
+        "duplicates_skipped": 0,
+        "rows": 0
+      },
+      "human_overrides": {},
+      "ledger": {
+        "stages": {
+          "validate": {
+            "n": 6,
+            "usd": 4.0655
+          }
+        }
+      },
+      "name": "validate-mid",
+      "nightshift": {
+        "agreement_max_abs": null,
+        "baseline_rows": 0,
+        "cost_usd": 0.0,
+        "denies": {},
+        "iterations": 0,
+        "kept": 0,
+        "last_stop_reason": null,
+        "reset_flat": 0,
+        "reset_regressed": 0,
+        "stop_reasons": {}
+      },
+      "path": "/tmp/claude-0/-home-user-Claude-Upgrade/f233027a-f654-5cf6-8d4d-2c7bd1bfa37c/scratchpad/foreign/validate-mid",
+      "persona": {
+        "completed": 0,
+        "findings": 0,
+        "findings_deduped": 0,
+        "rows_resolved_judged": 0,
+        "rows_resolved_rule": 0,
+        "walkthroughs": 0
+      },
+      "ship": {
+        "reports": 0,
+        "rows_failed": {}
+      },
+      "validation": {
+        "cost_usd": 4.0655,
+        "feedback_contradictions": 0,
+        "overrules": 0,
+        "runs": 1,
+        "verdicts": {
+          "NO-GO": 1
+        }
+      }
+    },
+    {
+      "build": {
+        "accepted_after_retry": 0,
+        "accepted_first_try": 0,
+        "attempts_total": 0,
+        "blocked": 0,
+        "cost_per_accepted_milestone": null,
+        "cost_usd": 0.0,
+        "milestones": 0
+      },
+      "feedback": {
+        "by_dimension": {},
+        "duplicates_skipped": 0,
+        "rows": 0
+      },
+      "human_overrides": {},
+      "ledger": {
+        "stages": {}
+      },
+      "name": "yaml",
+      "nightshift": {
+        "agreement_max_abs": 0.2256,
+        "baseline_rows": 1,
+        "cost_usd": 12.0849,
+        "denies": {
+          "budget": 1,
+          "safety": 1
+        },
+        "iterations": 6,
+        "kept": 1,
+        "last_stop_reason": "dryrun-complete",
+        "reset_flat": 0,
+        "reset_regressed": 0,
+        "stop_reasons": {
+          "cap": 1,
+          "crashed-at-child": 1,
+          "crashed-at-prompt": 1,
+          "dryrun-complete": 3
+        }
+      },
+      "path": "/tmp/claude-0/-home-user-Claude-Upgrade/f233027a-f654-5cf6-8d4d-2c7bd1bfa37c/scratchpad/foreign/yaml",
+      "persona": {
+        "completed": 0,
+        "findings": 0,
+        "findings_deduped": 0,
+        "rows_resolved_judged": 0,
+        "rows_resolved_rule": 0,
+        "walkthroughs": 0
+      },
+      "ship": {
+        "reports": 0,
+        "rows_failed": {}
+      },
+      "validation": {
+        "cost_usd": 0.0,
+        "feedback_contradictions": 0,
+        "overrules": 0,
+        "runs": 0,
+        "verdicts": {}
+      }
+    },
+    {
+      "build": {
+        "accepted_after_retry": 0,
+        "accepted_first_try": 0,
+        "attempts_total": 0,
+        "blocked": 0,
+        "cost_per_accepted_milestone": null,
+        "cost_usd": 0.0,
+        "milestones": 0
+      },
+      "feedback": {
+        "by_dimension": {},
+        "duplicates_skipped": 0,
+        "rows": 0
+      },
+      "human_overrides": {},
+      "ledger": {
+        "stages": {}
+      },
+      "name": "prettytable",
+      "nightshift": {
+        "agreement_max_abs": 0.0564,
+        "baseline_rows": 1,
+        "cost_usd": 4.8827,
+        "denies": {},
+        "iterations": 1,
+        "kept": 1,
+        "last_stop_reason": "dryrun-complete",
+        "reset_flat": 0,
+        "reset_regressed": 0,
+        "stop_reasons": {
+          "dryrun-complete": 1
+        }
+      },
+      "path": "/tmp/claude-0/-home-user-Claude-Upgrade/f233027a-f654-5cf6-8d4d-2c7bd1bfa37c/scratchpad/foreign/prettytable",
+      "persona": {
+        "completed": 0,
+        "findings": 0,
+        "findings_deduped": 0,
+        "rows_resolved_judged": 0,
+        "rows_resolved_rule": 0,
+        "walkthroughs": 0
+      },
+      "ship": {
+        "reports": 0,
+        "rows_failed": {}
+      },
+      "validation": {
+        "cost_usd": 0.0,
+        "feedback_contradictions": 0,
+        "overrules": 0,
+        "runs": 0,
+        "verdicts": {}
+      }
+    },
+    {
+      "build": {
+        "accepted_after_retry": 1,
+        "accepted_first_try": 2,
+        "attempts_total": 4,
+        "blocked": 0,
+        "cost_per_accepted_milestone": 6.2739,
+        "cost_usd": 18.8216,
+        "milestones": 3
+      },
+      "feedback": {
+        "by_dimension": {
+          "evals": 2,
+          "none": 1,
+          "perf": 1,
+          "tests": 1
+        },
+        "duplicates_skipped": 0,
+        "rows": 5
+      },
+      "human_overrides": {
+        "security-confirmed": 1,
+        "validation-overrule": 1
+      },
+      "ledger": {
+        "stages": {
+          "build": {
+            "n": 3,
+            "usd": 18.8216
+          },
+          "classify": {
+            "n": 10,
+            "usd": 0.178
+          },
+          "spec": {
+            "n": 1,
+            "usd": 1.9638
+          },
+          "validate": {
+            "n": 6,
+            "usd": 4.7127
+          }
+        }
+      },
+      "name": "inbox-triage",
+      "nightshift": {
+        "agreement_max_abs": 0.2117,
+        "baseline_rows": 1,
+        "cost_usd": 6.6444,
+        "denies": {},
+        "iterations": 2,
+        "kept": 1,
+        "last_stop_reason": "dryrun-complete",
+        "reset_flat": 1,
+        "reset_regressed": 0,
+        "stop_reasons": {
+          "crashed-at-check": 1,
+          "dryrun-complete": 2,
+          "score-infra-broken": 1
+        }
+      },
+      "path": "/tmp/claude-0/-home-user-Claude-Upgrade/f233027a-f654-5cf6-8d4d-2c7bd1bfa37c/scratchpad/foreign/inbox-triage",
+      "persona": {
+        "completed": 0,
+        "findings": 0,
+        "findings_deduped": 0,
+        "rows_resolved_judged": 0,
+        "rows_resolved_rule": 0,
+        "walkthroughs": 0
+      },
+      "ship": {
+        "reports": 1,
+        "rows_failed": {}
+      },
+      "validation": {
+        "cost_usd": 4.7127,
+        "feedback_contradictions": 0,
+        "overrules": 1,
+        "runs": 1,
+        "verdicts": {
+          "GO": 1
+        }
+      }
+    },
+    {
+      "build": {
+        "accepted_after_retry": 0,
+        "accepted_first_try": 0,
+        "attempts_total": 0,
+        "blocked": 0,
+        "cost_per_accepted_milestone": null,
+        "cost_usd": 0.0,
+        "milestones": 0
+      },
+      "feedback": {
+        "by_dimension": {},
+        "duplicates_skipped": 0,
+        "rows": 0
+      },
+      "human_overrides": {},
+      "ledger": {
+        "stages": {
+          "validate": {
+            "n": 9,
+            "usd": 9.4432
+          }
+        }
+      },
+      "name": "validate-registry",
+      "nightshift": {
+        "agreement_max_abs": null,
+        "baseline_rows": 0,
+        "cost_usd": 0.0,
+        "denies": {},
+        "iterations": 0,
+        "kept": 0,
+        "last_stop_reason": null,
+        "reset_flat": 0,
+        "reset_regressed": 0,
+        "stop_reasons": {}
+      },
+      "path": "/tmp/claude-0/-home-user-Claude-Upgrade/f233027a-f654-5cf6-8d4d-2c7bd1bfa37c/scratchpad/foreign/validate-registry",
+      "persona": {
+        "completed": 0,
+        "findings": 0,
+        "findings_deduped": 0,
+        "rows_resolved_judged": 0,
+        "rows_resolved_rule": 0,
+        "walkthroughs": 0
+      },
+      "ship": {
+        "reports": 0,
+        "rows_failed": {}
+      },
+      "validation": {
+        "cost_usd": 9.4432,
+        "feedback_contradictions": 0,
+        "overrules": 0,
+        "runs": 1,
+        "verdicts": {
+          "NO-GO": 1
+        }
+      }
+    }
+  ],
+  "schema": 1,
+  "totals": {
+    "accepted_after_retry": 1,
+    "accepted_first_try": 5,
+    "blocked": 0,
+    "build_cost_usd": 31.0427,
+    "cost_per_accepted_milestone": 5.1738,
+    "cost_usd": 86.0721,
+    "denies": {
+      "budget": 1,
+      "safety": 1
+    },
+    "findings": 11,
+    "first_try_rate": 0.8333,
+    "human_overrides": {
+      "security-confirmed": 1,
+      "validation-overrule": 1
+    },
+    "kept": 3,
+    "milestones": 6,
+    "nightshift_iterations": 10,
+    "projects": 7,
+    "reset_flat": 2,
+    "reset_regressed": 0,
+    "validation_runs": 5,
+    "verdicts": {
+      "GO": 1,
+      "NO-GO": 3,
+      "PIVOT": 1
+    },
+    "walkthroughs": 12
+  }
+}

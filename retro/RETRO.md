@@ -1,12 +1,12 @@
-# Retro — v3.3-inbox
+# Retro — v3.3-final
 
-Generated 2026-09-18T03:54:18Z from 6 project(s). Every number is a count over files the drivers wrote; no transcript was read.
+Generated 2026-09-18T04:32:39Z from 7 project(s). Every number is a count over files the drivers wrote; no transcript was read.
 
 ## Totals
 
 | what | value |
 |---|---|
-| validation runs | 4 (GO 1, NO-GO 2, PIVOT 1) |
+| validation runs | 5 (GO 1, NO-GO 3, PIVOT 1) |
 | milestones accepted first try / after retry / blocked | 5 / 1 / 0 |
 | first-try acceptance rate | 0.83 |
 | cost per accepted milestone | $5.17 |
@@ -14,7 +14,7 @@ Generated 2026-09-18T03:54:18Z from 6 project(s). Every number is a count over f
 | executor denies | budget 1, safety 1 |
 | persona walkthroughs / findings | 12 / 11 |
 | human overrides | security-confirmed 1, validation-overrule 1 |
-| total spend recorded | $76.63 |
+| total spend recorded | $86.07 |
 
 ## Per project
 
@@ -26,6 +26,7 @@ Generated 2026-09-18T03:54:18Z from 6 project(s). Every number is a count over f
 | yaml | 0 run(s)  $0.00 | 0/0/0, — | 1/0/0, dryrun-complete | 0/0 done, 0 findings (0 deduped) | none | none |
 | prettytable | 0 run(s)  $0.00 | 0/0/0, — | 1/0/0, dryrun-complete | 0/0 done, 0 findings (0 deduped) | none | none |
 | inbox-triage | 1 run(s) GO 1 $4.71 | 2/1/0, $6.27 | 1/1/0, dryrun-complete | 0/0 done, 0 findings (0 deduped) | none | security-confirmed 1, validation-overrule 1 |
+| validate-registry | 1 run(s) NO-GO 1 $9.44 | 0/0/0, — | 0/0/0, — | 0/0 done, 0 findings (0 deduped) | none | none |
 
 ## Trend
 
@@ -33,6 +34,7 @@ Generated 2026-09-18T03:54:18Z from 6 project(s). Every number is a count over f
 |---|---|---|---|---|---|---|
 | v3.3 | 1.00 | $4.07 | 0.67 | 0.92 | 0 | $44.31 |
 | v3.3-inbox | 0.83 | $5.17 | 0.60 | 0.92 | 2 | $76.63 |
+| v3.3-final | 0.83 | $5.17 | 0.60 | 0.92 | 2 | $86.07 |
 
 ## What to look at
 

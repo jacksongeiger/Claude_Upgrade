@@ -23,7 +23,7 @@ Write `{{DIR}}/plan.json`:
 {"claims":[
   {"id":"c1","measures":[
      {"name":"monthly_downloads_nearest_tool","unit":"downloads/month","direction":"min","kill_value":10000,
-      "sources":[{"kind":"url","where":"https://registry.npmjs.org/-/v1/search?text=changelog&size=5",
+      "sources":[{"kind":"url","where":"https://registry.npmjs.org/-/v1/search?text=auto-changelog&size=1",
                   "extract":"json:objects[0].downloads.monthly"}]}
   ]}, ...
 ]}
@@ -49,3 +49,13 @@ Rules:
   (tier 2). Anecdotal pages (`extract: text`) never satisfy the core claim.
 - `python3 {{KIT}}/validate.py schema --dir {{DIR}} --file plan` must print
   `"ok": true`. Then stop; reply with the file's contents and nothing else.
+
+Registry numbers: a registry search's `total`, or the downloads of its top
+result, measures the search engine, not a market — `text=llm changelog`
+matches every package mentioning either word (measured 2026-09-18: 90,771
+"competitors", a 65M-download top hit that was not one). A registry number
+is a measure only when it is a NAMED package's own count, fetched by exact
+name with `size=1` and read from `objects[0]` after `objects[0].package.name`
+is that name (`json:objects[0].downloads.monthly`), or from a crate's or
+PyPI project's own JSON. "No competitor exists" is shown by naming the
+candidates and reading each one's number, never by a search total.

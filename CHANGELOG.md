@@ -98,6 +98,16 @@ spawn site now points children at `~/.claude/nightshift/<slug>/claude/`
 (`loop/child_config.sh`), so user hooks, plugins and plugin hooks never
 load in a child. `docs/ECC-COEXISTENCE.md`; a driver test.
 
+**Validation's judgment, tested from the cloud.** A fourth idea whose
+evidence lives in registries (an LLM changelog tool) ran the full mid band
+twice for $9.44: PIVOT, then NO-GO. The core claim's own numbers were real
+this time (auto-changelog 736k downloads a month cleared its bar) and the
+kill came from the skeptic's stricter bars on git-cliff and
+git-release-notes, as designed. One systematic flaw found and fixed in the
+setter, skeptic and fetcher prompts: a registry search's total or top hit
+measures the search engine, not a market (`text=llm changelog` returned
+90,771 "competitors"); only a named package's own count is a measure.
+
 **Tests:** loop 190, pipeline 180, discovery 353, all green; shell suites
 test_run / test_hooks / test_merge / test_pipeline / test_validate green;
 corpus 8/8; replay 4/4.
