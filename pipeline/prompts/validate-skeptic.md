@@ -26,6 +26,8 @@ Write two files.
 the specific way each claim is most likely to be wrong.
 
 Rules:
+- At most two added measures per claim; the ones that would kill it, not a
+  research program.
 - Kill numbers only on measure names that exist in the redacted plan or in
   your `added_measures`; the referee rejects any other name and the stage
   stops for a human.

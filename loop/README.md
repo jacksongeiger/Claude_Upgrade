@@ -27,12 +27,14 @@ Runtime: `python3` (3.9+, stdlib only — no venv, no pip), `bash`, `git`, `jq`.
   statusline.sh                   the 3-line statusLine renderer
   pricing.json                    per-model $/Mtok, used only as the live estimate
   scorers/{tests,perf,evals,lighthouse,cmd}.py
+  scorers/kit_eval.py             this repo's own scorer: shell suites + retro corpus + stream replay
   hooks/{guard.sh,require-report.sh,events.sh,budget-gate.sh}
   prompts/iterate.md              the planner prompt (rendered by run.sh)
   tests/                          pytest for every script
 
 ~/Claude_Upgrade/agents/          subagent definitions copied into <project>/.claude/agents/ by init
 ~/Claude_Upgrade/commands/jg-loop.md
+~/Claude_Upgrade/retro/           collect.py, report.py, redact.py, corpus_run.py, corpus/ — the kit's own retro (retro/README.md)
 
 ~/.claude/nightshift/<slug>/      per-project config — OUTSIDE the worktree, executors cannot reach it
   config.json
@@ -223,14 +225,18 @@ crashed-at-<STEP>
 ## Cost accounting
 
 Primary: the child's stream-json `result` event `total_cost_usd`. Live: tail.py
-sums `usage` from every assistant message and prices via pricing.json → `live_spend_usd`
-(approximate; labelled as such). On kill/timeout/missing result the iteration
+prices each assistant message id once (the stream re-emits a message per
+content block) plus `system/thinking_tokens` deltas at the main model's output
+rate, via pricing.json → `live_spend_usd` (approximate; labelled as such).
+Calibrated by replay: `retro/corpus/streams/` holds redacted real streams and
+`loop/scorers/kit_eval.py` replays them, so a price or meter change that drifts
+from the bill shows up as a score drop. On kill/timeout/missing result the iteration
 is charged `max(live_spend, per_iter_max_usd)`. `run.sh` refuses to start an
 iteration when `spent + min_iter_usd > cap`, spawns the child with
 `--max-budget-usd min(per_iter_max, cap − spent)`, and kills the child's process
 group when `spent + live_spend ≥ cap`. The dryrun asserts the signed
-`(live − result) / result` is within [−0.10, +0.35] (the live sum over-counts
-because assistant messages are re-emitted per content block).
+`(live − result) / result` is within [−0.10, +0.35] (on 25 replayed real
+streams the estimate landed in [−0.10, +0.33]).
 
 ## Permissions (what the child may run at all)
 

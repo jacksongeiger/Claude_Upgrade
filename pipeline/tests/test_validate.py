@@ -377,3 +377,37 @@ def test_handoff_writes_anchors_success_lines_and_validation_block(tmp_path):
     assert len(s["anchors"]) == 3 and s["validation"]["slug"] and len(s["validation"]["verdict_sha256"]) == 64
     assert s["validation"]["validated_budget_usd"] == 50
     assert any(l.startswith("c1: monthly_downloads stays >= 50000") for l in s["success"]) and s["success"][0] == "Every acceptance check passes"
+
+
+def test_a_kill_with_blocked_required_sources_is_infra_not_a_burial(tmp_path):
+    d = frozen_project(tmp_path)
+    rows = good_rows(); rows[0]["value"] = 20000  # core would be killed by the skeptic's number
+    rows[1] = row("c1", None, None, "https://example.test/dead-tools", extracted_by="text", origin="example.test", required=True, reason="egress")
+    ledger(d, rows); judge_all(d)
+    w(d / "reachable.json", {"hosts": {"example.test": {"reachable": False, "reason": "egress"}}})
+    rc, out, _ = run(["verdict", "--dir", str(d), "--no-refetch"])
+    assert rc == 4 and out["verdict"] == "INFRA"
+    assert not (tmp_path / "DEAD_ENDS.md").exists()
+    assert "monthly_downloads=20000" in (d / "VERDICT.md").read_text()  # the kill seen so far is still shown
+
+
+def test_measure_caps(tmp_path):
+    d, _ = project(tmp_path); w(d / "claims.json", CLAIMS)
+    bad = json.loads(json.dumps(PLAN))
+    m = bad["claims"][0]["measures"][0]
+    bad["claims"][0]["measures"] = [dict(m, name=f"m{i}") for i in range(4)]
+    w(d / "plan.json", bad)
+    rc, out, _ = run(["schema", "--dir", str(d), "--file", "plan"])
+    assert rc == 2 and any("at most 3 measures" in p for p in out["problems"])
+
+
+def test_required_source_fetched_under_another_claim_counts(tmp_path):
+    d = frozen_project(tmp_path)
+    rows = good_rows()
+    # the c2 required source "a" was fetched, but filed under c1
+    for r in rows:
+        if r["source"]["url"] == "https://example.test/a":
+            r["claim"] = "c1"
+    ledger(d, rows); judge_all(d)
+    rc, out, _ = run(["verdict", "--dir", str(d), "--no-refetch"])
+    assert rc == 0, out

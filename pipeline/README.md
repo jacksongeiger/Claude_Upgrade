@@ -407,6 +407,21 @@ tests, slow → perf, confusing/can't find → persona, else none → needs-huma
 `title` = the bullet, deduplicated by normalized title; processed bullets are
 moved under `## processed <date>`. Exit 0; prints the rows added.
 
+## Stage 9 — Retro (does the kit get better?)
+
+`retro/collect.py --project <dir>... --out retro/history/<date>.json --label vX.Y`
+counts what the drivers wrote (ledgers, build state, verdicts, ux scores,
+ship reports, Nightshift scores and events) into one facts file; `retro/report.py`
+renders `retro/RETRO.md` with a trend across labels. Mistakes become cases in
+`retro/corpus/cases.json`, run through the real scripts by `retro/corpus_run.py`;
+redacted real streams under `retro/corpus/streams/` replay through `loop/tail.py`.
+`loop/scorers/kit_eval.py` turns suites + corpus + replay into the score
+Nightshift climbs on this repo. No model, no transcript: see `retro/README.md`.
+Instrumentation the retro reads: `attempts` per milestone in
+`.pipeline/build/state.json`, `HUMAN_OVERRIDE kind=… what=…` lines in
+`.pipeline/events.log` (gates accept, ship security-confirmed, validation
+overrule), `feedback-check.json` next to each validation run.
+
 ## Human gates, in one list
 
 the validation verdict · spec signed · every install · milestone merge to

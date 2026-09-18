@@ -30,7 +30,9 @@ Write `{{DIR}}/plan.json`:
 ```
 
 Rules:
-- One or more measures per claim. `direction: min` means the claim dies
+- One to three measures per claim, never more: any single killed measure
+  kills the claim, so eight proxies are eight ways to be wrong. Pick the
+  ones that would settle it. `direction: min` means the claim dies
   when the value is below `kill_value`; `max` means it dies above.
 - A kill number is the value at which you would tell the human not to
   build. Choose it as if you will be held to it, because you will: the

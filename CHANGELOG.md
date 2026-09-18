@@ -1,6 +1,55 @@
 # Changelog
 
 ---
+### v3.3 — 2026-09-18 — the validation stage, judgment behind the rules, and the retro loop
+
+**Stage 0, `/jg-validate`.** Before a spec exists, an idea is tried against
+evidence: an author states 3–6 falsifiable claims, a fresh setter plans how
+each would be measured, a skeptic (seeing only a redacted plan) sets stricter
+kill numbers and two disconfirming sources, `validate.py freeze` takes the
+stricter number per measure and hashes the plan, a Sonnet fetcher pulls every
+source through `fetch.py` only, a Sonnet judge grades text rows from files,
+and the referee script scores tiers (experiment 3, re-runnable number 2, judged
+text 1) into GO / PIVOT / NO-GO / INFRA / needs-human. `validate.toml` sets
+bands by build budget, per-role ceilings and a stage cap. The human overrules
+in writing; the verdict's hash gates `spec_check` and, for large builds,
+`milestone.py next` before the dependent milestone.
+
+**Two real runs, three rule changes.** A $15 idea went PIVOT then NO-GO for
+$4.09; a $60 idea ran all eight roles for $4.07 and went NO-GO with four
+Reddit sources blocked by the sandbox. From that: at most 3 measures per
+claim and 2 skeptic additions, a required source counts wherever it was
+fetched, and a blocked required source is INFRA unless the core claim is
+already supported. A cloud session cannot bury an idea it could not read.
+
+**Judgment behind the rules** (`pipeline/classify.py`, Haiku, metered under
+`classify:<what>`, `CLASSIFY_OFF` for tests): feedback routing and dedupe
+against the spec's anchors, persona finding dedupe and resolution; every
+call shape-checked and the deterministic rule kept as the fallback.
+
+**The executor ladder** (from ponytail): six cheaper rungs before a model
+reads a file, in `exec-sonnet` and `exec-opus`.
+
+**Pinned judges.** `scorers[].pins` hash in-repo judge files (eval corpora,
+loopscore, retrieve, pricing, the retro corpus, both test trees) into the
+manifest; `check_plan.py` refuses a plan that owns one and `guard.sh` trips
+on a write to one.
+
+**Retro** (`retro/`): `collect.py` counts what the drivers wrote across
+projects; `report.py` renders `retro/RETRO.md` with a trend; `redact.py`
+strips every text field from a stream and a test asserts nothing survives;
+`corpus_run.py` runs eight labelled past mistakes through the real scripts;
+`loop/scorers/kit_eval.py` scores suites + corpus + replay and is now this
+repo's fifth Nightshift scorer (baseline composite 93.10). The first replay
+found the live cost meter landing 0.42×–3.5× the bill on 25 real streams:
+`tail.py` now prices each message id once and adds `system/thinking_tokens`
+at the main model's output rate, and `pricing.json` carries the corrected
+Fable/Opus row. All 25 streams now land 0.90×–1.33×; four are fixtures.
+
+**Tests:** loop 187, pipeline 176, discovery 353, all green; shell suites
+test_run / test_hooks / test_merge / test_pipeline / test_validate green;
+corpus 8/8; replay 4/4.
+
 ### v3.2 — 2026-09-17 — rdx: the npm funnel, and what 4,000 packages taught the gate
 
 **What changed:** a fifth funnel, `discovery/rdx/funnels/npm.py`, indexes the

@@ -207,6 +207,8 @@ class Reducer:
         self.result_fields = {}
         self.last_assistant_text = ""
         self._agent_seq = 0
+        self._priced_ids = set()
+        self.main_model = None
 
     # ---- state.json (read-modify-write, own keys only) ----
 
@@ -254,14 +256,19 @@ class Reducer:
         model = message.get("model")
         usage = message.get("usage") or {}
         # The stream re-emits one API message once per content block, every
-        # copy carrying identical usage. Measured on the first full dryrun:
-        # summing every line over-estimates the real cost by ~21%, while
-        # pricing each message id once UNDER-estimates it by ~40% (some
-        # subagent cost never appears in the stream at all). This estimate
-        # exists to kill a runaway iteration, so the over-estimate is the safe
-        # side and is kept; the driver's dryrun check bounds it from both
-        # sides. The authoritative figure is always result.total_cost_usd.
-        self.live_spend += price_usage(self.pricing, model, usage)
+        # copy carrying identical usage, so each message id is priced once.
+        # Replayed against 25 real streams (retro, 2026-09-18) this plus the
+        # thinking-token estimate below lands within 0.90x-1.33x of the bill
+        # for every stream; summing every copy ranged 0.42x-3.5x. The
+        # authoritative figure is always result.total_cost_usd.
+        msg_id = message.get("id")
+        if msg_id is not None:
+            if msg_id in self._priced_ids:
+                usage = None
+            else:
+                self._priced_ids.add(msg_id)
+        if usage:
+            self.live_spend += price_usage(self.pricing, model, usage)
 
         for block in message.get("content") or []:
             if not isinstance(block, dict):
@@ -309,6 +316,14 @@ class Reducer:
             self.emit_agent_event("agent_stop", agent_id, agent_type, ts)
         return True
 
+    def handle_thinking(self, obj):
+        """system/thinking_tokens: the reasoning output the row usage omits."""
+        delta = obj.get("estimated_tokens_delta")
+        if not isinstance(delta, (int, float)) or delta <= 0:
+            return
+        p = resolve_model_pricing(self.pricing, self.main_model or "")
+        self.live_spend += (delta / 1_000_000.0) * p.get("output", 0)
+
     def handle_result(self, obj):
         total_cost = obj.get("total_cost_usd")
         subtype = obj.get("subtype")
@@ -355,6 +370,12 @@ class Reducer:
             print(json.dumps(final))
             sys.stdout.flush()
             sys.exit(0)
+        if typ == "system" and obj.get("subtype") == "init":
+            self.main_model = self.main_model or obj.get("model")
+            return False
+        if typ == "system" and obj.get("subtype") == "thinking_tokens":
+            self.handle_thinking(obj)
+            return True
         hook_name, _ = get_hook_info(obj)
         if hook_name is not None:
             return self.handle_hook_event(obj)

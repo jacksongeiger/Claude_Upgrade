@@ -373,8 +373,21 @@ def cmd_accept(args):
     os.makedirs(baseline_dir, exist_ok=True)
     baseline_path = os.path.join(baseline_dir, f"{args.name}.png")
     shutil.copyfile(last_path, baseline_path)
+    human_override("screenshot-baseline", args.name, os.path.dirname(os.path.dirname(os.path.dirname(baseline_dir))))
     print(json.dumps({"name": args.name, "accepted": baseline_path}))
     return EXIT_OK
+
+
+def human_override(kind, what, project_dir):
+    """A decision only the human could make, recorded for the retro."""
+    try:
+        from datetime import datetime, timezone
+        p = os.path.join(project_dir or ".", ".pipeline", "events.log")
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "a", encoding="utf-8") as f:
+            f.write(f"{datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')} HUMAN_OVERRIDE kind={kind} what={what}\n")
+    except OSError:
+        pass
 
 
 def cmd_run_all(args):

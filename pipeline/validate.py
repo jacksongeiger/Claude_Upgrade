@@ -62,6 +62,8 @@ FETCH = KIT / "fetch.py"
 EXIT_GO, EXIT_NOGO, EXIT_HUMAN, EXIT_INFRA, EXIT_PIVOT, EXIT_USAGE = 0, 2, 3, 4, 5, 1
 
 ORIGIN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]{1,127}$")
+MAX_MEASURES = 3          # per claim, from the setter
+MAX_ADDED_MEASURES = 2    # per claim, from the skeptic
 
 
 def now():
@@ -211,6 +213,8 @@ def check_plan(obj, claims_obj):
         ms = c.get("measures")
         if not isinstance(ms, list) or not ms:
             p.append(f"plan {cid}: at least one measure"); continue
+        if len(ms) > MAX_MEASURES:
+            p.append(f"plan {cid}: at most {MAX_MEASURES} measures per claim (one flaky proxy among eight kills a claim; pick the three that would settle it)")
         names = set()
         for m in ms:
             _measure_ok(m, p, f"plan {cid}")
@@ -242,6 +246,8 @@ def check_skeptic(obj, plan_obj):
                     p.append(f"skeptic {cid}: kill number on unknown measure {name!r}; measures are the setter's, add your own under added_measures")
                 if not isinstance(v, (int, float)) or isinstance(v, bool):
                     p.append(f"skeptic {cid}: kill number for {name} must be a number")
+        if len(c.get("added_measures") or []) > MAX_ADDED_MEASURES:
+            p.append(f"skeptic {cid}: at most {MAX_ADDED_MEASURES} added measures")
         for m in c.get("added_measures") or []:
             _measure_ok(m, p, f"skeptic {cid} added")
         ds = c.get("disconfirming_sources")
@@ -515,7 +521,7 @@ def cmd_verdict(a):
                 elif p is True:
                     st["supported_by"].append(f"{g['measure']}={g['value']} clears {m['direction']} {m['kill_value']} ({g['url']})")
                     st["tier"] = max(st["tier"], g["tier"])
-            elif g["tier"] >= 2:
+            elif g["tier"] >= 2 and g["measure"] not in (None, "text"):
                 st["supported_by"].append(f"{g['measure']}={g['value']} (no kill number on this measure; informational)")
         # anecdotal points come from the fetcher's own finds; the skeptic's
         # required sources are there to be seen, never to support
@@ -534,7 +540,7 @@ def cmd_verdict(a):
         # required (skeptic) sources must each have a row
         missing = []
         for rs in required.get(cid, []):
-            if not any((g["url"] or "") == rs["where"] or (g["url"] or "").startswith(rs["where"]) for g in crows):
+            if not any((g["url"] or "") == rs["where"] or (g["url"] or "").startswith(rs["where"]) for g in graded):
                 missing.append(rs["where"])
         if missing:
             st["missing_required"] = missing
@@ -543,7 +549,11 @@ def cmd_verdict(a):
 
     core = next(v for v in claims_out.values() if v["core"])
     overruled = load(d / "overrule.json") if (d / "overrule.json").exists() else None
-    if infra and core["status"] in ("unobtainable", "below-tier"):
+    if infra and core["status"] != "supported":
+        # a required source this machine cannot reach means the look was
+        # partial; a partial look may not bury an idea in DEAD_ENDS. The
+        # kills seen so far stay in the ledger for the run on a machine that
+        # reaches the host.
         verdict, code = "INFRA", EXIT_INFRA
     elif core["status"] in ("killed", "unobtainable", "below-tier"):
         verdict, code = "NO-GO", EXIT_NOGO
@@ -623,6 +633,12 @@ def cmd_overrule(a):
     d = Path(a.dir)
     dump(d / "overrule.json", {"by": a.by, "reason": a.reason, "measure": a.measure, "kill_value": float(a.kill_value),
                                "direction": a.direction, "at": now()})
+    try:
+        project = Path(load(d / "idea.json")["project"])
+        with open(project / ".pipeline" / "events.log", "a", encoding="utf-8") as f:
+            f.write(f"{now()} HUMAN_OVERRIDE kind=validation-overrule what={d.name} by={a.by}\n")
+    except (OSError, ValueError, KeyError):
+        pass
     print(json.dumps({"ok": True, "note": "re-run `validate.py verdict` to apply; /jg-feedback re-checks the number after ship"}))
     return 0
 

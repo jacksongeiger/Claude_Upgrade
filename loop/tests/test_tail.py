@@ -26,11 +26,17 @@ def price(model, usage):
     )
 
 
-def assistant_line(model, usage, content=None, parent_tool_use_id=None):
+_msg_seq = [0]
+
+
+def assistant_line(model, usage, content=None, parent_tool_use_id=None, msg_id=None):
+    if msg_id is None:
+        _msg_seq[0] += 1
+        msg_id = "msg_%d" % _msg_seq[0]
     return json.dumps({
         "type": "assistant",
         "message": {
-            "id": "msg_1",
+            "id": msg_id,
             "type": "message",
             "role": "assistant",
             "model": model,
@@ -53,6 +59,25 @@ def run_tail(tmp_path, iter_n=1, stall_seconds=120, stdin_text="", timeout=10):
         input=stdin_text, capture_output=True, text=True, timeout=timeout,
     )
     return proc, state, events
+
+
+def test_live_spend_prices_each_message_id_once_and_adds_thinking():
+    """The stream re-emits one message per content block with identical usage;
+    only the first copy is priced. system/thinking_tokens deltas are priced at
+    the main model's output rate (row usage omits reasoning tokens)."""
+    usage = {"input_tokens": 1000, "output_tokens": 500,
+             "cache_read_input_tokens": 200, "cache_creation_input_tokens": 100}
+    init = json.dumps({"type": "system", "subtype": "init", "model": "claude-sonnet-5"})
+    think = json.dumps({"type": "system", "subtype": "thinking_tokens", "estimated_tokens": 4000, "estimated_tokens_delta": 4000})
+    stdin_text = (init + "\n" + assistant_line("claude-sonnet-5", usage, msg_id="msg_dup") + "\n"
+                  + assistant_line("claude-sonnet-5", usage, msg_id="msg_dup") + "\n" + think + "\n")
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        proc, state, events = run_tail(Path(td), stdin_text=stdin_text)
+        assert proc.returncode == 0
+        data = json.loads(state.read_text())
+        expected = price("claude-sonnet-5", usage) + 4000 / 1_000_000.0 * PRICING["models"]["claude-sonnet-5"]["output"]
+        assert data["live_spend_usd"] == pytest_approx(expected)
 
 
 def test_live_spend_sums_two_models():

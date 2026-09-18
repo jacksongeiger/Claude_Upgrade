@@ -285,6 +285,17 @@ def check_lighthouse(spec, workdir, skip_set):
     return {"name": "lighthouse", "ok": ok, "detail": detail}
 
 
+def _human_override(workdir, kind, what):
+    try:
+        from datetime import datetime, timezone
+        p = Path(workdir) / ".pipeline" / "events.log"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("a", encoding="utf-8") as f:
+            f.write(f"{datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')} HUMAN_OVERRIDE kind={kind} what={what}\n")
+    except OSError:
+        pass
+
+
 def check_security_review(security_confirmed, skip_set):
     if skip_set & {"security", "security-review"}:
         return {"name": "security-review", "ok": None, "detail": "skipped"}
@@ -399,6 +410,8 @@ def main(argv=None):
     add("env-example", lambda: check_env_example(workdir))
     add("secrets", lambda: check_secrets(workdir))
     add("lighthouse", lambda: check_lighthouse(spec, workdir, skip_set))
+    if args.security_confirmed:
+        _human_override(workdir, "security-confirmed", args.tag)
     add("security-review", lambda: check_security_review(args.security_confirmed, skip_set))
     add("gates", lambda: check_gates(spec, workdir))
 

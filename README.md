@@ -92,9 +92,15 @@ Nightshift part (agents, worktrees, guards, allowlist, cost meter, merge):
                     # from the spec, persona and feedback rows
 ```
 
-The contract is `pipeline/README.md`. The human gates: spec signed, every
-install, milestone merge to main, token approval, first screenshot baselines,
-deploy.
+The contract is `pipeline/README.md`. The human gates: the validation
+verdict, spec signed, every install, milestone merge to main, token approval,
+first screenshot baselines, deploy.
+
+`retro/` judges the kit itself: `collect.py` counts what the drivers wrote
+across projects, `report.py` renders `retro/RETRO.md` with a trend, past
+mistakes live as cases in `retro/corpus/`, and `loop/scorers/kit_eval.py`
+scores suites + corpus + redacted-stream replay so Nightshift on this repo
+climbs the kit's own record. No model, no transcript (`retro/README.md`).
 
 ## Per-project templates
 

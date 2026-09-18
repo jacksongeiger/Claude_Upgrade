@@ -155,9 +155,12 @@ while :; do
     if jq -e --arg c "$CAP" --arg s "$SPENT" '(($s|tonumber) + 1.0) >= ($c|tonumber)' >/dev/null <<<'{}'; then stop cap "spent $SPENT of $CAP"; RC_FINAL=3; break; fi
     ITER=$(( $(jq -r '.iters // 0' "$STATE") + 1 ))
     ITER_DIR="$WT/.pipeline/build/$MS"; mkdir -p "$ITER_DIR/tasks"
-    python3 - "$STATE" "$ITER" <<'PY'
+    python3 - "$STATE" "$ITER" "$MS" <<'PY'
 import json,sys,pathlib
-p=pathlib.Path(sys.argv[1]); d=json.loads(p.read_text()); d["iters"]=int(sys.argv[2]); p.write_text(json.dumps(d,indent=2))
+p=pathlib.Path(sys.argv[1]); d=json.loads(p.read_text()); d["iters"]=int(sys.argv[2])
+# attempts per milestone: the retro's first-try acceptance rate reads this
+a=d.setdefault("attempts",{}); a[sys.argv[3]]=int(a.get(sys.argv[3],0))+1
+p.write_text(json.dumps(d,indent=2))
 PY
     event MILESTONE_START "id=$MS iter=$ITER"
     python3 "$KIT/milestone.py" --spec "$SPEC" target "$MS" --out "$ITER_DIR/target.json" >/dev/null
