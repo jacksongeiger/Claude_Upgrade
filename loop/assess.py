@@ -208,6 +208,9 @@ def find_python_package(manifest_dir_abs, manifest_dir_rel):
             for entry in sorted(os.listdir(src)):
                 if os.path.isfile(os.path.join(src, entry, "__init__.py")):
                     return entry
+            # a flat src/ (modules, no package) is still the thing to measure
+            if any(e.endswith(".py") for e in os.listdir(src)) or not os.listdir(src):
+                return "src"
         for entry in sorted(os.listdir(manifest_dir_abs)):
             if entry in SKIP_DIRS or entry.startswith("."):
                 continue
@@ -216,8 +219,10 @@ def find_python_package(manifest_dir_abs, manifest_dir_rel):
                 return entry
     except Exception:
         pass
+    # The folder's own name is a --cov target only when it is importable; a
+    # hyphenated project dir ("inbox-triage") measured nothing on 2026-09-18.
     base = os.path.basename(manifest_dir_rel) if manifest_dir_rel else os.path.basename(manifest_dir_abs)
-    return base or "."
+    return base if base and base.isidentifier() else "."
 
 
 def detect_python_tests(root, manifest_rel, gaps):

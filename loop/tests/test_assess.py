@@ -355,3 +355,15 @@ def test_node_project_jest_declared_counts_before_install(tmp_path):
     out = run_assess(tmp_path)
     assert out["tests"]["coverage_tool_installed"] is True
     assert out["tests"]["coverage_cmd"] == "npm test -- --coverage --coverageReporters=json-summary"
+
+
+def test_python_coverage_target_is_src_or_a_package_never_a_hyphenated_folder(tmp_path):
+    """2026-09-18: a project named inbox-triage with a flat src/ got --cov=inbox-triage, which measures nothing."""
+    import assess
+    proj = tmp_path / "inbox-triage"; (proj / "src").mkdir(parents=True)
+    (proj / "src" / "main.py").write_text("x = 1\n")
+    assert assess.find_python_package(str(proj), "") == "src"
+    pkg = tmp_path / "other-thing"; (pkg / "thing").mkdir(parents=True); (pkg / "thing" / "__init__.py").write_text("")
+    assert assess.find_python_package(str(pkg), "") == "thing"
+    bare = tmp_path / "bare-name"; bare.mkdir()
+    assert assess.find_python_package(str(bare), "") == "."

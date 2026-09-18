@@ -683,16 +683,31 @@ def cmd_handoff(a):
     claims = load(d / "claims.json")
     spec = load(a.spec) if Path(a.spec).exists() else {}
     spec["anchors"] = [c["statement"] for c in claims["claims"]]
+    # Success lines only for numbers the verdict saw clear their kill value:
+    # those are the ones /jg-feedback can re-check. A killed or unmeasured
+    # measure is not a promise the build can keep (the 2026-09-18 Inbox
+    # Triage run would have handed off 21 lines, 17 of them killed or never
+    # fetched).
+    rows = v.get("rows", [])
     lines = []
     for c in frozen["claims"]:
         for m in c["measures"]:
-            lines.append(f"{c['id']}: {m['name']} stays {'>=' if m['direction'] == 'min' else '<='} {m['kill_value']} {m['unit']}"[:120])
+            cleared = any(r.get("claim") == c["id"] and r.get("measure") == m["name"] and (r.get("tier") or 0) >= 2
+                          and isinstance(r.get("value"), (int, float)) and passes(m["direction"], r["value"], m["kill_value"])
+                          for r in rows)
+            if cleared:
+                lines.append(f"{c['id']}: {m['name']} stays {'>=' if m['direction'] == 'min' else '<='} {m['kill_value']} {m['unit']}"[:120])
     succ = [s for s in (spec.get("success") or []) if not re.match(r"^c[0-9]+: ", s)]
     spec["success"] = succ + lines
-    spec["validation"] = {"slug": v["slug"], "verdict_sha256": sha256_file(d / "verdict.json"),
-                          "validated_budget_usd": v["validated_budget_usd"]}
+    block = dict(spec.get("validation") or {})
+    block.update({"slug": v["slug"], "verdict": v["verdict"], "verdict_sha256": sha256_file(d / "verdict.json"),
+                  "validated_budget_usd": v["validated_budget_usd"]})
+    if v.get("overruled"):
+        block["overruled_by"] = v["overruled"].get("by")
+    spec["validation"] = block
     dump(a.spec, spec)
-    print(json.dumps({"ok": True, "anchors": len(spec["anchors"]), "success_lines": len(lines)}))
+    print(json.dumps({"ok": True, "anchors": len(spec["anchors"]), "success_lines": len(lines),
+                      "measures_frozen": sum(len(c["measures"]) for c in frozen["claims"])}))
     return 0
 
 
