@@ -244,3 +244,23 @@ def test_skip_records_checks_as_skipped(tmp_path):
     data = json.loads(out.read_text())
     checks = data["features"]["f-1"]["checks"]
     assert checks[1]["type"] == "persona" and checks[1]["ok"] is None and "skipped" in checks[1]["detail"]
+
+
+def test_evals_check_reads_the_named_metric(tmp_path):
+    """Inbox Triage m2: evals/run.py printed {"accuracy_tags": 1.0, ...} and the check wanted "value"; `metric` names the key."""
+    spec_path = tmp_path / "spec.json"
+    out_path = tmp_path / "acceptance.json"
+    write_spec(spec_path, [
+        {"id": "f-001", "milestone": "m1", "title": "named metric",
+         "acceptance": [{"type": "evals", "cmd": "echo '{\"accuracy_tags\": 0.9, \"n\": 40}'", "min": 0.8, "metric": "accuracy_tags"}],
+         "priority": 1},
+        {"id": "f-002", "milestone": "m1", "title": "wrong key",
+         "acceptance": [{"type": "evals", "cmd": "echo '{\"accuracy_tags\": 0.9}'", "min": 0.8}],
+         "priority": 2},
+    ])
+    proc = run_accept(spec_path, tmp_path, out_path)
+    assert proc.returncode == 4, proc.stdout + proc.stderr
+    data = json.loads(out_path.read_text())
+    f1 = data["features"]["f-001"]["checks"][0]; f2 = data["features"]["f-002"]["checks"][0]
+    assert f1["ok"] is True and "accuracy_tags=0.9" in f1["detail"]
+    assert f2["ok"] is None and "keys: ['accuracy_tags']" in f2["detail"] and "metric" in f2["detail"]

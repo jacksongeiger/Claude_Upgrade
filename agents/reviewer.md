@@ -14,6 +14,16 @@ path to `GOAL.md`, the executor's report JSON, and a diff command to run
 (`git diff <base>...<branch>`). Bash is for `git diff`, `git log` and running
 the acceptance command read-only — never for changing anything.
 
+Where you can look: your working directory is the loop's (or the build's)
+worktree, and the executor's branch is in the same repository. Read the
+executor's files with `git show <branch>:<path>` and `git diff
+<base>...<branch>` from where you are. The executor's own worktree directory
+is outside your working directory: `Read`, `cd` and `git -C` into it are
+denied automatically (no one can answer a permission prompt in this loop), so
+do not try them. You cannot run the test suite on the branch either; do not
+spend turns on it. `merge.sh` re-runs the full suite before anything merges
+and refuses newly failing or removed tests — your job is the reading.
+
 Answer six questions, then return exactly one JSON object and nothing else:
 
 ```

@@ -25,7 +25,7 @@ according to its `type`:
                run dir's trail.json is missing: infra, detail "no persona run".
     manual     recorded as {"type":"manual","ok":null,"detail":<what>},
                never counted as failed.
-    evals      run `cmd`, parse the last JSON line {"value":...}, compare to
+    evals      run `cmd`, parse the last JSON line, read `metric` (default "value"), compare to
                `min`.
 
 Writes --out (default "acceptance.json") as
@@ -359,15 +359,17 @@ def run_evals_check(check, workdir, timeout):
     except OSError as e:
         return check_result("evals", None, f"could not run cmd: {e}", "infra")
 
+    metric = check.get("metric") or "value"
     obj = _last_json_line(proc.stdout)
-    if not isinstance(obj, dict) or "value" not in obj:
-        return check_result("evals", None, f"last line of stdout has no value (exit {proc.returncode})", "infra")
+    if not isinstance(obj, dict) or metric not in obj:
+        have = sorted(k for k in obj) if isinstance(obj, dict) else None
+        return check_result("evals", None, f"last line of stdout has no {metric!r} (exit {proc.returncode}; keys: {have}); set the check's 'metric' to the key the runner prints", "infra")
     try:
-        value = float(obj["value"])
+        value = float(obj[metric])
     except (TypeError, ValueError):
-        return check_result("evals", None, f"value is not a number: {obj['value']!r}", "infra")
+        return check_result("evals", None, f"{metric} is not a number: {obj[metric]!r}", "infra")
     ok = value >= float(min_value)
-    detail = f"value={value} {'>=' if ok else '<'} min {min_value}"
+    detail = f"{metric}={value} {'>=' if ok else '<'} min {min_value}"
     return check_result("evals", ok, detail, "ok" if ok else "failed")
 
 

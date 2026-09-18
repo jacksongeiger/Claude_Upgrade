@@ -124,7 +124,7 @@ Rules `spec_check.py` enforces (exit 2 on any violation, one line per problem):
   `lighthouse {url, min:{category:score}}` · `persona {task, max_steps, must:complete, setup?:[driver actions]}`
   (every walkthrough starts in a fresh browser; `setup` is the scripted state the
   task starts from — replayed before every persona action, never counted as steps) ·
-  `gate {name, kind:screenshot|perf, ...}` · `evals {cmd, min}` · `manual {what}`;
+  `gate {name, kind:screenshot|perf, ...}` · `evals {cmd, min, metric?}` (the runner prints one JSON line; `metric` names the key, default `value`) · `manual {what}`;
 - milestone ids unique, `depends_on` acyclic, every feature's milestone exists;
 - `needs` ⊆ {ui, unit-tests, coverage, lighthouse, persona, perf, evals, llm, db, auth, deploy}, and
   must include every scorer an acceptance check implies (test→unit-tests, persona, lighthouse, perf, evals);
