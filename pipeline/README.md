@@ -430,6 +430,13 @@ Instrumentation the retro reads: `attempts` per milestone in
 `.pipeline/events.log` (gates accept, ship security-confirmed, validation
 overrule), `feedback-check.json` next to each validation run.
 
+## Two real projects, end to end
+
+| project | validate | spec | build | ship | feedback | Nightshift | total |
+|---|---|---|---|---|---|---|---|
+| Pocket Notes (Vite, no backend) | — | $1.48 | $12.22 (3 milestones) | 7/8 rows | 4 rows | 1 night, reset-flat | $18.45 |
+| Inbox Triage (FastAPI + SQLite + LLM) | $4.71 (NO-GO, overruled) | $1.96 | $18.82 (3 milestones, 78 tests, 96% cov) | 7 pass, 1 skip | 5 rows, $0.06 | 2 nights $6.64: reset-flat, kept +0.56 | $32.32 |
+
 ## Human gates, in one list
 
 the validation verdict · spec signed · every install · milestone merge to

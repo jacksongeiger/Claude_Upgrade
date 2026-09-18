@@ -96,6 +96,11 @@ The contract is `pipeline/README.md`. The human gates: the validation
 verdict, spec signed, every install, milestone merge to main, token approval,
 first screenshot baselines, deploy.
 
+Two real projects have been through every stage in the cloud: Pocket Notes
+(a Vite app, $18.45) and Inbox Triage (FastAPI + SQLite + an LLM behind
+three backends, $32.32 including a validation verdict, three milestones,
+ship, feedback and two Nightshift nights). `retro/RETRO.md` has the numbers.
+
 `retro/` judges the kit itself: `collect.py` counts what the drivers wrote
 across projects, `report.py` renders `retro/RETRO.md` with a trend, past
 mistakes live as cases in `retro/corpus/`, and `loop/scorers/kit_eval.py`

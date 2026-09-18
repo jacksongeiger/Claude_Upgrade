@@ -65,7 +65,32 @@ pin would have refused the milestone that creates `evals/` (build.sh
 exports `NIGHTSHIFT_PINS=off`; the pins stay Nightshift's rule). Each is a
 test, and three are corpus cases (`schema`, `handoff` kinds added).
 
-**Tests:** loop 187, pipeline 176, discovery 353, all green; shell suites
+**Inbox Triage, every stage, $32.32.** Validate $4.71 (NO-GO, overruled in
+writing) → interview $1.96 (6 features, 3 milestones, 0 unmeasurable, the
+verdict in the spec's validation block) → tools (unit-tests, coverage, perf
+ready; evals/llm/db are build deliverables) → build $18.82 (m1 $4.44: ingest
++ list, 26 tests, 100% coverage, p95 9 ms; m2 $11.12: LLM layer with
+fake/cli/sdk backends, triage with schema check and needs-review, queue,
+40-email evals harness; m3 $3.26: human overrides; 78 tests, 96% coverage)
+→ ship v0.3 (7 pass, lighthouse skipped: no UI; the ship check caught m2's
+`bench/queue.py` shadowing the stdlib `queue` for m1's bench) → feedback
+(5 inbox rows routed by Haiku for $0.06, one to needs-human) → Nightshift
+two dry runs $6.64 (baseline 99.24; night 1 reset-flat at +0.08; night 2
+kept at +0.56, meter within 9% of the bill). The cli backend scores 0.725
+tag accuracy on the labelled set for $0.10 per 40 emails, every call logged.
+
+What that run fixed: the evals check names its `metric` (accept.py, and
+mkconfig turns the check into a cmd scorer with `metric`/`scale`; the old
+`dir` key matched no scorer and stopped Nightshift at baseline); mkconfig
+says when it cannot sign the manifest; a dead line in run.sh crashed on a
+null iter after a self-scored baseline; the tests scorer treats a base with
+no tests as a zero floor; every earlier done milestone is re-accepted before
+a new one counts; reviewers are told the executor worktree is out of reach
+(denied calls per milestone 11 → 21 → 3); the ship check keeps its output
+out of the repo root; and a flat night that closed a reported defect with a
+bigger suite is kept (`KEPT reason=closed-report`). Each has a test.
+
+**Tests:** loop 190, pipeline 180, discovery 353, all green; shell suites
 test_run / test_hooks / test_merge / test_pipeline / test_validate green;
 corpus 8/8; replay 4/4.
 
