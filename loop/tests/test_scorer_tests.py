@@ -217,3 +217,16 @@ def test_configured_coverage_that_is_unreadable_is_an_infra_failure(tmp_path):
     assert out["ok"] is False
     assert "missing or unreadable" in out["error"]
     assert out["raw"]["passed"] == 10
+
+
+def test_no_tests_collected_is_a_zero_floor_not_an_error(tmp_path):
+    """pytest exit 5 on a greenfield base: ok with n_tests 0, so merge.sh can set its floor."""
+    import json, subprocess, sys
+    from pathlib import Path as P
+    scorer = P(__file__).resolve().parent.parent / "scorers" / "tests.py"
+    cfg = {"name": "tests", "cmd": "echo 'no tests ran in 0.01s'; exit 5",
+           "coverage_cmd": "exit 5", "coverage_file": "coverage.json"}
+    p = subprocess.run([sys.executable, str(scorer), "--config", json.dumps(cfg), "--workdir", str(tmp_path)], capture_output=True, text=True)
+    out = json.loads(p.stdout.strip().splitlines()[-1])
+    assert out["ok"] is True and out["error"] is None and out["value"] == 0.0
+    assert out["raw"]["n_tests"] == 0 and out["raw"]["note"] == "no tests collected"

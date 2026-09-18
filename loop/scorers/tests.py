@@ -225,6 +225,16 @@ def main():
 
         combined = stdout + "\n" + stderr
         parsed = parse_output(combined)
+        # A base with no tests yet (pytest exit 5 "no tests ran", vitest "No
+        # test files found") is a floor of zero, not a broken scorer: the
+        # first milestone of a greenfield project has to merge past it
+        # (Inbox Triage m1, 2026-09-18). Coverage is not asked of nothing.
+        if returncode == 5 or re.search(r"no tests ran|collected 0 items|No test files found|no tests found", combined, re.I):
+            emit(name, 0.0, True, None, {
+                "n_tests": 0, "passed": 0, "failed": 0, "coverage_pct": None, "failing": [],
+                "duration_s": round(wall, 3), "note": "no tests collected",
+            })
+            return 0
         if parsed is not None and parsed["n_tests"]:
             passed = parsed["passed"]
             failed = parsed["failed"]
