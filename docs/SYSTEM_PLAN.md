@@ -1,9 +1,9 @@
 # The project execution system: plan for the finished thing
 
-Status: 2026-09-18. Eight of nine stages exist and were run end to end on a
-real project with real spend. This document is the plan for what is left and
-the contract the remaining parts are built against. It is written to be read
-by someone with no prior context.
+Revision 2, 2026-09-18. Revision 1 was reviewed cold by a context-free
+reviewer (`docs/REVIEW-2026-09-18.md`); this revision answers every ranked
+finding and says where it disagrees. It is written to be read by someone with
+no prior context.
 
 ## 1. What the system is for
 
@@ -15,166 +15,220 @@ it runs in: nothing installs itself, nothing touches `main`, every
 third-party description is screened before it is stored, every unattended
 run has a cost cap and a kill switch.
 
-## 2. Principles (non-negotiable, inherited from what is built)
+## 2. Principles
 
 1. A script decides, a model proposes. Keep/undo, done/not done, ship/not,
-   and now go/no-go are checks a program runs over files.
+   go/no-go are checks a program runs over files. Where a decision needs
+   judgment, a model produces a structured answer and a script validates its
+   shape and applies it; the model never computes the verdict.
 2. Fresh eyes at every hand-off. The reviewer never saw the plan, the persona
-   never saw the code, the judge never saw the pitch. Every stage writes a
+   never saw the code, the judge never saw the case. Every stage writes a
    file; the next stage reads that file with a new context.
-3. The cheapest model that can do the job. Fable plans and reviews, Sonnet
-   builds, Opus for the hard ones, Haiku for chores.
-4. Nothing installs itself, nothing touches `main`. Human gates: spec signed,
-   every install, milestone merge, token approval, first screenshot baseline,
-   deploy, and (new) the validation verdict.
-5. Money has a ceiling: cap, live meter, kill switch that reaches child
+3. Nothing the loop scores can be edited by the thing being scored. Scorer
+   code, thresholds and labelled corpora are pinned by a manifest and denied
+   to executors, or live outside the repo.
+4. The cheapest model that can do the job. Fable plans and reviews, Sonnet
+   builds, Opus for the hard ones, Haiku for classification and chores.
+5. Nothing installs itself, nothing touches `main`. Human gates: validation
+   verdict, spec signed, every install, milestone merge, token approval,
+   first screenshot baseline, deploy. Each gate is enforced by a script that
+   refuses to proceed without the gate's artifact.
+6. Money has a ceiling: cap, live meter, kill switch that reaches child
    processes.
-6. If it cannot be measured it becomes a question for the human, not a guess.
-7. A defect found in a real run becomes a test before its fix merges.
+7. If it cannot be measured it becomes a question for the human, not a guess.
+8. A defect found in a real run becomes a test before its fix merges.
+9. Transcripts are never quoted into the repo. A fact from a transcript is a
+   count.
 
-## 3. What exists (with the evidence)
+## 3. What exists (with the evidence, corrected)
 
 | Part | Where | Proven on |
 |---|---|---|
-| ARD (`rdx`): resource discovery index, five funnels (4 marketplaces, MCP registry, GitHub, npm), sanitizer, silent gate, install tiers | `discovery/` | 36,178 rows; gate precision 1.0 / recall 0.75 on a 124-case labelled corpus; 353 unit tests; poison test 22 malicious rows stored, none reachable |
-| Nightshift: the unattended improvement loop (pick, plan, build in worktrees, review, merge with tests floor, score, keep/undo) | `loop/` | rdx 85.1→94.9, prettytable 97.8→99.7, yaml 96.8→97.2, Pocket Notes 97.8→97.9; cost meter agrees with the bill within 5% |
-| Pipeline: interview → tools → build → look & feel → gates → ship → feedback on one spine, `spec.json` | `pipeline/` | Pocket Notes (Vite app): interview $1.48, three milestones $12.22, four persona walkthroughs (judge 8–10/10), ship report 7/8 rows green, feedback 4 rows; total $18.45 |
-| Commands | `commands/jg-*.md`, `commands/ard.md` | used above |
-| Agents | `agents/` (exec-sonnet, exec-opus, reviewer, chore, test-assessor, persona, persona-judge) | used above |
+| ARD (`rdx`): resource discovery index, five funnels (4 marketplaces, MCP registry, GitHub, npm), sanitizer, silent gate, install tiers | `discovery/` | 36,178 rows; gate 21 true fires, 7 misses, 95 true silences on a 124-case labelled corpus (precision 1.0, recall 0.75); 353 unit tests; poison test 22 malicious rows stored, none reachable. Indexes tools, not data sources. |
+| Nightshift: the unattended improvement loop | `loop/` | Kept improvements: rdx 85.1→94.9, prettytable 97.8→99.7, yaml 96.8→97.2. On Pocket Notes the one iteration was reset as flat (+0.15, below the 0.5 floor): the loop ran and did no harm; it did not improve the product. Cost meter vs bill: within 5% on Pocket Notes, 8–32% on this repo across three runs; the dry-run tolerance is −10%/+35%. |
+| Pipeline: interview → tools → build → look & feel → gates → ship → feedback on one spine, `spec.json` | `pipeline/` | Pocket Notes (Vite app, no backend): interview $1.48, three milestones $12.22, four persona walkthroughs (judge 8–10/10), ship report 7/8 rows green, feedback 4 rows; total $18.45 |
+| Commands, agents | `commands/`, `agents/` | used above |
 
-Contracts: `pipeline/README.md` (the pipeline), `loop/README.md`
-(Nightshift), `discovery/README.md` (ARD). Changelog: `CHANGELOG.md`.
+Contracts: `pipeline/README.md`, `loop/README.md`, `discovery/README.md`.
 
-Known weaknesses, stated by the builder:
+Known weaknesses: one real project, one stack; scorers measure what the
+builders were told to hit; persona findings are noisy; macOS unproven; the
+Opus planner is most of the cost; lexical retrieval misses synonyms; GitHub
+search is unreachable from cloud sessions (the npm funnel covers OSS there);
+no headless child has ever fetched a web page (the inspiration stage
+reported no web access); this repo's own Nightshift scores one of three test
+suites and can edit its own ARD judge (see 4.0).
 
-- One real project, one stack (Vite, no backend, no auth, no database, no
-  LLM). The `db`, `auth`, `llm`, `evals` and `deploy` paths have only run
-  with fake commands in the synthetic test.
-- Scores are high because the scorers measure what the builders were told to
-  hit; Nightshift has little headroom on a project the system built.
-- Persona findings are noisy; stale rows are now closed by a clean
-  walkthrough, but that rule has not seen real data.
-- Everything ran in a Linux container. macOS (Chromium path, `claude`
-  binary permission prompts, launchd, osascript) is unproven.
-- Cost: $18 for a toy app. The Opus planner is most of it.
-- Lexical retrieval in ARD misses synonyms; local embeddings are the known
-  fix, not built.
-- GitHub search is unreachable from cloud sessions (proxy scoped to one
-  repo). The npm funnel covers OSS from anywhere; the GitHub funnel needs the
-  Mac and has never run live.
+## 4. What is left, in build order
 
-## 4. What is left to build
+### 4.0 Lock the judges (first, half a day)
 
-### 4.1 Stage 0: validate (`/jg-validate "<idea or URL>"`)
+- `loop/score.py --manifest-write` also pins every file a scorer's `cmd`
+  imports and every corpus it reads: for this repo `discovery/rdx/loopscore.py`,
+  `evalharness.py`, `retrieve.py`, `config.py`, `discovery/corpora/*.yaml`.
+  A manifest mismatch stops the run, as today.
+- `loop/check_plan.py` denies any `owned_paths` entry matching a pinned
+  file, and `hooks/safety` trips on an edit to one.
+- This repo's Nightshift config: `main_branch: main`, three tests scorers
+  (`discovery`, `loop/tests`, `pipeline/tests`), re-baselined.
+- `loop/init.py` and `pipeline/mkconfig.py` pin the same set for every
+  project that names an in-repo scorer.
+
+### 4.1 Fetch smoke test (one hour, before anything else in validation)
+
+A `claude -p` child through `pipeline/child.sh` with `WebFetch` and a
+`Bash(curl:*)` allow rule fetches one HTML page and one JSON API and writes a
+ledger row. Run from the cloud and from the Mac. Outcome recorded in
+`DEAD_ENDS.md` or the contract: it decides whether validation runs
+anywhere or only on the Mac, and whether the fetcher is the model or a
+script the model calls (`pipeline/fetch.py`: URL → text or JSON, hash,
+date; the recorded, re-runnable source).
+
+### 4.2 Stage 0: validate (`/jg-validate "<idea or URL>"`)
 
 Purpose: before the interview, establish with evidence whether the idea is
-worth building, at a conviction tier that scales with the build's cost.
+worth building, to a tier that scales with the build's cost. It replaces
+`/jg-feasibility`; interview round 4 reads `verdict.json` instead of asking
+its own feasibility question. `/jg-spec` refuses to run without a verdict
+of GO or an overruled NO-GO unless `--no-validate` is passed and logged.
 
-Roles:
+Roles, each a separate context, each writing a file the next reads:
 
-- The model judges. It writes the claims, decides what evidence would settle
-  each, where to get it, the number that kills it, and, after fetching, what
-  the evidence means. Evidence sources vary per project (a crypto service
-  plans on-chain activity and exchange volume; a CLI tool plans issue threads
-  and download curves; a personal tool plans a two-week usage log) and are
-  chosen at run time.
-- A script referees. It never reads the idea. It checks: the evidence plan
-  with kill numbers was frozen before the first fetch (a plan edited after
-  evidence is flagged); every record has a re-runnable source (URL, API call,
-  command) or is tier 0; the verdict is consistent with the model's own
-  pre-written thresholds (a GO over a killed claim is a flagged
-  contradiction); the reported conviction tier is the one the ledger
-  supports.
-- A fresh-context judge (fixed rubric, reads only plan + ledger) answers the
-  two qualitative questions: does each cited source really describe the
-  claimed pain, and does the case against outweigh the case for.
-- A skeptic (fresh context) writes the strongest case against before the
-  plan is frozen.
-- ARD finds evidence sources the model cannot reach with a browser (a chain
-  explorer, an exchange API, a registry); the human approves any install.
-- The human reads the verdict with every source linked and decides. A no-go
-  can be overruled in writing; the reason is stored with the verdict.
+1. **Author** (Fable): from the idea, writes `claims.json`: 3–6 claims, one
+   marked `core: true` (the single assumption the project depends on, as
+   CLAUDE.md requires). Each claim: who, pain, statement, and the metric
+   that would settle it. No numbers yet.
+2. **Setter** (Fable, fresh, sees only `claims.json` and the build budget):
+   writes `plan.json`: per claim the measure, the source kind and where,
+   and the kill number. Never sees the author's reasoning.
+3. **Skeptic** (Fable, fresh, sees `claims.json` only): writes
+   `skeptic.json`: per claim its own kill number and two sources that would
+   disconfirm the claim, plus `skeptic.md`, the case against.
+4. **Driver freeze** (`validate.py freeze`): merges plan and skeptic. The
+   stricter kill number wins per claim; the skeptic's disconfirming sources
+   are added as required ledger rows. Writes `plan.frozen.json` with its
+   sha and `frozen_at`. From here the plan is read-only to every child.
+5. **Fetcher** (Sonnet, fresh, read-only plan): for every planned source,
+   calls `pipeline/fetch.py` or the driver's search tool and appends a
+   ledger row: claim, measured, source `{kind, url|cmd, hash}`, value, unit,
+   date, note. It may add sources it finds; it may not remove planned ones.
+   A source it cannot reach becomes a row with `value: null,
+   note: unobtainable`. It never writes an estimate.
+6. **Judge** (Sonnet, fresh, sees plan + ledger, fixed rubric): one question
+   per ledger row: does the source say what the row claims, 0/1/2, with the
+   quoted line. Nothing else.
+7. **Referee** (`validate.py verdict`, script): re-fetches every `cmd`-kind
+   source and compares hashes (drift → tier drops to 0 with a note);
+   assigns tiers; drops rows the judge scored 0; computes per claim
+   supported/killed/unobtainable against the frozen numbers; applies the
+   tier table; writes `verdict.json` and `VERDICT.md` with every source
+   linked.
+8. **Human**: reads `VERDICT.md`. A NO-GO may be overruled in writing; the
+   overrule is stored as a claim with its own kill number and
+   `/jg-feedback` re-checks it after ship.
 
-Files:
+Evidence tiers (four, as the reviewer proposed):
 
-```
-.pipeline/validate/<slug>/
-  claims.json        3–6 claims: id, who, pain, statement, kill_metric, kill_value, direction
-  plan.json          per claim: measure, source (kind, where), kill number; frozen_at, sha
-  skeptic.md         case against, written before plan freeze
-  ledger.jsonl       {claim, measured, source:{kind,url|cmd}, value, unit, date, tier, note}
-  judge.json         rubric scores + evidence
-  verdict.json       {verdict: GO|PIVOT|NO-GO, tier, contradictions:[], overruled:{by,reason}?}
-  VERDICT.md         readable, every source linked
-```
+| tier | what counts | rule |
+|---|---|---|
+| 0 | nothing, unobtainable, unsourced, drifted, judge-scored 0 | never counts |
+| 1 | anecdotal: strangers describing the pain with links, a named person's message | three independent tier-1 rows make one tier-1 point |
+| 2 | primary data: query + result + date, re-runnable | one row is a point |
+| 3 | observed use: a prototype used more than once, payment, a usage log | one row is a point |
 
-Evidence tiers: 5 paid or retained use · 4 used a prototype more than once ·
-3 a named person said yes · 2 primary data with the query · 1 strangers
-describing the pain, with links · 0 estimates, unsourced numbers, the
-model's belief. "Unobtainable" is a valid ledger entry; the stage never
-fills a gap with an estimate.
+Provisional tier table, by `budget.build_usd` in the spec (the human can
+change it; the referee reads it from `pipeline/validate.toml`):
 
-Outputs: GO carries concept anchors and the kill numbers into `spec.json`
-(`anchors`, `success` lines) and later `/jg-feedback` checks them against
-real use; NO-GO appends to `DEAD_ENDS.md`; PIVOT returns to claims with the
-reason.
+| build budget | required |
+|---|---|
+| under $20 | core claim at tier 1 |
+| $20–100 | every claim at tier 1, core at tier 2 |
+| over $100 | every claim at tier 2, core at tier 2, plus one tier-3 row from an experiment (a landing page, a concierge run, a personal usage log) before milestone 2 |
 
-Exit codes: 0 go · 2 no-go · 3 pivot / needs-human · 4 infra · 1 usage.
+Verdict rules: core claim killed or below its required tier → NO-GO (exit
+2). Any non-core claim killed → PIVOT (exit 3, returns to the author with
+the ledger; a second PIVOT on the same idea is NO-GO). All required tiers
+met and nothing killed → GO (exit 0). Infra (fetching impossible, referee
+cannot re-fetch) → exit 4. The verdict is arithmetic; the prose is written
+afterwards from it.
 
-Budget: a cap per validation (number TBD by the human), metered like every
-other child.
+Files: `.pipeline/validate/<slug>/{claims.json, plan.json, skeptic.json,
+skeptic.md, plan.frozen.json, ledger.jsonl, judge.json, verdict.json,
+VERDICT.md}`. GO carries `anchors` (the claims, verbatim) and the kill
+numbers into `spec.json`; NO-GO appends to `DEAD_ENDS.md`.
 
-Open questions for the human: conviction threshold per build size;
-overruling policy; interviewing the human for tier 3–5 evidence first; paid
-sources; budget; whether the Mac is the primary machine.
+Budget: `validate.usd` in `pipeline/validate.toml`, default $5, metered
+like every other child. ARD is not part of this stage: it indexes tools,
+not data sources. A data-source funnel is a possible later project.
 
-### 4.2 The retro loop (the system improving itself)
+Tests: `validate.py` against a fake fetcher and hand-written ledgers: the
+stricter-number merge, the disconfirming-source requirement, freeze
+immutability (a child that edits the frozen plan is caught by sha), drift,
+the tier table, every verdict rule, the spec_check gate, the DEAD_ENDS
+write. Then one real run on an idea of the human's.
 
-- `retro/collect.py` (deterministic): from ledgers, events logs,
-  `scores.jsonl`, acceptance records, ship reports, gate stats
-  (`rdx stats`), persona findings, DEAD_ENDS and transcripts (`rdx mine`
-  already parses them) → `retro/facts.json`: first-try acceptance rate, cost
-  per accepted milestone, nights ended flat, gate false fires, human
-  overrides, time to green.
-- `retro/propose` (fresh model): each proposal cites one fact; lands as a
-  backlog row on this repo with `source: retro`.
-- Nightshift runs on this repo against its scorers: the three test suites,
-  `rdx eval` (gate precision, discovery, safety), the pipeline integration
-  test, and a new scorer, cost per accepted milestone across built projects.
-- Human merges. "Fine-tuning" means thresholds, prompts and rules against
-  labelled corpora, never model weights.
+### 4.3 Judgment where rules are doing judgment's job (Haiku behind a script)
 
-### 4.3 The ponytail ladder in executors
+- `feedback.py`: dimension by a Haiku call returning one of the allowed
+  dimensions, validated by the script; duplicates by a Haiku "same
+  complaint?" call over normalized titles, validated to an id list. Keyword
+  mapping stays as the fallback when the model is unavailable.
+- `ux_score.py`: persona findings deduplicated and a clean walkthrough's
+  "resolved" decision made by a Haiku call over the finding and the trail,
+  validated to row ids. The hash rule stays as the fallback.
+- Not changed: the ARD intent gate (regex, 3 ms, precision 1.0), keep/undo,
+  done/not, go/no-go, screenshot gates.
 
-Fold the six lower rungs of the ponytail ruleset (reuse what exists, stdlib
-before custom, native before dependency, installed dependency before new, one
-line before fifty, minimum that works; never cut validation/error handling)
-into `agents/exec-sonnet.md` and `agents/exec-opus.md`. Rung one ("should
-this exist") is omitted: executors do not decide scope. Measure with the
-retro's cost-per-accepted-milestone scorer.
+### 4.4 The retro (a report and a corpus, not proposals)
 
-### 4.4 Small additions
+- Instrument first: `build.sh` records `attempts` per milestone; merge, ship
+  and validate drivers log `human_override` events; `run.sh` already logs
+  flat nights and stop reasons.
+- `retro/collect.py` (deterministic, schema in `retro/facts.schema.json`):
+  first-try acceptance rate, cost per accepted milestone, flat nights, gate
+  false fires and misses, overrides, time to green, validation verdicts
+  later contradicted by feedback. Transcript-derived facts are counts only.
+- `retro/report.py`: trends per version label, as CLAUDE.md's benchmarking
+  rule asks. Cost per accepted milestone lives here, never in a scorer.
+- Each fact that names a mistake becomes a labelled regression case in
+  `retro/corpus/`: a plan `check_plan` should have rejected, a stale persona
+  finding, a prompt the gate should have fired on, a verdict feedback
+  overturned. A `kit-eval` scorer runs the fixture suites end to end plus a
+  replay of recorded stream logs through `tail.py` asserting cost agreement,
+  plus the pass rate on that corpus. That is what Nightshift climbs on this
+  repo. The corpus is pinned (4.0).
+- Kit edits that change a pinned scorer file mark every project's manifest
+  stale; `run.sh` says so at start and `score.py --manifest-write` re-signs.
 
-- Ship checklist: an AgentShield row (scans hooks, MCP config, permissions,
-  secrets) when ECC is installed; skipped cleanly otherwise.
-- `spec_check`: accept `anchors` and validation-derived success lines.
-- `feedback.py`: check inbox items against the kill numbers and report.
+### 4.5 The ponytail ladder in executors
 
-### 4.5 On the Mac (human-run)
+Fold the six lower rungs of the ponytail ruleset into `agents/exec-sonnet.md`
+and `agents/exec-opus.md` (rung one, "should this exist", omitted:
+executors do not decide scope). Measured by the reviewer's `scope_ok` rate
+and diff size per accepted subtask across the next real project, reported by
+the retro; not a scorer.
 
-- First live GitHub funnel sync; `rdx schedule` for the nightly refresh.
-- A Nightshift dry run with ECC enabled, to check hook coexistence.
-- Remote Control on the primary local session; cloud sessions for
-  closed-laptop work and throwaway sandboxes.
+### 4.6 Housekeeping
 
-## 5. Build order
+- Retire `commands/jg-feasibility.md` (points at `/jg-validate`); rename the
+  strategic review to `/jg-review-approach` so `skeptic` means one thing.
+- Annotate the `DEAD_ENDS.md` entry on custom subagents as superseded, with
+  the reason (agents became the unit every stage dispatches).
+- No AgentShield row until ECC is installed on the Mac.
 
-1. Validation contract page in `pipeline/README.md`; ponytail ladder in the
-   executor prompts (half a day together).
-2. `pipeline/validate.py` (referee + verdict + handoffs) with tests using a
-   fake fetcher; `prompts/validate.md`; `agents/skeptic.md`,
-   `agents/evidence-judge.md`; `commands/jg-validate.md`.
-3. One real validation run on an idea of the human's, with real fetching.
-4. Retro collector and proposer; one retro run on the data this system has
-   already produced.
-5. Second real project on a stack with a backend, a database and an LLM.
+### 4.7 On the Mac (human-run)
+
+First live GitHub funnel sync and `rdx schedule`; a Nightshift dry run with
+ECC enabled to check hook coexistence; Remote Control on the primary local
+session.
+
+### 4.8 Second real project
+
+A stack with a backend, a database and an LLM, through every stage including
+validation. Most remaining unknowns are there.
+
+## 5. Open questions for the human
+
+The tier table's numbers; the overrule policy (kept as "in writing, stored,
+re-checked"); paid sources (proposed: never without a per-source approval and
+a cost line); the validation budget default; whether the Mac is primary.
