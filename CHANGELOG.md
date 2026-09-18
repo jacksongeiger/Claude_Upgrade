@@ -46,6 +46,25 @@ found the live cost meter landing 0.42×–3.5× the bill on 25 real streams:
 at the main model's output rate, and `pricing.json` carries the corrected
 Fable/Opus row. All 25 streams now land 0.90×–1.33×; four are fixtures.
 
+**Third real run, Inbox Triage** (a FastAPI + SQLite + LLM service, the
+backend path; see `retro/RETRO.md` for the numbers). Validation on the mid
+band: eight roles, $4.71, NO-GO — from the cloud only registries and raw
+GitHub answer, so demand went unmeasured and the core claim died on a README
+entry count; overruled in writing (a verdict-level overrule now needs no
+measure and is written under the NO-GO entry in DEAD_ENDS.md). What the
+run fixed in the kit: `spent()` printed two lines on a project with no
+ledger (jq 1.7 prints 0 and exits 2 on a missing file) and sent the author
+out with no budget; role ceilings were too tight for six claims (now
+1.5/2/2/3/1.5, totals $15/$7); a skeptic's required source was a local
+file path (url-kind and disconfirming sources must be http(s) URLs);
+handoff would have written 21 success lines, 17 of them killed or never
+fetched (only cleared tier-2 numbers hand off; the interview's note
+survives); assess derived `--cov=inbox-triage` from the folder name (a flat
+`src/` or a package now, never a non-identifier); and mkconfig's `evals/*`
+pin would have refused the milestone that creates `evals/` (build.sh
+exports `NIGHTSHIFT_PINS=off`; the pins stay Nightshift's rule). Each is a
+test, and three are corpus cases (`schema`, `handoff` kinds added).
+
 **Tests:** loop 187, pipeline 176, discovery 353, all green; shell suites
 test_run / test_hooks / test_merge / test_pipeline / test_validate green;
 corpus 8/8; replay 4/4.
