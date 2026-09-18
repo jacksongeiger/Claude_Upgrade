@@ -37,7 +37,7 @@ def test_valid_spec_ok(tmp_path):
     p = write_spec(tmp_path, load_valid())
     proc = run([str(p)], tmp_path)
     assert proc.returncode == 0
-    assert proc.stdout.strip() == "ok: 2 features, 2 milestones, 0 unmeasurable"
+    assert proc.stdout.strip().splitlines()[0] == "ok: 2 features, 2 milestones, 0 unmeasurable"
 
 
 def test_unreadable_json_exit1(tmp_path):
@@ -99,7 +99,7 @@ def test_manual_only_feature_is_valid_and_counted(tmp_path):
     p = write_spec(tmp_path, spec)
     proc = run([str(p)], tmp_path)
     assert proc.returncode == 0
-    assert proc.stdout.strip() == "ok: 10 features, 2 milestones, 1 unmeasurable"
+    assert proc.stdout.strip().splitlines()[0] == "ok: 10 features, 2 milestones, 1 unmeasurable"
 
 
 def test_over_20_percent_unmeasurable_exit2(tmp_path):
@@ -314,3 +314,74 @@ def test_serve_required_for_persona_and_needs_must_cover_checks(tmp_path):
     assert proc.returncode == 2
     assert "stack.serve" in proc.stdout
     assert "missing 'persona'" in proc.stdout and "missing 'lighthouse'" in proc.stdout
+
+
+# ---------------------------------------------------------------------------
+# the validation gate
+# ---------------------------------------------------------------------------
+
+def _verdict(tmp_path, spec, verdict="GO", budget=50, overruled=None):
+    import hashlib
+    slug = "abcd1234"
+    d = tmp_path / ".pipeline" / "validate" / slug
+    d.mkdir(parents=True, exist_ok=True)
+    v = {"verdict": verdict, "validated_budget_usd": budget, "slug": slug, "overruled": overruled}
+    (d / "verdict.json").write_text(json.dumps(v))
+    spec["validation"] = {"slug": slug, "verdict_sha256": hashlib.sha256((d / "verdict.json").read_bytes()).hexdigest(),
+                          "validated_budget_usd": budget}
+    return spec
+
+
+def test_spec_without_validation_block_is_reported_not_failed(tmp_path):
+    p = write_spec(tmp_path, load_valid())
+    proc = run([str(p)], tmp_path)
+    assert proc.returncode == 0 and "no validation block" in proc.stdout
+
+
+def test_gate_flag_refuses_without_a_verdict(tmp_path):
+    p = write_spec(tmp_path, load_valid())
+    proc = run([str(p), "--gate-validate"], tmp_path)
+    assert proc.returncode == 3 and "run /jg-validate" in proc.stdout
+
+
+def test_go_verdict_passes_the_gate(tmp_path):
+    spec = _verdict(tmp_path, load_valid())
+    p = write_spec(tmp_path, spec)
+    proc = run([str(p), "--gate-validate"], tmp_path)
+    assert proc.returncode == 0 and "validated GO" in proc.stdout
+
+
+def test_no_go_verdict_without_overrule_refuses(tmp_path):
+    spec = _verdict(tmp_path, load_valid(), verdict="NO-GO")
+    p = write_spec(tmp_path, spec)
+    assert run([str(p)], tmp_path).returncode == 3  # the block is present, so it is enforced even without the flag
+
+
+def test_overruled_no_go_passes(tmp_path):
+    spec = _verdict(tmp_path, load_valid(), verdict="NO-GO", overruled={"by": "human", "reason": "x"})
+    p = write_spec(tmp_path, spec)
+    assert run([str(p), "--gate-validate"], tmp_path).returncode == 0
+
+
+def test_budget_outgrowing_the_verdict_is_exit_2(tmp_path):
+    spec = _verdict(tmp_path, load_valid(), budget=15)
+    spec["budget"] = {"build_usd": 40, "nightshift_cap_usd": 10}
+    p = write_spec(tmp_path, spec)
+    proc = run([str(p), "--gate-validate"], tmp_path)
+    assert proc.returncode == 2 and "exceeds the validated budget" in proc.stdout
+
+
+def test_changed_verdict_is_caught_by_the_sha(tmp_path):
+    spec = _verdict(tmp_path, load_valid())
+    vpath = tmp_path / ".pipeline" / "validate" / "abcd1234" / "verdict.json"
+    v = json.loads(vpath.read_text()); v["verdict"] = "GO"; v["note"] = "edited"; vpath.write_text(json.dumps(v))
+    p = write_spec(tmp_path, spec)
+    proc = run([str(p), "--gate-validate"], tmp_path)
+    assert proc.returncode == 3 and "changed since the spec recorded it" in proc.stdout
+
+
+def test_skipped_validation_is_allowed_and_named(tmp_path):
+    spec = load_valid(); spec["validation"] = {"skipped": True, "by": "human"}
+    p = write_spec(tmp_path, spec)
+    proc = run([str(p), "--gate-validate"], tmp_path)
+    assert proc.returncode == 0 and "skipped by human" in proc.stdout

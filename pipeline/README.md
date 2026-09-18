@@ -62,6 +62,7 @@ commands/jg-spec.md … jg-feedback.md
     gates/last/                 last gate run outputs (ignored)
     ship/<tag>/ship-report.json
     ledger.jsonl                cost per stage: {ts, stage, id, cost_usd, model_calls}
+  .pipeline/validate/<slug>/    stage 0: claims, plan, skeptic, frozen plan, ledger, bodies (ignored), judge, verdict
   .loop/                        Nightshift (unchanged)
 ```
 
@@ -142,6 +143,56 @@ Rules `spec_check.py` enforces (exit 2 on any violation, one line per problem):
 - `.pipeline/acceptance-index.json`: `{feature id: {milestone, checks}}` for gates.py run-all and ship_check.
 - `.gitignore` additions for the pipeline's scratch directories.
 - `SPEC.md` if absent (a readable rendering; never overwritten once it exists).
+
+## Stage 0 — /jg-validate (is it worth building?)
+
+`bash pipeline/validate.sh --project . --idea "<idea or URL>" --build-usd N`.
+Runs before the interview and replaces `/jg-feasibility`. Eight roles,
+each a fresh `claude -p` child through `child.sh`, each writing a file the
+next reads; the script between them does the redaction, the freeze, the
+budget and the verdict. A model judges what to measure and what it means; a
+script holds it to the numbers it wrote before looking.
+
+| role | model | reads | writes |
+|---|---|---|---|
+| author | fable | the idea (and the last ledger on a PIVOT) | `claims.json`: 3–6 claims, one `core`, no numbers |
+| setter | fable, fresh | claims, budget, reachable hosts | `plan.json`: measures (name, unit, direction, kill_value, sources) |
+| skeptic | fable, fresh | claims, `plan.redacted.json` (numbers removed by the driver) | `skeptic.json`: its own kill numbers, added measures, two disconfirming sources per claim; `skeptic.md` |
+| freeze | script | plan + skeptic | `plan.frozen.json`: the stricter number per measure, added measures, required sources; `freeze.sha` |
+| fetcher | sonnet, fresh | the frozen plan (read-only; the sha is checked after) | `ledger.jsonl` via `fetch.py` only; `bodies/` |
+| judge | sonnet, files only | plan, ledger, bodies | `judge.json`: 0/1/2 per row with the quoted line |
+| referee | script | everything above, `reachable.json` | `verdict.json`, `VERDICT.md`; `DEAD_ENDS.md` on NO-GO |
+| human | | `VERDICT.md` | an overrule, in writing, stored with the verdict |
+
+Under a $20 build budget only author, setter, fetcher and referee run.
+
+Tiers per ledger row: 3 an experiment's number (`--source-kind
+experiment`) · 2 a re-runnable number (`json:`/`regex:`/`count:`) whose
+value survives the referee's re-fetch (drift = absent, or moved across the
+kill number) · 1 a `text` row the judge scored ≥ 1; three rows with
+distinct origins make one point; the skeptic's required sources never
+count as support · 0 a failed fetch, a judge 0, a free-text origin.
+
+Required per band (`validate.toml`, `--build-usd`): small (< $20) core at
+tier 2; mid ($20–100) core at tier 2, others at tier 1; large (> $100) all
+at tier 2 plus one tier-3 row before any milestone with dependencies,
+which `milestone.py next` enforces (exit 3).
+
+Verdict: core killed or below tier → NO-GO (2); a non-core claim killed or
+below → PIVOT (5; the driver re-runs the author once with the ledger, a
+second PIVOT is NO-GO); a required source blocked here per `reachable.json`
+→ infra (4, run it where the host answers); unmatched measure at freeze or
+cap reached → needs-human (3); else GO (0). The stage total (`validate.toml
+budget.usd`, $8; $2 on the small band) is the sum of this slug's ledger
+rows across PIVOT passes.
+
+Files under `.pipeline/validate/<slug>/` (slug = sha256(idea)[:8]); `bodies/`
+is gitignored, the rest is committed. GO hands off with `validate.py
+handoff`: the claims become `spec.anchors`, the kill numbers success lines,
+and `spec.validation {slug, verdict_sha256, validated_budget_usd}` is what
+`spec_check.py --gate-validate` reads (missing or NO-GO verdict → 3; build
+budget above the validated one → 2; specs without the block are reported,
+not failed; `validation: {skipped: true, by}` is allowed and named).
 
 ## Stage 1 — /jg-spec (interview)
 
@@ -354,8 +405,9 @@ moved under `## processed <date>`. Exit 0; prints the rows added.
 
 ## Human gates, in one list
 
-spec signed · every install · milestone merge to main · tokens approval ·
-first screenshot baselines · deploy.
+the validation verdict · spec signed · every install · milestone merge to
+main · tokens approval · first screenshot baselines · deploy. Each is
+enforced by a script that refuses without the gate's artifact.
 
 ## Test plan
 
@@ -369,5 +421,7 @@ first screenshot baselines · deploy.
 
 ## Exit codes (all scripts)
 
-0 ok · 2 checks failed / spec invalid · 3 needs-human (baseline, unresolved
-gap, unanswerable) · 4 infra (a check could not run) · 1 usage error.
+0 ok · 2 checks failed / spec invalid / NO-GO · 3 needs-human (baseline,
+unresolved gap, unanswerable, cap reached) · 4 infra (a check could not
+run; a required source blocked here) · 5 PIVOT (validation only) · 1 usage
+error.

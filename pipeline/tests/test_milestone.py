@@ -192,3 +192,32 @@ def test_list_without_state_defaults_to_open(tmp_path):
     proc = run(["--spec", str(p), "list"], tmp_path)
     lines = proc.stdout.splitlines()
     assert all("done" not in l and "blocked" not in l for l in lines[2:])
+
+
+# ---------------------------------------------------------------------------
+# the tier-3 gate for large validations
+# ---------------------------------------------------------------------------
+
+def _large_validation(tmp_path, has_tier3):
+    slug = "feedbeef"
+    d = tmp_path / ".pipeline" / "validate" / slug
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "verdict.json").write_text(json.dumps({"verdict": "GO", "validated_budget_usd": 500, "has_tier3": has_tier3}))
+    spec = load_valid()
+    spec["validation"] = {"slug": slug, "verdict_sha256": "x" * 64, "validated_budget_usd": 500}
+    return write_spec(tmp_path, spec), tmp_path / ".pipeline" / "build" / "state.json"
+
+
+def test_large_validation_without_tier3_refuses_a_dependent_milestone(tmp_path):
+    p, state = _large_validation(tmp_path, has_tier3=False)
+    assert run(["--spec", str(p), "--state", str(state), "next"], tmp_path).stdout.strip() == "m1"
+    run(["--spec", str(p), "--state", str(state), "set", "m1", "done"], tmp_path)
+    proc = run(["--spec", str(p), "--state", str(state), "next"], tmp_path)
+    assert proc.returncode == 3 and "tier-3" in proc.stderr
+
+
+def test_large_validation_with_tier3_proceeds(tmp_path):
+    p, state = _large_validation(tmp_path, has_tier3=True)
+    run(["--spec", str(p), "--state", str(state), "set", "m1", "done"], tmp_path)
+    proc = run(["--spec", str(p), "--state", str(state), "next"], tmp_path)
+    assert proc.returncode == 0 and proc.stdout.strip() == "m2"

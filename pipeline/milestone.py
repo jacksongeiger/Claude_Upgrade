@@ -117,6 +117,31 @@ def milestone_by_id(spec, mid):
 # next
 # ---------------------------------------------------------------------------
 
+def _tier3_gate(spec, state_path):
+    """A large-band validation (over $100) promised a tier-3 row from an
+    experiment before any milestone with dependencies; the verdict says
+    whether one exists. Returns the slug when the gate holds, else None."""
+    v = spec.get("validation") if isinstance(spec.get("validation"), dict) else None
+    if not v or v.get("skipped") or not v.get("slug"):
+        return None
+    try:
+        budget = float(v.get("validated_budget_usd") or 0)
+    except (TypeError, ValueError):
+        return None
+    project = Path(state_path).resolve().parent.parent.parent if state_path else Path(".")
+    vpath = project / ".pipeline" / "validate" / str(v["slug"]) / "verdict.json"
+    toml_path = Path(__file__).resolve().parent / "validate.toml"
+    try:
+        import tomllib
+        cfg = tomllib.loads(toml_path.read_text())
+        if budget <= cfg["bands"]["mid_max_usd"] or not cfg["require"]["large"].get("tier3_before_dependent_milestone", True):
+            return None
+        verdict = json.loads(vpath.read_text())
+    except (OSError, ValueError, KeyError):
+        return None
+    return None if verdict.get("has_tier3") else str(v["slug"])
+
+
 def cmd_next(spec, state_path):
     graph = milestone_graph(spec)
     cycle = _find_cycle(graph)
@@ -125,6 +150,7 @@ def cmd_next(spec, state_path):
         return 2
 
     state = load_state(state_path)
+    tier3_gate = _tier3_gate(spec, state_path)
     for m in spec.get("milestones", []):
         mid = m.get("id")
         if not mid:
@@ -134,6 +160,10 @@ def cmd_next(spec, state_path):
             continue
         deps = m.get("depends_on") or []
         if all(milestone_status(state, dep) == "done" for dep in deps):
+            if deps and tier3_gate:
+                print(f"needs-human: {mid} depends on {deps} and the validation ({tier3_gate}) has no tier-3 evidence row yet; "
+                      f"run the experiment the verdict names, record it with fetch.py --source-kind experiment, re-run validate.py verdict", file=sys.stderr)
+                return 3
             print(mid)
             return 0
 

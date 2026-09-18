@@ -64,6 +64,10 @@ command -v jq >/dev/null || { echo "jq required" >&2; exit 1; }
 [ -f "$SPEC" ] || { echo "no spec.json in $PROJECT — run /jg-spec first" >&2; exit 1; }
 mkdir -p "$RUN" "$BUILD" "$LOOP/run" "$PIPE/wt"
 python3 "$KIT/spec_check.py" "$SPEC" >/dev/null || { echo "spec.json does not validate — run spec_check.py" >&2; exit 1; }
+# the validation gate: a spec that carries a verdict must still be a GO whose budget it has not outgrown
+if jq -e '.validation' "$SPEC" >/dev/null 2>&1; then
+    python3 "$KIT/spec_check.py" "$SPEC" --gate-validate >"$PROJECT/.pipeline/run/gate-validate.out" 2>&1 || { cat "$PROJECT/.pipeline/run/gate-validate.out" >&2; echo "validation gate refused — see above" >&2; exit 3; }
+fi
 if [ ! -f "$CONFIG" ]; then
     python3 "$KIT/mkconfig.py" --project "$PROJECT" --spec "$SPEC" --out "$CONFIG" || { echo "could not write a Nightshift config" >&2; exit 4; }
 fi

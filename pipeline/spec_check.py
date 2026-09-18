@@ -369,7 +369,7 @@ def derive(spec, project_dir):
 
     # ignore the pipeline's scratch, never its records
     gi = project_dir / ".gitignore"
-    wanted = [".pipeline/run/", ".pipeline/wt/", ".pipeline/build/", ".pipeline/ux/*/shots/",
+    wanted = [".pipeline/run/", ".pipeline/wt/", ".pipeline/build/", ".pipeline/ux/*/shots/", ".pipeline/validate/*/bodies/",
               ".pipeline/gates/last/", ".pipeline/ledger.jsonl", ".pipeline/events.*", ".pipeline/assess.json",
               ".loop/run/", ".loop/wt/", ".loop/state.json", ".loop/events.*", ".loop/iterations/",
               ".loop/heartbeat", ".loop/map.json", ".loop/report.*", ".claude/worktrees/"]
@@ -392,11 +392,48 @@ def derive(spec, project_dir):
     return written
 
 # CLI
+def gate_validate(spec, project_dir, strict):
+    """The validation gate. Returns (problems, exit code, note).
+
+    `spec.validation` is `{slug, verdict_sha256, validated_budget_usd}`
+    (written by validate.py handoff) or `{skipped: true, by: ...}`. With
+    `strict` (--gate-validate) a missing block is needs-human (3); without
+    it the state is reported and nothing fails, so every existing project
+    and fixture keeps working.
+    """
+    v = spec.get("validation")
+    if not isinstance(v, dict):
+        return ([], 3, "no validation block: run /jg-validate first") if strict else ([], 0, "no validation block (reported, not enforced)")
+    if v.get("skipped"):
+        return [], 0, f"validation skipped by {v.get('by', '?')}"
+    slug = str(v.get("slug") or "")
+    vpath = Path(project_dir) / ".pipeline" / "validate" / slug / "verdict.json"
+    if not slug or not vpath.exists():
+        return ([f"validation: no verdict at {vpath}"], 3, "verdict missing")
+    import hashlib
+    digest = hashlib.sha256(vpath.read_bytes()).hexdigest()
+    if digest != v.get("verdict_sha256"):
+        return ([f"validation: verdict.json changed since the spec recorded it ({digest[:8]} != {str(v.get('verdict_sha256'))[:8]}); run validate.py handoff again"], 3, "verdict changed")
+    try:
+        verdict = json.loads(vpath.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        return ([f"validation: unreadable verdict: {exc}"], 4, "verdict unreadable")
+    if verdict.get("verdict") != "GO" and not verdict.get("overruled"):
+        return ([f"validation: verdict is {verdict.get('verdict')}"], 3, "not a GO")
+    build = float((spec.get("budget") or {}).get("build_usd") or 0)
+    validated = float(v.get("validated_budget_usd") or verdict.get("validated_budget_usd") or 0)
+    if build > validated:
+        return ([f"validation: budget.build_usd {build:g} exceeds the validated budget {validated:g}; validate again at the higher tier"], 2, "budget outgrew the verdict")
+    return [], 0, f"validated GO at ${validated:g} (slug {slug})"
+
+
 def build_parser():
     ap = argparse.ArgumentParser(description="validate/derive spec.json")
     ap.add_argument("spec", help="path to spec.json")
     ap.add_argument("--derive", action="store_true")
     ap.add_argument("--project", help="project dir (default: spec's own directory)")
+    ap.add_argument("--gate-validate", action="store_true",
+                    help="refuse (exit 3) without a GO verdict; exit 2 when the build budget outgrew it")
     return ap
 
 def main(argv=None):
@@ -420,6 +457,15 @@ def main(argv=None):
         f"{counts['unmeasurable']} unmeasurable"
     )
     print(summary)
+
+    project_dir = Path(args.project) if args.project else spec_path.resolve().parent
+    gproblems, gcode, gnote = gate_validate(spec, project_dir, args.gate_validate)
+    print(f"validation: {gnote}")
+    if args.gate_validate or "validation" in spec:
+        for p in gproblems:
+            print(p)
+        if gcode:
+            return gcode
 
     if args.derive:
         project_dir = Path(args.project) if args.project else spec_path.resolve().parent

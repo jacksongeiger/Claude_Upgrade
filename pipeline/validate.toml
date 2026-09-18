@@ -1,0 +1,47 @@
+# Validation stage settings. The human edits the numbers; the referee reads them.
+
+[budget]
+# stage total across every role and PIVOT pass, in USD
+usd = 8.0
+# the under-$20 path (author -> setter -> fetcher -> referee)
+usd_small = 2.0
+
+[bands]
+# build budget bands, by the --build-usd named at invocation
+small_max_usd = 20
+mid_max_usd = 100
+
+# Required evidence per band. tier: 1 = anecdotal (three independent rows
+# make one point), 2 = primary data (one re-runnable row clearing its kill
+# number), 3 = observed use. The core claim is never satisfied by tier 1.
+[require.small]
+core = 2
+other = 0
+
+[require.mid]
+core = 2
+other = 1
+
+[require.large]
+core = 2
+other = 2
+# a tier-3 row from an experiment before any milestone with dependencies
+tier3_before_dependent_milestone = true
+
+[tiers]
+anecdotal_rows_per_point = 3
+
+[roles]
+author = "fable"
+setter = "fable"
+skeptic = "fable"
+fetcher = "sonnet"
+judge = "sonnet"
+
+[caps]
+# per-child ceilings; the stage total above still binds
+author = 1.0
+setter = 1.0
+skeptic = 1.0
+fetcher = 2.5
+judge = 1.0

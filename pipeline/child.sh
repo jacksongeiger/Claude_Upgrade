@@ -71,7 +71,7 @@ kill_child() { [ -n "$CHILD_PGID" ] || CHILD_PGID=$(cat "$RUN/child.pgid" 2>/dev
 trap 'kill_child; exit 130' INT TERM
 
 ( cd "$CWD"
-  export NIGHTSHIFT_CONFIG="$CONFIG" NIGHTSHIFT_KIT="$LOOP_KIT" PIPELINE_KIT="$KIT"
+  export NIGHTSHIFT_CONFIG="$CONFIG" NIGHTSHIFT_KIT="$LOOP_KIT" PIPELINE_KIT="$KIT" PIPELINE_STAGE="$STAGE"
   setsid bash -c 'echo $$ > "$1"; shift; exec "$@"' _ "$RUN/child.pgid" \
     timeout "${TMO}m" "$CLAUDE_BIN" -p "$(cat "$RUN/prompt.md")" \
     --model "$MODEL" --max-budget-usd "$BUDGET" --max-turns "$TURNS" \
