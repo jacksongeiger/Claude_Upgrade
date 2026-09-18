@@ -306,6 +306,27 @@ task against the live URL, tags `release/<tag>`.
 
 Human gate: **the deploy**.
 
+## Fetching evidence: `fetch.py`
+
+The validation stage's only way to touch the network is a script,
+`pipeline/fetch.py`, never `WebFetch`: a ledger row must carry something the
+referee can re-run. `fetch.py get <url> --extract json:<path>|regex:<re>|count:<re>|text
+[--run-dir D] [--ledger L --claim C --measure M --origin HOST]` writes the
+body (HTML stripped, capped) to `<run-dir>/bodies/<sha256>.txt`, prints one
+JSON line with `value`, `extracted_by`, `body_hash`, `date` and a `reason`
+(`egress | 404 | paywall | timeout | http | extract`) on failure, and
+appends the ledger row. `--origin` must be a host or a handle, never free
+text. `fetch.py probe --out reachable.json` fetches a fixed host list and
+records which hosts answer 2xx from here.
+
+Smoke-tested headless on 2026-09-18: a `claude -p` Sonnet child through
+`child.sh` ran the probe and two fetches for $0.08 with no denies. From a
+cloud session the reachable set is registries (npm, PyPI, crates.io) and
+raw GitHub files; api.github.com, Reddit, Hacker News, Product Hunt, Stack
+Overflow, dev.to, Wikipedia, arXiv, search engines and chain explorers are
+refused by the proxy. The referee reads `reachable.json` to tell "blocked
+here" (infra, run it on the Mac) from "nobody has it" (unobtainable).
+
 ## Stage 7 — Nightshift
 
 Unchanged in the loop; the handoff is three facts:
