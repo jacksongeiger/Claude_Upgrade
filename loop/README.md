@@ -263,6 +263,16 @@ executor could not run. No `git push`, no bare `git`, no `Bash(*)`. Commands
 containing `$VAR`, `$(...)` or backticks are denied by Claude Code regardless
 of the allowlist; the prompts say so and check_plan treats them as denied.
 
+## Children see only the kit's config
+
+Every child (`claude -p`) runs with `CLAUDE_CONFIG_DIR` set to
+`~/.claude/nightshift/<slug>/claude/`, written by `child_config.sh` from the
+child settings: the allowlist and the kit's hooks. User hooks, installed
+plugins and their hooks, user-level agents and commands, and the global
+`~/.claude/CLAUDE.md` never load in a child (`docs/ECC-COEXISTENCE.md` has
+the measurements; `--safe-mode` drops the kit's hooks too, so it is not
+used). The project's own `CLAUDE.md` still applies in the worktree.
+
 ## Guards (subagent-scoped hooks on the executor definitions)
 
 `hooks/guard.sh` (PreToolUse, matcher `Bash|Write|Edit|MultiEdit`):

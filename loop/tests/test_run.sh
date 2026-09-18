@@ -69,6 +69,11 @@ grep -q "STOP reason=iters" .loop/events.log && pass "STOP line in events.log" |
 [ ! -f .loop/run/loop.pid ] && pass "loop.pid removed" || fail "loop.pid left"
 [ "$(jq -r '.spent_usd' .loop/state.json)" = "0.42" ] && pass "charged result cost" || fail "spent=$(jq -r .spent_usd .loop/state.json)"
 
+# 1c. the child ran with a kit-owned CLAUDE_CONFIG_DIR holding only its settings (no user hooks, no plugins)
+CFGDIR=$(sed -n 's/^CLAUDE_CONFIG_DIR=//p' .loop/wt/loop/.loop/iterations/1/child-env.txt 2>/dev/null)
+case "$CFGDIR" in "$HOME_FAKE"/.claude/nightshift/*/claude) pass "child CLAUDE_CONFIG_DIR is the slug's own dir" ;; *) fail "child CLAUDE_CONFIG_DIR=$CFGDIR" ;; esac
+[ -f "$CFGDIR/settings.json" ] && jq -e '.hooks.PreToolUse' "$CFGDIR/settings.json" >/dev/null && pass "child config dir carries the kit's settings and hooks" || fail "no settings.json with hooks in $CFGDIR"
+
 # 6b. child allowlist is derived from the config's commands (test_cmd "bash ./run_tests.sh")
 jq -e '.permissions.allow | index("Bash(bash:*)")' .loop/run/child-settings.json >/dev/null && pass "child allowlist carries the test runner" || fail "runner rule missing from child-settings.json"
 jq -e '.permissions.allow | index("Bash(git push:*)")' .loop/run/child-settings.json >/dev/null && fail "git push allowlisted" || pass "git push not allowlisted"

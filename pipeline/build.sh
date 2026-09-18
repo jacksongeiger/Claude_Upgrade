@@ -208,6 +208,7 @@ PY
     ( cd "$WT"
       # the build writes the judges the spec asks for (evals corpus, bench); pins are Nightshift's rule
       export NIGHTSHIFT_CONFIG="$CONFIG" NIGHTSHIFT_KIT="$LOOP_KIT" NIGHTSHIFT_ITER_DIR="$ITER_DIR" NIGHTSHIFT_PINS=off PIPELINE_STAGE=build
+      CLAUDE_CONFIG_DIR=$(bash "$LOOP_KIT/child_config.sh" "$NSDIR" "$CHILD_SETTINGS"); export CLAUDE_CONFIG_DIR
       setsid bash -c 'echo $$ > "$1"; shift; exec "$@"' _ "$RUN/child.pgid" \
         timeout "${CHILD_TIMEOUT}m" "$CLAUDE_BIN" -p "$(cat "$ITER_DIR/prompt.md")" \
         --model fable --max-budget-usd "$BUDGET" --max-turns "$CHILD_TURNS" \

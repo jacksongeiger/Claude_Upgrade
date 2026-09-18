@@ -427,6 +427,8 @@ PY
     (
       cd "$WT"
       export NIGHTSHIFT_CONFIG="$CONFIG" NIGHTSHIFT_KIT="$KIT" NIGHTSHIFT_ITER_DIR="$ITER_DIR"
+      # the child's only config: no user hooks, no plugins (loop/child_config.sh)
+      CLAUDE_CONFIG_DIR=$(bash "$KIT/child_config.sh" "$NSDIR" "$CHILD_SETTINGS"); export CLAUDE_CONFIG_DIR
       rm -f "$RUN/child.pgid"
       # setsid makes the child its own session leader: its pid is its pgid.
       # Record it from inside so kill paths never have to guess with pgrep.

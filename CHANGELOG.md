@@ -90,6 +90,14 @@ a new one counts; reviewers are told the executor worktree is out of reach
 out of the repo root; and a flat night that closed a reported defect with a
 bigger suite is kept (`KEPT reason=closed-report`). Each has a test.
 
+**ECC coexistence, settled without the Mac.** ECC 2.2.1's hooks (GateGuard,
+a dev-server block, format/typecheck and a 300 s session-evaluator Stop
+hook) would run inside every kit child. `--safe-mode` was measured to drop
+the kit's own hooks too; `CLAUDE_CONFIG_DIR` was measured to work. Every
+spawn site now points children at `~/.claude/nightshift/<slug>/claude/`
+(`loop/child_config.sh`), so user hooks, plugins and plugin hooks never
+load in a child. `docs/ECC-COEXISTENCE.md`; a driver test.
+
 **Tests:** loop 190, pipeline 180, discovery 353, all green; shell suites
 test_run / test_hooks / test_merge / test_pipeline / test_validate green;
 corpus 8/8; replay 4/4.
