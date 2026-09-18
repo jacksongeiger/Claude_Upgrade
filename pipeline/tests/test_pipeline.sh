@@ -9,7 +9,7 @@ PASSED=0; FAILED=0
 pass() { echo "  ok   $*"; PASSED=$((PASSED+1)); }
 fail() { echo "  FAIL $*"; FAILED=$((FAILED+1)); }
 
-D=$(mktemp -d); export HOME="$D/home"; mkdir -p "$HOME"
+D=$(mktemp -d); export HOME="$D/home"; mkdir -p "$HOME"; export CLASSIFY_OFF=1
 P="$D/proj"; mkdir -p "$P"; cd "$P"
 git init -q -b main . ; git config user.email t@t; git config user.name t
 echo "# proj" > README.md; echo "PASS PASS FAIL FAIL" > tests.txt

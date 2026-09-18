@@ -108,7 +108,7 @@ def close_superseded(run_dir: str, backlog_path: str, task: str) -> int:
     return closed
 
 
-def feed_backlog(run_dir: str, backlog_path: str, task: str) -> int:
+def feed_backlog(run_dir: str, backlog_path: str, task: str, supersede: bool = True) -> int:
     """Append dead_ends/confusions from <run_dir>/findings.json to the
     backlog, deduplicated by id. Returns the number of rows added."""
     findings_path = os.path.join(run_dir, "findings.json")
@@ -123,7 +123,8 @@ def feed_backlog(run_dir: str, backlog_path: str, task: str) -> int:
         # earlier walkthrough of the same task raised: the product (or the
         # driver) no longer shows the problem, and a night spent on a stale
         # finding is a night wasted.
-        close_superseded(run_dir, backlog_path, task)
+        if supersede:
+            close_superseded(run_dir, backlog_path, task)
         return 0
 
     rows = backlog_io.load(backlog_path) if os.path.exists(backlog_path) else []
@@ -160,6 +161,8 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--run", required=True)
     ap.add_argument("--check", required=True)
     ap.add_argument("--backlog")
+    ap.add_argument("--no-supersede", action="store_true",
+                    help="do not close a task's open rows by the name rule (the caller decided with judgment)")
     args = ap.parse_args(argv)
 
     try:
@@ -190,7 +193,7 @@ def main(argv: list[str]) -> int:
     print(json.dumps(score))
 
     if args.backlog:
-        feed_backlog(args.run, args.backlog, check.get("task", ""))
+        feed_backlog(args.run, args.backlog, check.get("task", ""), supersede=not args.no_supersede)
 
     must = check.get("must", "complete")
     if must == "complete" and not score["completed"]:

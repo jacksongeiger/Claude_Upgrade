@@ -85,7 +85,7 @@ def judge_all(d, score=2):
 
 def test_init_bands_and_roles(tmp_path):
     d, out = project(tmp_path, 10)
-    assert out["band"] == "small" and out["roles"] == ["author", "setter", "fetcher", "referee"] and out["cap_usd"] == 2.0
+    assert out["band"] == "small" and out["roles"] == ["author", "setter", "fetcher", "referee"] and out["cap_usd"] == 4.5
     assert len(out["slug"]) == 8 and (d / "idea.json").exists() and (d / "bodies").is_dir()
     _, out2 = project(tmp_path / "b", 50)
     assert out2["band"] == "mid" and "skeptic" in out2["roles"] and "judge" in out2["roles"]

@@ -1,10 +1,13 @@
 # Validation stage settings. The human edits the numbers; the referee reads them.
 
 [budget]
-# stage total across every role and PIVOT pass, in USD
-usd = 8.0
+# stage total across every role and PIVOT pass, in USD. Measured on the
+# first real run (2026-09-18): a Fable author $0.87, setter $0.69, a Sonnet
+# fetcher $0.33; a PIVOT pass re-runs the author and setter and re-fetches
+# only what changed.
+usd = 12.0
 # the under-$20 path (author -> setter -> fetcher -> referee)
-usd_small = 2.0
+usd_small = 4.5
 
 [bands]
 # build budget bands, by the --build-usd named at invocation

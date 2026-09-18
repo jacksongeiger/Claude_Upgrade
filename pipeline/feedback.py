@@ -149,6 +149,13 @@ def main(argv=None):
     lines = inbox_text.splitlines()
     sections = parse_inbox(lines)
 
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import classify  # noqa: E402
+    workdir = str(Path(args.backlog).resolve().parent.parent)
+    existing_titles = {r.get("id"): r.get("title", "") for r in rows if r.get("status") == "open" and r.get("title")}
+    skipped_dupes = []
+    new_bullets = []
+
     touched_idxs = []
     for sec in sections:
         if sec["processed"] or not sec["bullets"]:
@@ -158,9 +165,22 @@ def main(argv=None):
             row = build_row(bullet, sec["heading"])
             if row["id"] in ids:
                 continue
+            # judgment behind the rules: a Haiku call decides the dimension
+            # and whether an open row already covers this; the keyword rule
+            # and the title hash stay as the fallback when it is unavailable
+            dim = classify.dimension(row["title"], workdir)
+            if dim:
+                row["dimension"] = dim
+                row["status"] = "open" if dim != "none" else "needs-human"
+            same = classify.duplicates(row["title"], existing_titles, workdir)
+            if same:
+                skipped_dupes.append((row["title"], same))
+                continue
             ids.add(row["id"])
             rows.append(row)
             added.append(row)
+            existing_titles[row["id"]] = row["title"]
+            new_bullets.append(row["title"])
 
     if args.sentry:
         entries = json.loads(Path(args.sentry).read_text(encoding="utf-8"))
@@ -175,6 +195,33 @@ def main(argv=None):
     print(f"added {len(added)} rows")
     for row in added:
         print(f"{row['id']} {row['title']}")
+    for title, same in skipped_dupes:
+        print(f"duplicate of {','.join(same)}: {title}")
+
+    # feedback against the validation verdict: an inbox item that contradicts
+    # an anchor or a kill number is a fact the retro must see
+    for vdir in sorted(Path(workdir).glob(".pipeline/validate/*/verdict.json")):
+        try:
+            verdict = json.loads(vdir.read_text(encoding="utf-8"))
+            claims = json.loads((vdir.parent / "claims.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        anchors = [c.get("statement", "") for c in claims.get("claims", []) if c.get("statement")]
+        if verdict.get("overruled"):
+            o = verdict["overruled"]
+            anchors.append(f"overrule: {o.get('reason')} ({o.get('measure')} {o.get('direction')} {o.get('kill_value')})")
+        found = classify.contradictions(new_bullets, anchors, workdir) if new_bullets else []
+        if found:
+            out = vdir.parent / "feedback-check.json"
+            prior = []
+            if out.exists():
+                try:
+                    prior = json.loads(out.read_text(encoding="utf-8")).get("contradictions", [])
+                except (OSError, ValueError):
+                    prior = []
+            out.write_text(json.dumps({"contradictions": prior + found}, indent=2) + "\n", encoding="utf-8")
+            for c in found:
+                print(f"contradicts validation ({c.get('anchor')}): {c.get('bullet')}")
 
     if args.dry_run:
         return 0

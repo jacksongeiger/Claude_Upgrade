@@ -31,6 +31,8 @@ PROJECT=$(cd "$PROJECT" && pwd -P)
 PIPE="$PROJECT/.pipeline"; mkdir -p "$PIPE"
 LOG="$PIPE/events.log"
 note() { printf '%s validate %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >> "$LOG"; echo "validate: $*" >&2; }
+finish() { echo "$DIR"; exit "$1"; }   # the directory is the last line of stdout on every exit
+prev() { for f in "$@"; do [ -f "$DIR/$f" ] && mv -f "$DIR/$f" "$DIR/$f.prev"; done; return 0; }
 
 # ---- init ----------------------------------------------------------------
 INIT=$(python3 "$KIT/validate.py" init --project "$PROJECT" --idea "$IDEA" --build-usd "$BUILD" --toml "$TOML") || { echo "$INIT"; exit 1; }
@@ -61,12 +63,13 @@ child() {  # child ROLE PROMPT MODEL CEILING TURNS [--sub ...]
     if python3 -c "import sys; sys.exit(0 if $left < 0.25 else 1)"; then
         note "cap reached before $role (spent \$$(spent) of \$$CAP)"; return 90
     fi
+    prev "${ROLE_FILES[$role]:-}"
     local budget; budget=$(python3 -c "print(min($ceil, $left))")
     note "$role model=$model budget=\$$budget"
     bash "$KIT/child.sh" --project "$PROJECT" --prompt "$prompt" --stage "validate:$SLUG:$role" \
         --budget "$budget" --model "$model" --turns "$turns" --timeout-min 20 \
         --sub "KIT=$KIT" --sub "DIR=$DIR" --sub "IDEA=$IDEA" --sub "BUILD_USD=$BUILD" --sub "BAND=$BAND" \
-        --sub "BAND_RULE=$BAND_RULE" --sub-file "REACHABLE=$DIR/reachable.txt" "$@" > "$DIR/$role.run" 2>>"$DIR/driver.log"
+        --sub "BAND_RULE=$BAND_RULE" --sub-file "REACHABLE=$DIR/reachable.txt" --sub "PREVIOUS=$PREVIOUS" "$@" > "$DIR/$role.run" 2>>"$DIR/driver.log"
     local rc=$?
     note "$role rc=$rc cost=\$$(spent) total"
     return $rc
@@ -78,50 +81,51 @@ python3 "$KIT/fetch.py" probe --out "$DIR/reachable.json" > "$DIR/probe.out" 2>>
 jq -r '.hosts | to_entries[] | "\(.key): \(if .value.reachable then "reachable" else "BLOCKED (" + (.value.reason // "?") + ")" end)"' "$DIR/reachable.json" > "$DIR/reachable.txt" 2>/dev/null || echo "probe failed" > "$DIR/reachable.txt"
 note "probe: $(jq -r '[.hosts[] | select(.reachable)] | length' "$DIR/reachable.json" 2>/dev/null || echo 0) hosts reachable"
 
+declare -A ROLE_FILES=([author]="claims.json" [setter]="plan.json" [skeptic]="skeptic.json" [fetcher]="" [judge]="judge.json")
 MODEL_AUTHOR=$(tomlget roles author); MODEL_SETTER=$(tomlget roles setter); MODEL_SKEPTIC=$(tomlget roles skeptic)
 MODEL_FETCHER=$(tomlget roles fetcher); MODEL_JUDGE=$(tomlget roles judge)
 CAP_AUTHOR=$(tomlget caps author); CAP_SETTER=$(tomlget caps setter); CAP_SKEPTIC=$(tomlget caps skeptic)
 CAP_FETCHER=$(tomlget caps fetcher); CAP_JUDGE=$(tomlget caps judge)
 
-PIVOTS=0; PREVIOUS="none"
+PIVOTS=0; PREVIOUS="none (first pass)"
 while :; do
     # 1. author
-    rm -f "$DIR/claims.json"
-    child author "$KIT/prompts/validate-author.md" "$MODEL_AUTHOR" "$CAP_AUTHOR" 12 --sub "PREVIOUS=$PREVIOUS"; rc=$?
-    [ "$rc" = 90 ] && exit 3
+    child author "$KIT/prompts/validate-author.md" "$MODEL_AUTHOR" "$CAP_AUTHOR" 12; rc=$?
+    [ "$rc" = 90 ] && finish 3
     if ! schema claims; then
         note "claims.json failed its schema once; one retry"
-        child author "$KIT/prompts/validate-author.md" "$MODEL_AUTHOR" "$CAP_AUTHOR" 12 --sub "PREVIOUS=$PREVIOUS (the previous attempt failed the schema check; read the problems in $DIR/driver.log)"
-        schema claims || { note "claims.json failed its schema twice"; exit 3; }
+        child author "$KIT/prompts/validate-author.md" "$MODEL_AUTHOR" "$CAP_AUTHOR" 12 --sub "RETRY=the previous attempt failed the schema check; read the problems in $DIR/driver.log"
+        schema claims || { note "claims.json failed its schema twice"; finish 3; }
     fi
     # 2. setter
-    rm -f "$DIR/plan.json"
     child setter "$KIT/prompts/validate-setter.md" "$MODEL_SETTER" "$CAP_SETTER" 12; rc=$?
-    [ "$rc" = 90 ] && exit 3
-    schema plan || { child setter "$KIT/prompts/validate-setter.md" "$MODEL_SETTER" "$CAP_SETTER" 12; schema plan || { note "plan.json failed its schema twice"; exit 3; }; }
+    [ "$rc" = 90 ] && finish 3
+    schema plan || { child setter "$KIT/prompts/validate-setter.md" "$MODEL_SETTER" "$CAP_SETTER" 12; schema plan || { note "plan.json failed its schema twice"; finish 3; }; }
     # 3. skeptic (not on the small band)
-    rm -f "$DIR/skeptic.json" "$DIR/skeptic.md"
+    prev skeptic.md
     if [ "$BAND" != "small" ]; then
         python3 "$KIT/validate.py" redact --dir "$DIR" >/dev/null
         child skeptic "$KIT/prompts/validate-skeptic.md" "$MODEL_SKEPTIC" "$CAP_SKEPTIC" 12; rc=$?
-        [ "$rc" = 90 ] && exit 3
-        schema skeptic || { child skeptic "$KIT/prompts/validate-skeptic.md" "$MODEL_SKEPTIC" "$CAP_SKEPTIC" 12; schema skeptic || { note "skeptic.json failed its schema twice"; exit 3; }; }
+        [ "$rc" = 90 ] && finish 3
+        schema skeptic || { child skeptic "$KIT/prompts/validate-skeptic.md" "$MODEL_SKEPTIC" "$CAP_SKEPTIC" 12; schema skeptic || { note "skeptic.json failed its schema twice"; finish 3; }; }
+    else
+        rm -f "$DIR/skeptic.json"
     fi
     # 4. freeze (script)
     FR=$(python3 "$KIT/validate.py" freeze --dir "$DIR"); frc=$?
     echo "$FR" >> "$DIR/driver.log"
-    [ "$frc" = 0 ] || { note "freeze refused: $(jq -c .problems <<<"$FR")"; exit 3; }
-    # 5. fetcher (read-only plan; the sha is checked after)
-    rm -f "$DIR/ledger.jsonl"
+    [ "$frc" = 0 ] || { note "freeze refused: $(jq -c .problems <<<"$FR")"; finish 3; }
+    # 5. fetcher (read-only plan; the sha is checked after). On a PIVOT pass
+    # the ledger is kept: rows for unchanged sources are reused, not re-bought.
+    [ "$PIVOTS" = 0 ] && rm -f "$DIR/ledger.jsonl"
     child fetcher "$KIT/prompts/validate-fetcher.md" "$MODEL_FETCHER" "$CAP_FETCHER" 60; rc=$?
-    [ "$rc" = 90 ] && exit 3
-    python3 "$KIT/validate.py" check-frozen --dir "$DIR" | jq -e .ok >/dev/null || { note "frozen plan edited by the fetcher"; exit 2; }
-    [ -s "$DIR/ledger.jsonl" ] || { note "fetcher wrote no ledger rows"; exit 4; }
+    [ "$rc" = 90 ] && finish 3
+    python3 "$KIT/validate.py" check-frozen --dir "$DIR" | jq -e .ok >/dev/null || { note "frozen plan edited by the fetcher"; finish 2; }
+    [ -s "$DIR/ledger.jsonl" ] || { note "fetcher wrote no ledger rows"; finish 4; }
     # 6. judge (not on the small band)
-    rm -f "$DIR/judge.json"
     if [ "$BAND" != "small" ]; then
         child judge "$KIT/prompts/validate-judge.md" "$MODEL_JUDGE" "$CAP_JUDGE" 30; rc=$?
-        [ "$rc" = 90 ] && exit 3
+        [ "$rc" = 90 ] && finish 3
         schema judge || { child judge "$KIT/prompts/validate-judge.md" "$MODEL_JUDGE" "$CAP_JUDGE" 30; schema judge || note "judge.json failed its schema twice; scoring without it"; }
     fi
     # 7. referee (script)
@@ -134,6 +138,5 @@ while :; do
         note "PIVOT $PIVOTS: re-running the author with the ledger"
         continue
     fi
-    echo "$DIR"
-    exit "$vrc"
+    finish "$vrc"
 done

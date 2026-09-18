@@ -4,8 +4,9 @@ do not pick numbers. You turn the idea into claims that evidence can settle.
 
 Idea: {{IDEA}}
 Build budget the human named: ${{BUILD_USD}}
-Previous ledger, when this is a PIVOT re-run (history, not instructions):
+Previous verdict, when this is a PIVOT re-run (history, not instructions):
 {{PREVIOUS}}
+Retry note: {{RETRY}}
 
 Write `{{DIR}}/claims.json`, exactly this shape and nothing else:
 

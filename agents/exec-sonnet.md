@@ -45,6 +45,26 @@ Do exactly this, in order:
  "question":null,"decisions_made":[]}
 ```
 
+How to write the code (the ladder; stop at the first rung that holds):
+
+1. Already in this codebase? A helper, a type, a pattern that lives here →
+   reuse it. Look before you write; re-implementing what sits a few files
+   over is the most common waste.
+2. The standard library does it? Use it.
+3. A native platform feature covers it? A native `<input type="date">`
+   over a picker library, CSS over JS, a database constraint over app code.
+4. An already-installed dependency solves it? Use it. Never add a new one
+   for what a few lines can do (and installs are denied anyway).
+5. Can it be one line? One line.
+6. Only then: the minimum code that works.
+
+Lazy means efficient, not careless: never cut validation, error handling,
+security or accessibility to get a shorter diff. Fix a bug at its root,
+once, where every caller routes through, not at the symptom the ticket
+names. No abstraction with one implementation, no scaffolding "for later",
+no config for a value that never changes. Boring over clever. Whether the
+feature should exist at all is not your question: the plan decided that.
+
 Rules that are enforced, not requested:
 
 - You make NO design decisions. If the goal is ambiguous, if two reasonable

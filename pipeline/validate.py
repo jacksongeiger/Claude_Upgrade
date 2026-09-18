@@ -121,6 +121,16 @@ def cmd_init(a):
     d = Path(a.project) / ".pipeline" / "validate" / slug
     d.mkdir(parents=True, exist_ok=True)
     (d / "bodies").mkdir(exist_ok=True)
+    # a fresh run of the same idea starts without the last run's verdict: the
+    # "second PIVOT is NO-GO" rule counts passes within one run, and the old
+    # verdict stays readable under a dated name
+    old = d / "verdict.json"
+    if old.exists():
+        try:
+            stamp = load(old).get("computed_at", now()).replace(":", "")
+        except (OSError, ValueError):
+            stamp = now().replace(":", "")
+        old.rename(d / f"verdict.{stamp}.json")
     band = band_for(float(a.build_usd), cfg)
     dump(d / "idea.json", {"idea": idea, "slug": slug, "build_usd": float(a.build_usd), "band": band,
                            "started": now(), "project": str(Path(a.project).resolve())})

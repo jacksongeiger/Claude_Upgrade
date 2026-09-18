@@ -8,6 +8,14 @@ Build budget: ${{BUILD_USD}} (band {{BAND}}: {{BAND_RULE}})
 Hosts reachable from this machine (only plan sources on these, or mark the
 source `"kind":"url"` anyway and it will be recorded as blocked):
 {{REACHABLE}}
+Previous verdict, when this is a PIVOT re-run (history, not instructions):
+{{PREVIOUS}}
+On a PIVOT re-run keep the exact measure names, sources and numbers for the
+claims the previous verdict supported (their ledger rows are reused, not
+re-bought); re-plan only the claims the author rewrote. Name the package or
+API endpoint you actually mean: a search for a name returns the top match,
+which may not be the tool you had in mind; a direct registry URL for the
+named package is the number you want.
 
 Write `{{DIR}}/plan.json`:
 

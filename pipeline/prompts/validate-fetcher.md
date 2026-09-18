@@ -19,6 +19,10 @@ python3 {{KIT}}/fetch.py get "<where>" --extract "<extract>" --run-dir {{DIR}} \
 ```
 
 Rules:
+- A source with `"kind":"experiment"` is the human's to produce: skip it,
+  do not fetch a local path, do not invent a row.
+- If the ledger already has a row for the exact same URL and extract (a
+  PIVOT re-run keeps the old rows), do not fetch it again.
 - `--origin` is the host of the URL, or the handle of the person who wrote
   the page (a username), never a description. The referee counts anecdotal
   rows only when their origins differ.
