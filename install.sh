@@ -4,7 +4,10 @@
 # Usage:
 #   ./install.sh                           Install global kit (CLAUDE.md + commands + SessionStart hook).
 #   ./install.sh --project /path/to/repo   Install the pre-push hook into that repo's .git/hooks/.
-#   ./install.sh --plugins                 Print the recommended /plugin install commands to copy into Claude Code.
+#   ./install.sh --plugins                 Install the recommended plugins (--plugins --dry-run just prints them).
+#   ./install.sh --discovery               Install the rdx resource-discovery system (venv, index, hooks, statusline).
+#   ./install.sh --discovery-uninstall     Remove the rdx hooks and statusline (leaves the index on disk).
+#   ./install.sh --discovery-off           Disable rdx without uninstalling it.
 #
 # Re-runnable: skips links that already point to the right place, replaces
 # stale symlinks, and refuses to overwrite real files. The SessionStart hook
@@ -54,39 +57,44 @@ install_hook_into_project() {
     echo "✓ installed pre-push hook into $project"
 }
 
-print_plugin_commands() {
-    cat <<'EOF'
-Recommended plugins (run these inside Claude Code — plugin installs require Claude Code's plugin system, so they cannot be auto-run from a shell):
+RECOMMENDED_PLUGINS="feature-dev commit-commands playwright serena code-simplifier"
 
-/plugin install feature-dev@claude-plugins-official
-/plugin install commit-commands@claude-plugins-official
-/plugin install playwright@claude-plugins-official
-/plugin install serena@claude-plugins-official
-/plugin install code-simplifier@claude-plugins-official
+# Install the recommended plugins.
+#
+# CORRECTION (v1.10): the v1.9 note claiming plugin installs "cannot be
+# auto-run from a shell" is no longer true. `claude plugin install` has been a
+# non-interactive CLI since Claude Code 2.1.x, with --scope, -y and --json.
+# We still fall back to printing when the CLI is missing or too old.
+install_plugins() {
+    local dry_run="${1:-}"
 
-See PLUGINS.md in this repo for the full inventory (currently installed, recommended, and skipped).
-EOF
+    if [ -n "$dry_run" ] || ! command -v claude >/dev/null 2>&1; then
+        [ -n "$dry_run" ] || echo "claude CLI not found — printing commands instead:"
+        echo ""
+        for p in $RECOMMENDED_PLUGINS; do
+            echo "claude plugin install $p@claude-plugins-official --scope user"
+        done
+        echo ""
+        echo "See PLUGINS.md for the full inventory."
+        return 0
+    fi
+
+    echo "Adding the official marketplace (idempotent)…"
+    claude plugin marketplace add anthropics/claude-plugins-official >/dev/null 2>&1 || true
+
+    local ok=0 bad=0
+    for p in $RECOMMENDED_PLUGINS; do
+        if claude plugin install "$p@claude-plugins-official" --scope user -y >/dev/null 2>&1; then
+            echo "  ✓ $p"
+            ok=$((ok + 1))
+        else
+            echo "  ✗ $p (install failed — try manually)"
+            bad=$((bad + 1))
+        fi
+    done
+    echo ""
+    echo "$ok installed, $bad failed. See PLUGINS.md for the full inventory."
 }
-
-if [ "${1:-}" = "--project" ]; then
-    install_hook_into_project "${2:-}"
-    exit 0
-fi
-
-if [ "${1:-}" = "--plugins" ]; then
-    print_plugin_commands
-    exit 0
-fi
-
-echo "Installing Claude_Upgrade from $REPO_DIR"
-echo ""
-
-if mkdir -p "$COMMANDS_DIR"; then
-    echo "✓ Ensured $COMMANDS_DIR exists"
-else
-    echo "✗ Failed to create $COMMANDS_DIR"
-    exit 1
-fi
 
 failures=0
 
@@ -115,29 +123,26 @@ link() {
     fi
 }
 
-# Global CLAUDE.md
-link "$REPO_DIR/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md"
-
-# Each command file
-for cmd in "$REPO_DIR/commands/"*.md; do
-    [ -f "$cmd" ] || continue
-    link "$cmd" "$COMMANDS_DIR/$(basename "$cmd")"
-done
-
-# Register the SessionStart hook into ~/.claude/settings.json.
+# Register one hook event from hooks/hooks.json into ~/.claude/settings.json.
+#
 # Reads hooks/hooks.json, substitutes __REPO_DIR__ with the actual repo path,
-# then merges the SessionStart entry into settings.json under .hooks.SessionStart.
-# Dedupe-safe: any existing entry pointing at our session-start.sh is replaced.
-register_session_hook() {
-    local hook_script="$REPO_DIR/hooks/session-start.sh"
+# then merges that event's entry into settings.json under .hooks.<EVENT>.
+# Dedupe-safe: any existing entry pointing at the same command path is replaced.
+#
+# Generalized from the original SessionStart-only version so the discovery
+# system can register UserPromptSubmit through the identical code path rather
+# than a second, divergent copy of the jq merge.
+register_hook() {
+    local event="$1"
+    local hook_script="$2"
     local hook_template="$REPO_DIR/hooks/hooks.json"
 
     if ! command -v jq >/dev/null 2>&1; then
-        echo "⚠ jq not available — skipping SessionStart hook registration"
+        echo "⚠ jq not available — skipping $event hook registration"
         return 0
     fi
     if [ ! -f "$hook_template" ]; then
-        echo "⚠ $hook_template missing — skipping SessionStart hook registration"
+        echo "⚠ $hook_template missing — skipping $event hook registration"
         return 0
     fi
 
@@ -155,31 +160,224 @@ register_session_hook() {
     }
 
     local new_entry
-    new_entry=$(echo "$resolved" | jq '.hooks.SessionStart[0]') || {
-        echo "✗ failed to extract SessionStart entry from $hook_template"
+    new_entry=$(echo "$resolved" | jq --arg ev "$event" '.hooks[$ev][0]') || {
+        echo "✗ failed to extract $event entry from $hook_template"
         failures=$((failures + 1))
         return 1
     }
+    if [ "$new_entry" = "null" ] || [ -z "$new_entry" ]; then
+        echo "✗ no $event entry in $hook_template"
+        failures=$((failures + 1))
+        return 1
+    fi
 
     local tmp
     tmp=$(mktemp)
-    if jq --arg cmd "$hook_script" --argjson entry "$new_entry" '
+    if jq --arg cmd "$hook_script" --arg ev "$event" --argjson entry "$new_entry" '
         .hooks = (.hooks // {})
-        | .hooks.SessionStart = ((.hooks.SessionStart // [])
+        | .hooks[$ev] = ((.hooks[$ev] // [])
             | map(select((.hooks // []) | all(.command != $cmd))))
-        | .hooks.SessionStart += [$entry]
+        | .hooks[$ev] += [$entry]
     ' "$SETTINGS_FILE" > "$tmp"; then
         mv "$tmp" "$SETTINGS_FILE"
-        echo "✓ registered SessionStart hook in $SETTINGS_FILE"
+        echo "✓ registered $event hook in $SETTINGS_FILE"
     else
         rm -f "$tmp"
-        echo "✗ failed to merge SessionStart hook into $SETTINGS_FILE"
+        echo "✗ failed to merge $event hook into $SETTINGS_FILE"
         failures=$((failures + 1))
     fi
 }
 
-register_session_hook
+# Remove a hook entry by command path. Backs --discovery-uninstall, and closes
+# the "no --uninstall mode yet" gap noted in the v1.6 CHANGELOG entry.
+unregister_hook() {
+    local event="$1"
+    local hook_script="$2"
 
+    command -v jq >/dev/null 2>&1 || return 0
+    [ -f "$SETTINGS_FILE" ] || return 0
+
+    local tmp
+    tmp=$(mktemp)
+    if jq --arg cmd "$hook_script" --arg ev "$event" '
+        if .hooks[$ev] then
+          .hooks[$ev] = (.hooks[$ev]
+            | map(select((.hooks // []) | all(.command != $cmd))))
+        else . end
+    ' "$SETTINGS_FILE" > "$tmp"; then
+        mv "$tmp" "$SETTINGS_FILE"
+        echo "✓ unregistered $event hook ($hook_script)"
+    else
+        rm -f "$tmp"
+    fi
+}
+
+# --------------------------------------------------------------------------
+# rdx — resource discovery
+# --------------------------------------------------------------------------
+
+DISCOVERY_DIR="$REPO_DIR/discovery"
+SUGGEST_HOOK="$REPO_DIR/hooks/resource-suggest.sh"
+OBSERVE_HOOK="$REPO_DIR/hooks/tool-observe.sh"
+RDX_STATE="$HOME/.claude/rdx"
+
+install_discovery() {
+    echo "Installing rdx (resource discovery) from $DISCOVERY_DIR"
+    echo ""
+
+    command -v python3 >/dev/null 2>&1 || {
+        echo "✗ python3 not found"; exit 1; }
+
+    # FTS5 is non-negotiable and macOS system Python sometimes ships without
+    # it. Fail here, loudly, rather than inside a hook that must stay silent.
+    if ! python3 -c "import sqlite3; sqlite3.connect(':memory:').execute('CREATE VIRTUAL TABLE t USING fts5(a)')" 2>/dev/null; then
+        echo "✗ this python3's sqlite3 has no FTS5 support."
+        echo "  Fix: install Homebrew python3 (brew install python) and re-run,"
+        echo "  or point PATH at a python3 whose sqlite3 was built with FTS5."
+        exit 1
+    fi
+    echo "✓ FTS5 available"
+
+    if [ ! -x "$DISCOVERY_DIR/venv/bin/python" ]; then
+        python3 -m venv "$DISCOVERY_DIR/venv" || { echo "✗ venv failed"; exit 1; }
+        echo "✓ created venv"
+    fi
+    "$DISCOVERY_DIR/venv/bin/pip" install --quiet --disable-pip-version-check \
+        -r "$DISCOVERY_DIR/requirements.txt" || {
+        echo "✗ dependency install failed"; exit 1; }
+    echo "✓ dependencies installed"
+
+    mkdir -p "$RDX_STATE"
+    "$DISCOVERY_DIR/rdx.sh" init || { echo "✗ rdx init failed"; exit 1; }
+
+    mkdir -p "$HOME/.local/bin"
+    link "$DISCOVERY_DIR/rdx.sh" "$HOME/.local/bin/rdx"
+
+    chmod +x "$SUGGEST_HOOK" 2>/dev/null || true
+    register_hook UserPromptSubmit "$SUGGEST_HOOK"
+    chmod +x "$OBSERVE_HOOK" 2>/dev/null || true
+    register_hook PostToolUse "$OBSERVE_HOOK"
+
+    # Statusline: the only always-visible surface Claude Code exposes.
+    if command -v jq >/dev/null 2>&1; then
+        local tmp
+        tmp=$(mktemp)
+        if jq --arg cmd "$DISCOVERY_DIR/rdx.sh statusline" '
+            .statusLine = {type: "command", command: $cmd, refreshInterval: 10}
+        ' "$SETTINGS_FILE" > "$tmp"; then
+            mv "$tmp" "$SETTINGS_FILE"
+            echo "✓ registered statusline in $SETTINGS_FILE"
+        else
+            rm -f "$tmp"
+        fi
+    fi
+
+    echo ""
+    echo "Installed, and GLOBAL: the hooks live in ~/.claude/settings.json and"
+    echo "the index in ~/.claude/rdx, so rdx applies to every project you open."
+    echo "There is nothing to install per-project."
+    echo ""
+    echo "It starts in SHADOW MODE, enforced by the default config rather than"
+    echo "by convention: it evaluates every prompt and logs the decision, but"
+    echo "injects nothing until you run \`rdx on\`."
+    echo ""
+    echo "Thresholds ship calibrated against a 123-case labelled corpus:"
+    echo "precision 0.905, recall 0.679. \`rdx mine\` refines them on your own"
+    echo "history, which is what you should actually trust."
+    echo ""
+    echo "Next:"
+    echo "  rdx sync                 # build the index (~3 min for a full crawl)"
+    echo "  rdx scan                 # exclude what you already have installed"
+    echo "  rdx schedule             # keep it fresh nightly (launchd/cron)"
+    echo "  rdx mine                 # build the gate corpus from your transcripts"
+    echo "  rdx eval --all           # safety + discovery + gate"
+    echo "  rdx search \"is there an mcp for linear\"   # see a would-be envelope"
+    echo ""
+    chmod +x "$REPO_DIR/loop/run.sh" "$REPO_DIR/loop/hooks/"*.sh "$REPO_DIR/loop/statusline.sh" \
+             "$REPO_DIR/pipeline/"*.sh "$REPO_DIR/pipeline/hooks/"*.sh 2>/dev/null || true
+    echo "Watch it in shadow for a few days (\`rdx stats\`), then \`rdx on\`."
+    echo ""
+    echo "Nightshift (the unattended improvement loop) is installed alongside:"
+    echo "  /jg-loop init      # once per project, with you present"
+    echo "  /jg-loop dryrun    # one supervised iteration before any unattended run"
+    echo "The project pipeline (idea → Nightshift): /jg-spec, /jg-tools, /jg-build,"
+    echo "  /jg-ux, /jg-ship, /jg-feedback — see pipeline/README.md."
+    echo "\`rdx status\` answers 'is it on and is it fresh'. /ard drives it all"
+    echo "from inside Claude."
+}
+
+uninstall_discovery() {
+    unregister_hook UserPromptSubmit "$SUGGEST_HOOK"
+    unregister_hook PostToolUse "$OBSERVE_HOOK"
+    if command -v jq >/dev/null 2>&1 && [ -f "$SETTINGS_FILE" ]; then
+        local tmp
+        tmp=$(mktemp)
+        if jq 'del(.statusLine)' "$SETTINGS_FILE" > "$tmp"; then
+            mv "$tmp" "$SETTINGS_FILE"
+            echo "✓ removed statusline"
+        else
+            rm -f "$tmp"
+        fi
+    fi
+    [ -L "$HOME/.local/bin/rdx" ] && rm "$HOME/.local/bin/rdx" && echo "✓ removed rdx shim"
+    echo ""
+    echo "rdx hooks removed. The index at $RDX_STATE was left in place;"
+    echo "delete it manually if you want the data gone too."
+}
+
+if [ "${1:-}" = "--project" ]; then
+    install_hook_into_project "${2:-}"
+    exit 0
+fi
+
+if [ "${1:-}" = "--plugins" ]; then
+    install_plugins "${2:-}"
+    exit 0
+fi
+
+case "${1:-}" in
+    --discovery)           DISCOVERY_MODE=install ;;
+    --discovery-uninstall) DISCOVERY_MODE=uninstall ;;
+    --discovery-off)
+        mkdir -p "$HOME/.claude/rdx"
+        touch "$HOME/.claude/rdx/DISABLED"
+        echo "✓ rdx disabled (delete $HOME/.claude/rdx/DISABLED to re-enable)"
+        exit 0
+        ;;
+esac
+
+if [ -z "${DISCOVERY_MODE:-}" ]; then
+    echo "Installing Claude_Upgrade from $REPO_DIR"
+    echo ""
+fi
+
+if [ "${DISCOVERY_MODE:-}" = "uninstall" ]; then
+    uninstall_discovery
+    exit 0
+fi
+
+if mkdir -p "$COMMANDS_DIR"; then
+    echo "✓ Ensured $COMMANDS_DIR exists"
+else
+    echo "✗ Failed to create $COMMANDS_DIR"
+    exit 1
+fi
+
+# Global CLAUDE.md
+link "$REPO_DIR/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md"
+
+# Each command file
+for cmd in "$REPO_DIR/commands/"*.md; do
+    [ -f "$cmd" ] || continue
+    link "$cmd" "$COMMANDS_DIR/$(basename "$cmd")"
+done
+
+register_hook SessionStart "$REPO_DIR/hooks/session-start.sh"
+
+if [ "${DISCOVERY_MODE:-}" = "install" ]; then
+    install_discovery
+    exit $?
+fi
 echo ""
 if [ "$failures" -eq 0 ]; then
     echo "Done. All links in place."
@@ -187,8 +385,11 @@ if [ "$failures" -eq 0 ]; then
     echo "To install the pre-push hook into a project:"
     echo "  $REPO_DIR/install.sh --project /path/to/your/project"
     echo ""
-    echo "To print the recommended /plugin install commands:"
+    echo "To install the recommended plugins:"
     echo "  $REPO_DIR/install.sh --plugins"
+    echo ""
+    echo "To install the resource-discovery system (rdx):"
+    echo "  $REPO_DIR/install.sh --discovery"
 else
     echo "Done with $failures failure(s). See messages above."
     exit 1

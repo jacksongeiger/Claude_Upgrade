@@ -1,0 +1,835 @@
+[
+  {
+    "id": "plan-owns-pinned-corpus",
+    "kind": "check_plan",
+    "note": "2026-09-18: the ARD eval's corpus sat in the worktree; an executor owning it could relabel seven cases and raise recall to 1.0. The judge is not the executor's to edit.",
+    "files": [
+      "discovery/corpora/gate.starter.yaml",
+      "discovery/rdx/loopscore.py"
+    ],
+    "config": {
+      "scorers": [
+        {
+          "name": "rdx-eval",
+          "script": "cmd",
+          "cmd": "cd discovery && python -m rdx.loopscore",
+          "pins": [
+            "discovery/rdx/loopscore.py",
+            "discovery/corpora/*.yaml"
+          ]
+        }
+      ]
+    },
+    "plan": {
+      "iter": 1,
+      "task_ids": [
+        "bl-1"
+      ],
+      "decisions": [],
+      "subtasks": [
+        {
+          "id": "t-1a",
+          "row": "bl-1",
+          "goal": "raise gate recall",
+          "acceptance_cmd": "pytest -q",
+          "owned_paths": [
+            "discovery/corpora/gate.starter.yaml"
+          ],
+          "hard": false,
+          "model": "sonnet",
+          "worktree": "/abs/.loop/wt/t-1a",
+          "branch": "loop/x/t-1a"
+        }
+      ]
+    },
+    "expect": "reject",
+    "reject_match": "pinned scorer file"
+  },
+  {
+    "id": "plan-owns-ordinary-file",
+    "kind": "check_plan",
+    "note": "the deny must not catch ordinary source files next to a pinned one",
+    "files": [
+      "discovery/corpora/gate.starter.yaml",
+      "discovery/rdx/retrieve.py",
+      "discovery/rdx/funnels/npm.py"
+    ],
+    "config": {
+      "scorers": [
+        {
+          "name": "rdx-eval",
+          "script": "cmd",
+          "cmd": "cd discovery && python -m rdx.loopscore",
+          "pins": [
+            "discovery/rdx/loopscore.py",
+            "discovery/corpora/*.yaml"
+          ]
+        }
+      ]
+    },
+    "plan": {
+      "iter": 1,
+      "task_ids": [
+        "bl-1"
+      ],
+      "decisions": [],
+      "subtasks": [
+        {
+          "id": "t-1a",
+          "row": "bl-1",
+          "goal": "widen the npm funnel's keyword list",
+          "acceptance_cmd": "pytest -q",
+          "owned_paths": [
+            "discovery/rdx/funnels/npm.py"
+          ],
+          "hard": false,
+          "model": "sonnet",
+          "worktree": "/abs/.loop/wt/t-1a",
+          "branch": "loop/x/t-1a"
+        }
+      ]
+    },
+    "expect": "ok"
+  },
+  {
+    "id": "stale-persona-finding-closed-by-clean-walkthrough",
+    "kind": "ux_supersede",
+    "note": "2026-09-17: Nightshift spent its one iteration on a finding from before the driver's selector fix. A clean walkthrough of the same task closes it (the name rule, with the model off).",
+    "open_rows": [
+      {
+        "id": "ux-f176cde0",
+        "title": "could not type into the Title box",
+        "dimension": "persona",
+        "source": "persona",
+        "status": "open",
+        "rung": 1,
+        "est": "S",
+        "attempts": 0,
+        "iter_added": 0,
+        "note": "task \"Create a note titled groceries with the body milk, eggs and see it in the list\""
+      },
+      {
+        "id": "ux-other",
+        "title": "dark mode toggle hidden",
+        "dimension": "persona",
+        "source": "persona",
+        "status": "open",
+        "rung": 1,
+        "est": "S",
+        "attempts": 0,
+        "iter_added": 0,
+        "note": "task \"Turn on dark mode\""
+      }
+    ],
+    "run": {
+      "result": {
+        "status": "complete",
+        "steps": 4
+      },
+      "findings": {
+        "dead_ends": [],
+        "confusions": []
+      }
+    },
+    "task": "Create a note titled groceries with the body milk, eggs and see it in the list",
+    "expect_done": [
+      "ux-f176cde0"
+    ],
+    "expect_open": [
+      "ux-other"
+    ]
+  },
+  {
+    "id": "freeze-takes-the-stricter-number",
+    "kind": "freeze",
+    "note": "2026-09-18 review: the author must not set its own bar; the skeptic's stricter number wins per measure, the setter's stands when it is the stricter one.",
+    "claims": {
+      "claims": [
+        {
+          "id": "c1",
+          "core": true,
+          "who": "developers",
+          "pain": "changelogs go stale",
+          "statement": "developers want a generated changelog",
+          "metric_hint": "downloads"
+        },
+        {
+          "id": "c2",
+          "core": false,
+          "who": "maintainers",
+          "pain": "release notes take an hour",
+          "statement": "existing tools require conventional commits",
+          "metric_hint": "issues"
+        },
+        {
+          "id": "c3",
+          "core": false,
+          "who": "teams",
+          "pain": "nobody reads it",
+          "statement": "people describe the pain in public",
+          "metric_hint": "posts"
+        }
+      ]
+    },
+    "plan": {
+      "claims": [
+        {
+          "id": "c1",
+          "measures": [
+            {
+              "name": "downloads",
+              "unit": "downloads/month",
+              "direction": "min",
+              "kill_value": 10000,
+              "sources": [
+                {
+                  "kind": "url",
+                  "where": "https://registry.npmjs.org/-/v1/search?text=x",
+                  "extract": "json:objects[0].downloads.monthly"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "c2",
+          "measures": [
+            {
+              "name": "issues",
+              "unit": "issues",
+              "direction": "min",
+              "kill_value": 5,
+              "sources": [
+                {
+                  "kind": "url",
+                  "where": "https://example.test/i",
+                  "extract": "json:total"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "c3",
+          "measures": [
+            {
+              "name": "latency",
+              "unit": "ms",
+              "direction": "max",
+              "kill_value": 300,
+              "sources": [
+                {
+                  "kind": "url",
+                  "where": "https://example.test/l",
+                  "extract": "json:ms"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "skeptic": {
+      "claims": [
+        {
+          "id": "c1",
+          "kill_numbers": {
+            "downloads": 50000
+          },
+          "added_measures": [],
+          "disconfirming_sources": [
+            {
+              "where": "https://example.test/a"
+            },
+            {
+              "where": "https://example.test/b"
+            }
+          ]
+        },
+        {
+          "id": "c2",
+          "kill_numbers": {
+            "issues": 2
+          },
+          "added_measures": [],
+          "disconfirming_sources": [
+            {
+              "where": "https://example.test/c"
+            },
+            {
+              "where": "https://example.test/d"
+            }
+          ]
+        },
+        {
+          "id": "c3",
+          "kill_numbers": {
+            "latency": 100
+          },
+          "added_measures": [],
+          "disconfirming_sources": [
+            {
+              "where": "https://example.test/e"
+            },
+            {
+              "where": "https://example.test/f"
+            }
+          ]
+        }
+      ]
+    },
+    "expect_kill": {
+      "c1/downloads": 50000,
+      "c2/issues": 5,
+      "c3/latency": 100
+    }
+  },
+  {
+    "id": "blocked-host-is-infra-not-no-go",
+    "kind": "verdict",
+    "note": "2026-09-18 review: a cloud session cannot reach forums; a required source blocked here must not bury an idea in DEAD_ENDS.",
+    "band_usd": 50,
+    "claims": {
+      "claims": [
+        {
+          "id": "c1",
+          "core": true,
+          "who": "developers",
+          "pain": "changelogs go stale",
+          "statement": "developers want a generated changelog",
+          "metric_hint": "downloads"
+        },
+        {
+          "id": "c2",
+          "core": false,
+          "who": "maintainers",
+          "pain": "release notes take an hour",
+          "statement": "existing tools require conventional commits",
+          "metric_hint": "issues"
+        },
+        {
+          "id": "c3",
+          "core": false,
+          "who": "teams",
+          "pain": "nobody reads it",
+          "statement": "people describe the pain in public",
+          "metric_hint": "posts"
+        }
+      ]
+    },
+    "plan": {
+      "claims": [
+        {
+          "id": "c1",
+          "measures": [
+            {
+              "name": "downloads",
+              "unit": "downloads/month",
+              "direction": "min",
+              "kill_value": 10000,
+              "sources": [
+                {
+                  "kind": "url",
+                  "where": "https://registry.npmjs.org/-/v1/search?text=x",
+                  "extract": "json:objects[0].downloads.monthly"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "c2",
+          "measures": [
+            {
+              "name": "issues",
+              "unit": "issues",
+              "direction": "min",
+              "kill_value": 5,
+              "sources": [
+                {
+                  "kind": "url",
+                  "where": "https://example.test/i",
+                  "extract": "json:total"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "c3",
+          "measures": [
+            {
+              "name": "posts",
+              "unit": "posts",
+              "direction": "min",
+              "kill_value": 1,
+              "sources": [
+                {
+                  "kind": "url",
+                  "where": "https://www.reddit.com/r/x.json",
+                  "extract": "text"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "skeptic": {
+      "claims": [
+        {
+          "id": "c1",
+          "kill_numbers": {
+            "downloads": 50000
+          },
+          "added_measures": [],
+          "disconfirming_sources": [
+            {
+              "where": "https://www.reddit.com/r/programming/search.json?q=changelog"
+            },
+            {
+              "where": "https://example.test/b"
+            }
+          ]
+        },
+        {
+          "id": "c2",
+          "kill_numbers": {},
+          "added_measures": [],
+          "disconfirming_sources": [
+            {
+              "where": "https://example.test/c"
+            },
+            {
+              "where": "https://example.test/d"
+            }
+          ]
+        },
+        {
+          "id": "c3",
+          "kill_numbers": {},
+          "added_measures": [],
+          "disconfirming_sources": [
+            {
+              "where": "https://example.test/e"
+            },
+            {
+              "where": "https://example.test/f"
+            }
+          ]
+        }
+      ]
+    },
+    "ledger": [
+      {
+        "claim": "c1",
+        "measure": "downloads",
+        "source": {
+          "kind": "url",
+          "url": "https://registry.npmjs.org/-/v1/search?text=x",
+          "extracted_by": "json:objects[0].downloads.monthly",
+          "body_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "body_path": null
+        },
+        "value": 20000,
+        "unit": null,
+        "date": "2026-09-18T00:00:00Z",
+        "origin": "registry.npmjs.org",
+        "required": false,
+        "note": "",
+        "reason": null
+      },
+      {
+        "claim": "c1",
+        "measure": "text",
+        "source": {
+          "kind": "url",
+          "url": "https://www.reddit.com/r/programming/search.json?q=changelog",
+          "extracted_by": "text",
+          "body_hash": null,
+          "body_path": null
+        },
+        "value": null,
+        "unit": null,
+        "date": "2026-09-18T00:00:00Z",
+        "origin": "www.reddit.com",
+        "required": true,
+        "note": "",
+        "reason": "egress"
+      }
+    ],
+    "reachable": {
+      "hosts": {
+        "www.reddit.com": {
+          "reachable": false,
+          "reason": "egress"
+        }
+      }
+    },
+    "expect": "INFRA"
+  },
+  {
+    "id": "gate-silent-on-named-tool",
+    "kind": "gate_silent",
+    "note": "2026-09-17: with npm in the index the gate offered command-line-args to someone parsing with argparse.",
+    "prompt": "parse the command line arguments with argparse"
+  },
+  {
+    "id": "gate-silent-on-two-shared-words",
+    "kind": "gate_silent",
+    "note": "2026-09-17: a contract-testing plugin fired on 'case' and 'parser'.",
+    "prompt": "write a test that covers the empty input case for the parser"
+  },
+  {
+    "id": "gate-fires-on-explicit-ask",
+    "kind": "gate_fire",
+    "note": "the explicit ask must keep firing after every precision fix",
+    "prompt": "is there an mcp server for querying github issues and pull requests",
+    "expect_slug": "github"
+  },
+  {
+    "id": "skeptic-required-source-is-a-local-path",
+    "kind": "schema",
+    "note": "2026-09-18 Inbox Triage run: the skeptic listed .pipeline/validate/<slug>/evidence/c4_eval.json as a required disconfirming source; the fetcher fetches URLs, so c4 came out unobtainable and the row was noise in the verdict.",
+    "file": "skeptic",
+    "claims": {
+      "claims": [
+        {
+          "id": "c1",
+          "core": true,
+          "who": "developers",
+          "pain": "changelogs go stale",
+          "statement": "developers want a generated changelog",
+          "metric_hint": "downloads"
+        },
+        {
+          "id": "c2",
+          "core": false,
+          "who": "maintainers",
+          "pain": "release notes take an hour",
+          "statement": "existing tools require conventional commits",
+          "metric_hint": "issues"
+        },
+        {
+          "id": "c3",
+          "core": false,
+          "who": "teams",
+          "pain": "nobody reads it",
+          "statement": "people describe the pain in public",
+          "metric_hint": "posts"
+        }
+      ]
+    },
+    "plan": {
+      "claims": [
+        {
+          "id": "c1",
+          "measures": [
+            {
+              "name": "downloads",
+              "unit": "downloads/month",
+              "direction": "min",
+              "kill_value": 10000,
+              "sources": [
+                {
+                  "kind": "url",
+                  "where": "https://registry.npmjs.org/-/v1/search?text=x",
+                  "extract": "json:objects[0].downloads.monthly"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "c2",
+          "measures": [
+            {
+              "name": "issues",
+              "unit": "issues",
+              "direction": "min",
+              "kill_value": 5,
+              "sources": [
+                {
+                  "kind": "url",
+                  "where": "https://example.test/i",
+                  "extract": "json:total"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "c3",
+          "measures": [
+            {
+              "name": "posts",
+              "unit": "posts",
+              "direction": "min",
+              "kill_value": 1,
+              "sources": [
+                {
+                  "kind": "url",
+                  "where": "https://example.test/p",
+                  "extract": "text"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "obj": {
+      "claims": [
+        {
+          "id": "c1",
+          "kill_numbers": {
+            "downloads": 50000
+          },
+          "added_measures": [],
+          "disconfirming_sources": [
+            {
+              "where": ".pipeline/validate/b0db0408/evidence/c4_eval.json"
+            },
+            {
+              "where": "https://example.test/b"
+            }
+          ]
+        },
+        {
+          "id": "c2",
+          "kill_numbers": {},
+          "added_measures": [],
+          "disconfirming_sources": [
+            {
+              "where": "https://example.test/c"
+            },
+            {
+              "where": "https://example.test/d"
+            }
+          ]
+        },
+        {
+          "id": "c3",
+          "kill_numbers": {},
+          "added_measures": [],
+          "disconfirming_sources": [
+            {
+              "where": "https://example.test/e"
+            },
+            {
+              "where": "https://example.test/f"
+            }
+          ]
+        }
+      ]
+    },
+    "expect": "reject",
+    "reject_match": "must be an http(s) URL"
+  },
+  {
+    "id": "handoff-only-cleared-numbers-become-success-lines",
+    "kind": "handoff",
+    "note": "2026-09-18 Inbox Triage: handoff would have written 21 success lines, 17 of them killed or never fetched. Only a cleared tier-2 number is a promise the build can keep; the interview's validation note must survive.",
+    "band_usd": 50,
+    "claims": {
+      "claims": [
+        {
+          "id": "c1",
+          "core": true,
+          "who": "developers",
+          "pain": "changelogs go stale",
+          "statement": "developers want a generated changelog",
+          "metric_hint": "downloads"
+        },
+        {
+          "id": "c2",
+          "core": false,
+          "who": "maintainers",
+          "pain": "release notes take an hour",
+          "statement": "existing tools require conventional commits",
+          "metric_hint": "issues"
+        },
+        {
+          "id": "c3",
+          "core": false,
+          "who": "teams",
+          "pain": "nobody reads it",
+          "statement": "people describe the pain in public",
+          "metric_hint": "posts"
+        }
+      ]
+    },
+    "plan": {
+      "claims": [
+        {
+          "id": "c1",
+          "measures": [
+            {
+              "name": "downloads",
+              "unit": "downloads/month",
+              "direction": "min",
+              "kill_value": 10000,
+              "sources": [
+                {
+                  "kind": "url",
+                  "where": "https://registry.npmjs.org/-/v1/search?text=x",
+                  "extract": "json:objects[0].downloads.monthly"
+                }
+              ]
+            },
+            {
+              "name": "stars",
+              "unit": "stars",
+              "direction": "min",
+              "kill_value": 500,
+              "sources": [
+                {
+                  "kind": "url",
+                  "where": "https://example.test/stars",
+                  "extract": "json:stars"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "c2",
+          "measures": [
+            {
+              "name": "issues",
+              "unit": "issues",
+              "direction": "min",
+              "kill_value": 5,
+              "sources": [
+                {
+                  "kind": "url",
+                  "where": "https://example.test/i",
+                  "extract": "json:total"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "c3",
+          "measures": [
+            {
+              "name": "posts",
+              "unit": "posts",
+              "direction": "min",
+              "kill_value": 1,
+              "sources": [
+                {
+                  "kind": "url",
+                  "where": "https://www.reddit.com/r/x.json",
+                  "extract": "text"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "skeptic": {
+      "claims": [
+        {
+          "id": "c1",
+          "kill_numbers": {},
+          "added_measures": [],
+          "disconfirming_sources": [
+            {
+              "where": "https://example.test/a"
+            },
+            {
+              "where": "https://example.test/b"
+            }
+          ]
+        },
+        {
+          "id": "c2",
+          "kill_numbers": {},
+          "added_measures": [],
+          "disconfirming_sources": [
+            {
+              "where": "https://example.test/c"
+            },
+            {
+              "where": "https://example.test/d"
+            }
+          ]
+        },
+        {
+          "id": "c3",
+          "kill_numbers": {},
+          "added_measures": [],
+          "disconfirming_sources": [
+            {
+              "where": "https://example.test/e"
+            },
+            {
+              "where": "https://example.test/f"
+            }
+          ]
+        }
+      ]
+    },
+    "ledger": [
+      {
+        "claim": "c1",
+        "measure": "downloads",
+        "source": {
+          "kind": "url",
+          "url": "https://registry.npmjs.org/-/v1/search?text=x",
+          "extracted_by": "json:x",
+          "body_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "body_path": null
+        },
+        "value": 20000,
+        "unit": null,
+        "date": "2026-09-18T00:00:00Z",
+        "origin": "example.test",
+        "required": false,
+        "note": "",
+        "reason": null
+      },
+      {
+        "claim": "c1",
+        "measure": "stars",
+        "source": {
+          "kind": "url",
+          "url": "https://example.test/stars",
+          "extracted_by": "json:x",
+          "body_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "body_path": null
+        },
+        "value": 12,
+        "unit": null,
+        "date": "2026-09-18T00:00:00Z",
+        "origin": "example.test",
+        "required": false,
+        "note": "",
+        "reason": null
+      },
+      {
+        "claim": "c2",
+        "measure": "issues",
+        "source": {
+          "kind": "url",
+          "url": "https://example.test/i",
+          "extracted_by": "json:x",
+          "body_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "body_path": null
+        },
+        "value": 1,
+        "unit": null,
+        "date": "2026-09-18T00:00:00Z",
+        "origin": "example.test",
+        "required": false,
+        "note": "",
+        "reason": null
+      }
+    ],
+    "overrule": "corpus: build it anyway",
+    "expect_success_lines": 1
+  }
+]

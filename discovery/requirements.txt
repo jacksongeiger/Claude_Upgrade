@@ -1,0 +1,10 @@
+# Runtime: none. rdx uses only the Python standard library (urllib, sqlite3,
+# json, re) so the UserPromptSubmit hook has no import cost beyond stdlib and
+# no supply-chain surface of its own.
+
+# Development / eval only:
+pytest==8.3.4
+PyYAML==6.0.2
+
+# dev: coverage is a Nightshift score dimension
+pytest-cov==6.0.0

@@ -1,0 +1,11 @@
+{
+  "_note": "USD per million tokens. Used ONLY for the live mid-iteration estimate; the authoritative figure is the child's stream-json result.total_cost_usd. Calibrated 2026-09-18 by replaying 25 real streams (retro/corpus/streams): with each message id priced once plus system/thinking_tokens at the main model's output rate, live/bill landed in 0.90-1.33 for every stream. Re-run `python3 loop/scorers/kit_eval.py` after any price change.",
+  "models": {
+    "claude-fable-5-1":            {"input": 15.00, "output": 75.00, "cache_read": 1.50, "cache_write": 18.75},
+    "claude-opus-5":               {"input": 15.00, "output": 75.00, "cache_read": 1.50, "cache_write": 18.75},
+    "claude-sonnet-5":             {"input": 3.00,  "output": 15.00, "cache_read": 0.30, "cache_write": 3.75},
+    "claude-haiku-4-5-20251001":   {"input": 1.00,  "output": 5.00,  "cache_read": 0.10, "cache_write": 1.25}
+  },
+  "aliases": {"fable": "claude-fable-5-1", "opus": "claude-opus-5", "sonnet": "claude-sonnet-5", "haiku": "claude-haiku-4-5-20251001"},
+  "fallback": {"input": 15.00, "output": 75.00, "cache_read": 1.50, "cache_write": 18.75}
+}

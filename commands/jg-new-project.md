@@ -2,12 +2,12 @@
 
 You are bootstrapping a new project. Walk through this flow in order — do not skip steps unless the user explicitly tells you to.
 
-## 1. Feasibility
-- Per the global CLAUDE.md, run a feasibility investigation before writing code, unless the user has explicitly said skip it.
-- Identify the core assumption the project depends on. Validate it (market conditions, API availability, data, fees — whatever applies).
-- Present findings and give a GO / NO-GO recommendation.
-- If NO-GO, log the idea and reasoning in `DEAD_ENDS.md` at the parent project location (or in this new project's `DEAD_ENDS.md` once it exists) and stop.
-- Wait for explicit user confirmation before continuing.
+## 1. Validate
+- Create the project folder first (step 3 moves up: confirm the path, `mkdir`, `cd`, `git init`), because validation writes its files under the project's `.pipeline/validate/`.
+- Run `/jg-validate --build-usd <what the human expects to spend building it> "<the idea>"`. This replaces the old inline feasibility check: the stage writes claims, freezes kill numbers before any evidence is read, fetches evidence with sources, and a script computes GO, PIVOT or NO-GO.
+- On NO-GO: the stage has already appended the idea and the ledger summary to `DEAD_ENDS.md` in the new folder; copy that entry to the kit's `DEAD_ENDS.md` (the parent location) if the folder will be deleted, and stop.
+- On PIVOT: revise the idea with the human and run it again.
+- On GO: continue. `/jg-spec` will read the verdict; do not skip to the spec.
 
 ## 2. Stack and template
 - Default to **Python** per the global CLAUDE.md ("Default to Python unless another language is clearly better suited").
@@ -19,9 +19,7 @@ You are bootstrapping a new project. Walk through this flow in order — do not 
   - General → `CLAUDE.general.md`
 
 ## 3. Project folder
-- Confirm the target path with the user (default: `~/<project-name>`).
-- Create the folder and `cd` into it.
-- Run `git init`.
+- Already created in step 1. Confirm you are in it.
 
 ## 4. CLAUDE.md
 - Copy the chosen template into the project root as `CLAUDE.md`.

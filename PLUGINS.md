@@ -11,12 +11,20 @@
 - superpowers (obra) — parallel agents, systematic debugging, brainstorming, verification flows
 
 ## Install on a New Machine
-Run these in Claude Code after install.sh:
-/plugin install feature-dev@claude-plugins-official
-/plugin install commit-commands@claude-plugins-official
-/plugin install playwright@claude-plugins-official
-/plugin install serena@claude-plugins-official
-/plugin install code-simplifier@claude-plugins-official
+Run `./install.sh --plugins` — it shells out to `claude plugin install` directly.
+
+CORRECTION (v2.0): the v1.9 note that plugin installs "cannot be auto-run from
+a shell" was true when written but is now wrong. `claude plugin install` is a
+non-interactive CLI as of Claude Code 2.1.x, supporting `--scope`, `-y`,
+`--json` and `--config`. `./install.sh --plugins --dry-run` still prints the
+commands instead of running them.
+
+The recommended set:
+claude plugin install feature-dev@claude-plugins-official --scope user
+claude plugin install commit-commands@claude-plugins-official --scope user
+claude plugin install playwright@claude-plugins-official --scope user
+claude plugin install serena@claude-plugins-official --scope user
+claude plugin install code-simplifier@claude-plugins-official --scope user
 
 ## Recommended but Not Installed
 - feature-dev — structured feature development with planning gates (89k installs, most popular)
