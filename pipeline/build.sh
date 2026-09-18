@@ -192,7 +192,8 @@ PY
     # the live meter resumes from state.json: start this child's count at zero
     [ -f "$LOOP/state.json" ] && jq '.live_spend_usd = 0 | .agents = [] | .phase = "PLAN"' "$LOOP/state.json" > "$LOOP/state.json.tmp" 2>/dev/null && mv "$LOOP/state.json.tmp" "$LOOP/state.json" || echo '{"live_spend_usd":0,"agents":[],"phase":"PLAN"}' > "$LOOP/state.json"
     ( cd "$WT"
-      export NIGHTSHIFT_CONFIG="$CONFIG" NIGHTSHIFT_KIT="$LOOP_KIT" NIGHTSHIFT_ITER_DIR="$ITER_DIR"
+      # the build writes the judges the spec asks for (evals corpus, bench); pins are Nightshift's rule
+      export NIGHTSHIFT_CONFIG="$CONFIG" NIGHTSHIFT_KIT="$LOOP_KIT" NIGHTSHIFT_ITER_DIR="$ITER_DIR" NIGHTSHIFT_PINS=off PIPELINE_STAGE=build
       setsid bash -c 'echo $$ > "$1"; shift; exec "$@"' _ "$RUN/child.pgid" \
         timeout "${CHILD_TIMEOUT}m" "$CLAUDE_BIN" -p "$(cat "$ITER_DIR/prompt.md")" \
         --model fable --max-budget-usd "$BUDGET" --max-turns "$CHILD_TURNS" \

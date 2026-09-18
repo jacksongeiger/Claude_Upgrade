@@ -31,6 +31,7 @@ denied "$(NIGHTSHIFT_CONFIG="$PINCFG" guard Bash "{\"command\":\"echo x > eval/h
 denied "$(NIGHTSHIFT_CONFIG="$PINCFG" guard Bash "{\"command\":\"cat eval/h.py\"}")" && fail "denied reading a pinned file" || pass "allow: reading a pinned file"
 denied "$(NIGHTSHIFT_CONFIG="$PINCFG" guard Write "{\"file_path\":\"$WT/src/x.py\",\"content\":\"x\"}")" && fail "denied an unpinned write" || pass "allow: unpinned write with pins configured"
 grep -q "DENY safety pinned" "$D/repo/.loop/events.log" && pass "pinned deny is a safety trip" || fail "pinned deny not logged as safety"
+denied "$(NIGHTSHIFT_PINS=off NIGHTSHIFT_CONFIG="$PINCFG" guard Write "{\"file_path\":\"$WT/corpora/c.yaml\",\"content\":\"x\"}")" && fail "build stage (NIGHTSHIFT_PINS=off) denied a pinned write" || pass "allow: pinned write in the build stage (NIGHTSHIFT_PINS=off)"
 denied "$(guard Write "{\"file_path\":\"$D/repo/f\",\"content\":\"x\"}")" && pass "deny write to main checkout" || fail "allowed write to main checkout"
 denied "$(guard Edit "{\"file_path\":\"$WT/.claude/settings.json\"}")" && pass "deny write under .claude/" || fail "allowed .claude/ write"
 denied "$(guard Edit "{\"file_path\":\"$WT/.loop/backlog.yaml\"}")" && pass "deny write under .loop/" || fail "allowed .loop/ write"

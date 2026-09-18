@@ -49,6 +49,9 @@ _project_root() {
 # driver exports as NIGHTSHIFT_CONFIG; the manifest hash check at score time
 # is the lock, this is the early warning.
 _pin_globs() {
+    # NIGHTSHIFT_PINS=off: the build stage (pipeline/build.sh) writes the
+    # judges the spec asks for; pins are Nightshift's rule, not the build's.
+    [ "${NIGHTSHIFT_PINS:-}" != "off" ] || return 0
     [ -n "${NIGHTSHIFT_CONFIG:-}" ] && [ -r "${NIGHTSHIFT_CONFIG}" ] || return 0
     jq -r '[.scorers[]? | select(.enabled != false) | .pins[]?] | .[]' "$NIGHTSHIFT_CONFIG" 2>/dev/null
 }

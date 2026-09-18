@@ -573,3 +573,16 @@ def test_owning_other_files_still_passes(tmp_path):
     plan = write_plan_target(tmp_path / "it", [base_subtask(owned_paths=["src/app.py"])], ["bl-1"])
     rc, out, _ = run_check([str(plan), "--config", str(cfg), "--repo", str(repo)])
     assert rc == 0, out
+
+
+def test_build_stage_may_own_pinned_files(tmp_path, monkeypatch):
+    """pipeline/build.sh exports NIGHTSHIFT_PINS=off: milestone m2 of Inbox Triage had to create evals/ that the evals scorer pins."""
+    import os, subprocess, sys
+    repo, cfg = _pinned_config(tmp_path)
+    plan = write_plan_target(tmp_path / "it", [base_subtask(owned_paths=["corpora/cases.yaml"])], ["bl-1"])
+    env = dict(os.environ, NIGHTSHIFT_PINS="off")
+    p = subprocess.run([sys.executable, str(CHECK_PLAN), str(plan), "--config", str(cfg), "--repo", str(repo)], capture_output=True, text=True, env=env)
+    assert p.returncode == 0, p.stdout
+    env["NIGHTSHIFT_PINS"] = "on"
+    p = subprocess.run([sys.executable, str(CHECK_PLAN), str(plan), "--config", str(cfg), "--repo", str(repo)], capture_output=True, text=True, env=env)
+    assert p.returncode == 2 and "pinned scorer file" in p.stdout

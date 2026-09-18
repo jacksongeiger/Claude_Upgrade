@@ -280,7 +280,10 @@ repo (an eval harness, its thresholds, a labelled corpus, a bench script) is
 the judge of the code around it. `scorers[].pins` lists those files as
 repo-relative globs; `score.py` hashes them **in the worktree it scores**, so
 an executor's edit, a merge that touches one, or a new file matching a
-corpus glob is a manifest mismatch and the run stops. `check_plan.py` refuses
+corpus glob is a manifest mismatch and the run stops. The build stage
+(`pipeline/build.sh`) exports `NIGHTSHIFT_PINS=off`: there the spec asks for
+the evals corpus and the bench to be written and the human merges every
+milestone, so the pins are Nightshift's rule alone. `check_plan.py` refuses
 a plan that owns a pinned path, and the guard denies a write to one (by tool
 or by shell redirect) as a safety trip. `init.py` and `mkconfig.py` derive a
 conservative default (the named script or module, a `corpora`/`fixtures`/
