@@ -80,6 +80,22 @@ grep -q "MILESTONE_DONE id=m1" .pipeline/events.log && pass "events logged" || f
 [ -f .pipeline/wt/build/.pipeline/build/m1/acceptance.final.json ] && pass "acceptance.final.json written" || fail "no acceptance record"
 [ -z "$(git -C .pipeline/wt/build status --short | grep -v '^??')" ] && pass "build worktree clean" || fail "build worktree dirty: $(git -C .pipeline/wt/build status --short | grep -v '^??' | head -3 | tr '\n' ' ')"
 
+# 3b. regression: m2 passes its own checks but an earlier done milestone no longer accepts → m2 blocked, exit 3
+python3 - <<'PY'
+import json; s=json.load(open("spec.json"))
+for f in s["features"]:
+    if f["milestone"] == "m1":
+        for a in f["acceptance"]:
+            if a["type"] == "test": a["cmd"] = "false"
+json.dump(s, open("spec.json","w"))
+PY
+python3 "$KIT/milestone.py" --spec spec.json --state .pipeline/build/state.json set m2 open --note "regression test" >/dev/null
+bash "$KIT/build.sh" --project "$P" --accept-only m2 > "$D/build-regress.out" 2>&1; RC=$?
+[ "$RC" = "3" ] && pass "accept-only m2 exits 3 when m1 regressed" || { fail "regression rc=$RC (expected 3)"; tail -3 "$D/build-regress.out"; }
+grep -q "regression of an earlier milestone: m1" "$D/build-regress.out" && pass "regression names the milestone" || fail "no regression line: $(tail -2 "$D/build-regress.out")"
+[ "$(jq -r '.milestones.m2.status' .pipeline/build/state.json)" = "blocked" ] && pass "m2 blocked by the regression" || fail "m2 state: $(jq -c .milestones .pipeline/build/state.json)"
+git checkout -q spec.json; python3 "$KIT/milestone.py" --spec spec.json --state .pipeline/build/state.json set m2 done --note "restored" >/dev/null
+
 # 4. blocked milestone: fake does nothing → tests still FAIL → accept exit 2 → blocked, exit 3
 P2="$D/proj2"; mkdir -p "$P2"; cp "$P/spec.json" "$P/run_tests.sh" "$P/CHANGELOG.md" "$P/README.md" "$P2/"; cd "$P2"
 git init -q -b main .; git config user.email t@t; git config user.name t; echo "PASS PASS FAIL FAIL" > tests.txt

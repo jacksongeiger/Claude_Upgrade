@@ -123,6 +123,15 @@ jq -n --arg lk "$LOOP_KIT" --argjson allow "$ALLOW_JSON" '{worktree:{baseRef:"he
 AGENTS_JSON=$(python3 "$LOOP_KIT/agents_json.py" --no-ui)
 
 # an accepted milestone closes its spec rows in the loop's backlog (worktree and project)
+regress_check() {  # regress_check MS ITER_DIR -> prints " m1(exit 2)" per earlier done milestone that no longer accepts, empty when all hold
+    local ms="$1" it="$2" prev rc out=""
+    for prev in $(jq -r --arg ms "$ms" '.milestones | to_entries[] | select(.value.status=="done" and .key!=$ms) | .key' "$STATE" 2>/dev/null); do
+        python3 "$KIT/accept.py" --spec "$SPEC" --milestone "$prev" --workdir "$WT" --out "$it/acceptance.regress.$prev.json" >>"$RUN/build.log" 2>&1; rc=$?
+        [ "$rc" = 0 ] || out="$out $prev(exit $rc)"
+    done
+    printf '%s' "$out"
+}
+
 mark_rows_done() {
     # the worktree's copy only: the project's copy receives it when the human
     # merges the build branch (editing both would conflict at that merge)
@@ -135,11 +144,14 @@ mark_rows_done() {
 if [ -n "$ACCEPT_ONLY" ]; then
     STEP="accept"; MS="$ACCEPT_ONLY"; ITER_DIR="$WT/.pipeline/build/$MS"; mkdir -p "$ITER_DIR"
     python3 "$KIT/accept.py" --spec "$SPEC" --milestone "$MS" --workdir "$WT" --out "$ITER_DIR/acceptance.final.json" 2>>"$RUN/build.log"; ARC=$?
+    REGRESSED=""
+    if [ "$ARC" = "0" ]; then REGRESSED=$(regress_check "$MS" "$ITER_DIR"); [ -z "$REGRESSED" ] || { ARC=2; echo "regression of an earlier milestone:$REGRESSED"; }; fi
     case "$ARC" in
       0) python3 "$KIT/milestone.py" --spec "$SPEC" --state "$STATE" set "$MS" done --note "accepted (accept-only)" >/dev/null
          mark_rows_done "$MS"
          git -C "$WT" tag -f "build/$MS" >/dev/null 2>&1 || true; event MILESTONE_DONE "id=$MS (accept-only)"; stop complete "accept-only $MS done"; exit 0 ;;
-      2) event MILESTONE_BLOCKED "id=$MS (accept-only)"; stop complete "accept-only $MS: checks failed"; exit 3 ;;
+      2) python3 "$KIT/milestone.py" --spec "$SPEC" --state "$STATE" set "$MS" blocked --note "acceptance failed (accept-only)${REGRESSED:+: regression of an earlier milestone:$REGRESSED}" >/dev/null
+         event MILESTONE_BLOCKED "id=$MS (accept-only)${REGRESSED:+ regression:$REGRESSED}"; stop complete "accept-only $MS: checks failed"; exit 3 ;;
       *) event MILESTONE_INFRA "id=$MS exit=$ARC (accept-only)"; stop infra "accept-only $MS exit $ARC"; exit 4 ;;
     esac
 fi
@@ -238,12 +250,19 @@ PY
     # ---- the script decides -------------------------------------------------
     STEP="accept"
     python3 "$KIT/accept.py" --spec "$SPEC" --milestone "$MS" --workdir "$WT" --out "$ITER_DIR/acceptance.final.json" >>"$RUN/build.log" 2>&1; ARC=$?
+    # A milestone that passes its own checks can still break an earlier one
+    # (Inbox Triage m2 added bench/queue.py, which shadowed the stdlib
+    # `queue` for m1's bench; the ship check was the first to see it). Every
+    # earlier done milestone is re-accepted before this one counts.
+    REGRESSED=""
+    if [ "$ARC" = "0" ]; then REGRESSED=$(regress_check "$MS" "$ITER_DIR"); [ -z "$REGRESSED" ] || ARC=2; fi
     case "$ARC" in
       0) python3 "$KIT/milestone.py" --spec "$SPEC" --state "$STATE" set "$MS" done --note "accepted iter $ITER" >/dev/null
          mark_rows_done "$MS"
          git -C "$WT" tag -f "build/$MS" >/dev/null 2>&1 || true
          event MILESTONE_DONE "id=$MS cost=$CHARGE"; DONE_COUNT=$((DONE_COUNT+1)) ;;
       2) FAILS=$(jq -r '[.features[] | .checks[] | select(.ok==false) | (.type + ":" + (.detail|tostring|.[0:80]))] | join("; ")' "$ITER_DIR/acceptance.final.json" 2>/dev/null || echo "?")
+         [ -z "$REGRESSED" ] || FAILS="regression of an earlier milestone:$REGRESSED"
          python3 "$KIT/milestone.py" --spec "$SPEC" --state "$STATE" set "$MS" blocked --note "acceptance failed: $FAILS" >/dev/null
          event MILESTONE_BLOCKED "id=$MS fails=$FAILS"; RC_FINAL=3 ;;
       *) python3 "$KIT/milestone.py" --spec "$SPEC" --state "$STATE" set "$MS" blocked --note "acceptance could not run (exit $ARC)" >/dev/null

@@ -265,9 +265,12 @@ does what Nightshift's iterate.md does, with these differences:
   exit 0 all ok · 2 some failed · 4 infra (a check could not run).
   Persona checks are run through `ux_score.py` (below); lighthouse through the
   existing scorer; `gate` through `gates.py`.
-- a milestone is `done` only on accept exit 0; on 2 the planner gets one
-  more iteration on the failed features, then the milestone is `blocked` with
-  the failures in `summary.md` and a needs-human row.
+- a milestone is `done` only on accept exit 0 AND every earlier `done`
+  milestone still accepts on the same worktree (a regression blocks the new
+  one and names the old: Inbox Triage m2 shadowed the stdlib `queue` for
+  m1's bench); on 2 the planner gets one more iteration on the failed
+  features, then the milestone is `blocked` with the failures in
+  `summary.md` and a needs-human row.
 
 Human gate: **`git merge --no-ff build/<date>` (or the milestone tag) into main**, printed, never run.
 
