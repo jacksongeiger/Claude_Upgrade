@@ -195,8 +195,10 @@ schema check decides whether the run continues.
 
 Files under `.pipeline/validate/<slug>/` (slug = sha256(idea)[:8]); `bodies/`
 is gitignored, the rest is committed. GO hands off with `validate.py
-handoff`: the claims become `spec.anchors`, the kill numbers success lines,
-and `spec.validation {slug, verdict_sha256, validated_budget_usd}` is what
+handoff`: the claims become `spec.anchors`, the kill numbers that a tier-2
+row actually cleared become success lines (a killed or unmeasured number is
+not a promise the build can keep; the Inbox Triage run would otherwise have
+handed off 21 lines, 17 of them dead), and `spec.validation {slug, verdict_sha256, validated_budget_usd}` is what
 `spec_check.py --gate-validate` reads (missing or NO-GO verdict → 3; build
 budget above the validated one → 2; specs without the block are reported,
 not failed; `validation: {skipped: true, by}` is allowed and named).

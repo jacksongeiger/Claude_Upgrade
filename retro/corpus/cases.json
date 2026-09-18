@@ -625,5 +625,211 @@
     },
     "expect": "reject",
     "reject_match": "must be an http(s) URL"
+  },
+  {
+    "id": "handoff-only-cleared-numbers-become-success-lines",
+    "kind": "handoff",
+    "note": "2026-09-18 Inbox Triage: handoff would have written 21 success lines, 17 of them killed or never fetched. Only a cleared tier-2 number is a promise the build can keep; the interview's validation note must survive.",
+    "band_usd": 50,
+    "claims": {
+      "claims": [
+        {
+          "id": "c1",
+          "core": true,
+          "who": "developers",
+          "pain": "changelogs go stale",
+          "statement": "developers want a generated changelog",
+          "metric_hint": "downloads"
+        },
+        {
+          "id": "c2",
+          "core": false,
+          "who": "maintainers",
+          "pain": "release notes take an hour",
+          "statement": "existing tools require conventional commits",
+          "metric_hint": "issues"
+        },
+        {
+          "id": "c3",
+          "core": false,
+          "who": "teams",
+          "pain": "nobody reads it",
+          "statement": "people describe the pain in public",
+          "metric_hint": "posts"
+        }
+      ]
+    },
+    "plan": {
+      "claims": [
+        {
+          "id": "c1",
+          "measures": [
+            {
+              "name": "downloads",
+              "unit": "downloads/month",
+              "direction": "min",
+              "kill_value": 10000,
+              "sources": [
+                {
+                  "kind": "url",
+                  "where": "https://registry.npmjs.org/-/v1/search?text=x",
+                  "extract": "json:objects[0].downloads.monthly"
+                }
+              ]
+            },
+            {
+              "name": "stars",
+              "unit": "stars",
+              "direction": "min",
+              "kill_value": 500,
+              "sources": [
+                {
+                  "kind": "url",
+                  "where": "https://example.test/stars",
+                  "extract": "json:stars"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "c2",
+          "measures": [
+            {
+              "name": "issues",
+              "unit": "issues",
+              "direction": "min",
+              "kill_value": 5,
+              "sources": [
+                {
+                  "kind": "url",
+                  "where": "https://example.test/i",
+                  "extract": "json:total"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "c3",
+          "measures": [
+            {
+              "name": "posts",
+              "unit": "posts",
+              "direction": "min",
+              "kill_value": 1,
+              "sources": [
+                {
+                  "kind": "url",
+                  "where": "https://www.reddit.com/r/x.json",
+                  "extract": "text"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "skeptic": {
+      "claims": [
+        {
+          "id": "c1",
+          "kill_numbers": {},
+          "added_measures": [],
+          "disconfirming_sources": [
+            {
+              "where": "https://example.test/a"
+            },
+            {
+              "where": "https://example.test/b"
+            }
+          ]
+        },
+        {
+          "id": "c2",
+          "kill_numbers": {},
+          "added_measures": [],
+          "disconfirming_sources": [
+            {
+              "where": "https://example.test/c"
+            },
+            {
+              "where": "https://example.test/d"
+            }
+          ]
+        },
+        {
+          "id": "c3",
+          "kill_numbers": {},
+          "added_measures": [],
+          "disconfirming_sources": [
+            {
+              "where": "https://example.test/e"
+            },
+            {
+              "where": "https://example.test/f"
+            }
+          ]
+        }
+      ]
+    },
+    "ledger": [
+      {
+        "claim": "c1",
+        "measure": "downloads",
+        "source": {
+          "kind": "url",
+          "url": "https://registry.npmjs.org/-/v1/search?text=x",
+          "extracted_by": "json:x",
+          "body_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "body_path": null
+        },
+        "value": 20000,
+        "unit": null,
+        "date": "2026-09-18T00:00:00Z",
+        "origin": "example.test",
+        "required": false,
+        "note": "",
+        "reason": null
+      },
+      {
+        "claim": "c1",
+        "measure": "stars",
+        "source": {
+          "kind": "url",
+          "url": "https://example.test/stars",
+          "extracted_by": "json:x",
+          "body_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "body_path": null
+        },
+        "value": 12,
+        "unit": null,
+        "date": "2026-09-18T00:00:00Z",
+        "origin": "example.test",
+        "required": false,
+        "note": "",
+        "reason": null
+      },
+      {
+        "claim": "c2",
+        "measure": "issues",
+        "source": {
+          "kind": "url",
+          "url": "https://example.test/i",
+          "extracted_by": "json:x",
+          "body_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "body_path": null
+        },
+        "value": 1,
+        "unit": null,
+        "date": "2026-09-18T00:00:00Z",
+        "origin": "example.test",
+        "required": false,
+        "note": "",
+        "reason": null
+      }
+    ],
+    "overrule": "corpus: build it anyway",
+    "expect_success_lines": 1
   }
 ]

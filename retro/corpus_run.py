@@ -18,6 +18,8 @@ kinds:
                  runs validate.py freeze + verdict --no-refetch
     schema       {"file": "plan|skeptic|claims|judge", "claims"?, "plan"?, "obj": {...}, "expect": "ok"|"reject", "reject_match": "<substring>"}
                  runs validate.py schema on the file (claims/plan supplied so the cross-checks have context)
+    handoff      {"band_usd", "claims", "plan", "skeptic"?, "ledger", "overrule"?, "expect_success_lines": N}
+                 verdict (+ overrule) then handoff into a spec; counts the success lines and keeps the spec's note
     gate_silent  {"prompt": "..."}  and  gate_fire {"prompt": "...", "expect_slug": "..."}
                  run discovery's retrieve.evaluate against the real index when present, else skipped
 Prints one JSON line: {"ok", "passed", "failed", "skipped", "cases": [...]}.
@@ -154,7 +156,30 @@ def case_schema(c, tmp):
     return (not out.get("ok")) and c.get("reject_match", "") in problems, problems[:200]
 
 
-RUNNERS = {"check_plan": case_check_plan, "schema": case_schema, "ux_supersede": case_ux_supersede, "freeze": case_freeze, "verdict": case_verdict,
+def case_handoff(c, tmp):
+    """{"band_usd", "claims", "plan", "skeptic"?, "ledger", "judge"?, "expect_success_lines": N}: verdict then handoff into an empty spec."""
+    d, fr = _validate_dir(c, tmp)
+    if fr.returncode != 0:
+        return False, fr.stdout.strip()[:200]
+    (d / "ledger.jsonl").write_text("".join(json.dumps(r) + "\n" for r in c["ledger"]))
+    if c.get("judge"):
+        w(d / "judge.json", c["judge"])
+    sh([sys.executable, str(PIPE / "validate.py"), "verdict", "--dir", str(d), "--no-refetch"])
+    if c.get("overrule"):
+        sh([sys.executable, str(PIPE / "validate.py"), "overrule", "--dir", str(d), "--by", "corpus", "--reason", c["overrule"]])
+        sh([sys.executable, str(PIPE / "validate.py"), "verdict", "--dir", str(d), "--no-refetch"])
+    spec = Path(tmp) / "spec.json"; w(spec, {"success": ["Every acceptance check passes"], "validation": {"note": "kept"}})
+    proc = sh([sys.executable, str(PIPE / "validate.py"), "handoff", "--dir", str(d), "--spec", str(spec)])
+    try:
+        out = json.loads(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return False, proc.stdout[:200] + proc.stderr[:200]
+    got = json.loads(spec.read_text())
+    ok = out.get("success_lines") == c["expect_success_lines"] and got.get("validation", {}).get("note") == "kept"
+    return ok, json.dumps({"success_lines": out.get("success_lines"), "frozen": out.get("measures_frozen"), "note_kept": got.get("validation", {}).get("note") == "kept"})
+
+
+RUNNERS = {"check_plan": case_check_plan, "schema": case_schema, "handoff": case_handoff, "ux_supersede": case_ux_supersede, "freeze": case_freeze, "verdict": case_verdict,
            "gate_silent": lambda c, t: case_gate(c, t, False), "gate_fire": lambda c, t: case_gate(c, t, True)}
 
 
