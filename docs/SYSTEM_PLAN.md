@@ -1,8 +1,8 @@
 # The project execution system: plan for the finished thing
 
-Revision 2, 2026-09-18. Revision 1 was reviewed cold by a context-free
-reviewer (`docs/REVIEW-2026-09-18.md`); this revision answers every ranked
-finding and says where it disagrees. It is written to be read by someone with
+Revision 3, 2026-09-18. Revisions 1 and 2 were reviewed cold by context-free
+reviewers (`docs/REVIEW-2026-09-18.md`, `docs/REVIEW-2026-09-18-r2.md`); this
+revision answers every structural finding of both. It is written to be read by someone with
 no prior context.
 
 ## 1. What the system is for
@@ -66,7 +66,11 @@ suites and can edit its own ARD judge (see 4.0).
 - `loop/score.py --manifest-write` also pins every file a scorer's `cmd`
   imports and every corpus it reads: for this repo `discovery/rdx/loopscore.py`,
   `evalharness.py`, `retrieve.py`, `config.py`, `discovery/corpora/*.yaml`.
-  A manifest mismatch stops the run, as today.
+  These pins are **repo-relative and verified at `<workdir>/<path>`** at
+  score time, i.e. in the loop worktree the executors and merges touch, not
+  in the kit checkout. That hash check is the defence that does not depend
+  on the planner's honesty; the deny rule and the hook below are extra.
+  A mismatch stops the run, as today.
 - `loop/check_plan.py` denies any `owned_paths` entry matching a pinned
   file, and `hooks/safety` trips on an edit to one.
 - This repo's Nightshift config: `main_branch: main`, three tests scorers
@@ -76,21 +80,32 @@ suites and can edit its own ARD judge (see 4.0).
 
 ### 4.1 Fetch smoke test (one hour, before anything else in validation)
 
-A `claude -p` child through `pipeline/child.sh` with `WebFetch` and a
-`Bash(curl:*)` allow rule fetches one HTML page and one JSON API and writes a
-ledger row. Run from the cloud and from the Mac. Outcome recorded in
-`DEAD_ENDS.md` or the contract: it decides whether validation runs
-anywhere or only on the Mac, and whether the fetcher is the model or a
-script the model calls (`pipeline/fetch.py`: URL → text or JSON, hash,
-date; the recorded, re-runnable source).
+Decided now: the fetcher is a script, `pipeline/fetch.py` (URL → extracted
+value or text, `extracted_by`, body hash, date), never `WebFetch`; only a
+script gives the referee something to re-run. `fetch.py --probe` runs a
+fixed host list (registries, GitHub API, Reddit, Hacker News, Product Hunt,
+a search endpoint, two forums) from a `claude -p` child through
+`pipeline/child.sh` and writes `.pipeline/validate/reachable.json`. Run
+from the cloud and from the Mac. Egress here is per host: measured today
+the cloud reaches registries and the GitHub API and refuses forums, Hacker
+News, Product Hunt and search engines at the proxy. The reachable set, not
+a pass/fail, is the output, and the referee reads it (4.2, step 7).
 
 ### 4.2 Stage 0: validate (`/jg-validate "<idea or URL>"`)
 
 Purpose: before the interview, establish with evidence whether the idea is
 worth building, to a tier that scales with the build's cost. It replaces
 `/jg-feasibility`; interview round 4 reads `verdict.json` instead of asking
-its own feasibility question. `/jg-spec` refuses to run without a verdict
-of GO or an overruled NO-GO unless `--no-validate` is passed and logged.
+its own feasibility question.
+
+Invocation: `/jg-validate --build-usd N "<idea or URL>"`. The budget is
+named up front because the spec does not exist yet. The slug is the first
+8 hex of sha256(idea text). `verdict.json` stores the idea text and
+`validated_budget_usd`. `spec_check.py` gains the gate: exit 3 when no
+verdict exists or the verdict is NO-GO without `overruled` (unless
+`--no-validate` is passed and logged), and exit 2 when
+`budget.build_usd > validated_budget_usd` (validate again at the higher
+tier). Today `spec_check.py` reads neither; this is new code.
 
 Roles, each a separate context, each writing a file the next reads:
 
@@ -99,30 +114,43 @@ Roles, each a separate context, each writing a file the next reads:
    CLAUDE.md requires). Each claim: who, pain, statement, and the metric
    that would settle it. No numbers yet.
 2. **Setter** (Fable, fresh, sees only `claims.json` and the build budget):
-   writes `plan.json`: per claim the measure, the source kind and where,
-   and the kill number. Never sees the author's reasoning.
-3. **Skeptic** (Fable, fresh, sees `claims.json` only): writes
-   `skeptic.json`: per claim its own kill number and two sources that would
-   disconfirm the claim, plus `skeptic.md`, the case against.
-4. **Driver freeze** (`validate.py freeze`): merges plan and skeptic. The
-   stricter kill number wins per claim; the skeptic's disconfirming sources
-   are added as required ledger rows. Writes `plan.frozen.json` with its
-   sha and `frozen_at`. From here the plan is read-only to every child.
+   writes `plan.json`: per claim one or more measures (name, unit,
+   direction), the source kind and where for each, and a kill number per
+   measure. Never sees the author's reasoning.
+3. **Skeptic** (Fable, fresh, sees `claims.json` plus the setter's measure
+   names, units and directions with the numbers redacted by the driver):
+   writes `skeptic.json`: per claim its own kill number on each of the
+   setter's measures, any measures it adds (with numbers and sources), and
+   two sources that would disconfirm the claim, plus `skeptic.md`, the case
+   against.
+4. **Driver freeze** (`validate.py freeze`): merges on the shared measure
+   set. Per measure the stricter kill number wins; a kill number whose
+   measure is not in the claim's measure set is rejected; the skeptic's
+   added measures and disconfirming sources become required ledger rows.
+   Writes `plan.frozen.json` with its sha and `frozen_at`. From here the
+   plan is read-only to every child.
 5. **Fetcher** (Sonnet, fresh, read-only plan): for every planned source,
-   calls `pipeline/fetch.py` or the driver's search tool and appends a
-   ledger row: claim, measured, source `{kind, url|cmd, hash}`, value, unit,
-   date, note. It may add sources it finds; it may not remove planned ones.
-   A source it cannot reach becomes a row with `value: null,
-   note: unobtainable`. It never writes an estimate.
+   calls `pipeline/fetch.py` and appends a ledger row: claim, measure,
+   source `{kind, url|cmd, extracted_by, body_hash}`, value, unit, date,
+   author or origin (for independence), note. It may add sources it finds;
+   it may not remove planned ones. A source it cannot reach becomes a row
+   with `value: null` and `reason: egress | 404 | paywall | timeout`. It
+   never writes an estimate.
 6. **Judge** (Sonnet, fresh, sees plan + ledger, fixed rubric): one question
    per ledger row: does the source say what the row claims, 0/1/2, with the
    quoted line. Nothing else.
-7. **Referee** (`validate.py verdict`, script): re-fetches every `cmd`-kind
-   source and compares hashes (drift → tier drops to 0 with a note);
-   assigns tiers; drops rows the judge scored 0; computes per claim
-   supported/killed/unobtainable against the frozen numbers; applies the
-   tier table; writes `verdict.json` and `VERDICT.md` with every source
-   linked.
+7. **Referee** (`validate.py verdict`, script): re-runs every re-runnable
+   source through `fetch.py` and compares the **extracted value**, not the
+   body: drift is when the value is absent on re-fetch or has crossed the
+   kill number; live counters that moved but still clear the number are
+   fine, and both hashes are stored for the record. Assigns tiers; drops
+   rows the judge scored 0; counts tier-1 rows only when their origins are
+   distinct; computes per claim supported / killed / below tier /
+   unobtainable against the frozen numbers; applies the tier table. If a
+   required (skeptic) source is unobtainable for a network reason and
+   `reachable.json` confirms the host is blocked here, the verdict is
+   infra (exit 4, "run this on the Mac"), never NO-GO. Writes
+   `verdict.json` and `VERDICT.md` with every source linked.
 8. **Human**: reads `VERDICT.md`. A NO-GO may be overruled in writing; the
    overrule is stored as a claim with its own kill number and
    `/jg-feedback` re-checks it after ship.
@@ -136,30 +164,36 @@ Evidence tiers (four, as the reviewer proposed):
 | 2 | primary data: query + result + date, re-runnable | one row is a point |
 | 3 | observed use: a prototype used more than once, payment, a usage log | one row is a point |
 
-Provisional tier table, by `budget.build_usd` in the spec (the human can
-change it; the referee reads it from `pipeline/validate.toml`):
+Provisional tier table, by the budget named at invocation (the human can
+change it; the referee reads it from `pipeline/validate.toml`). The core
+claim is never satisfied by tier 1: anecdotes have no value a kill number
+can test, and any real pain has three forum posts. Tier 2 costs one query.
 
-| build budget | required |
-|---|---|
-| under $20 | core claim at tier 1 |
-| $20–100 | every claim at tier 1, core at tier 2 |
-| over $100 | every claim at tier 2, core at tier 2, plus one tier-3 row from an experiment (a landing page, a concierge run, a personal usage log) before milestone 2 |
+| build budget | required | roles that run |
+|---|---|---|
+| under $20 | core at tier 2 (one re-runnable row clearing its kill number) | author → fetcher → referee; the author sets the one measure and number, the referee applies it |
+| $20–100 | core at tier 2, every other claim at tier 1 (three independent rows) | all eight |
+| over $100 | every claim at tier 2, plus one tier-3 row from an experiment (a landing page, a concierge run, a personal usage log) before milestone 2 | all eight |
 
 Verdict rules: core claim killed or below its required tier → NO-GO (exit
-2). Any non-core claim killed → PIVOT (exit 3, returns to the author with
-the ledger; a second PIVOT on the same idea is NO-GO). All required tiers
-met and nothing killed → GO (exit 0). Infra (fetching impossible, referee
-cannot re-fetch) → exit 4. The verdict is arithmetic; the prose is written
-afterwards from it.
+2). Any non-core claim killed or below its required tier → PIVOT (exit 5,
+returns to the author with the ledger; a second PIVOT on the same idea is
+NO-GO). All required tiers met and nothing killed → GO (exit 0).
+Needs-human (an unmatched measure at freeze, an overrule pending) → exit
+3, as everywhere in the pipeline. Infra (a required source blocked here,
+the referee cannot re-fetch) → exit 4. The verdict is arithmetic; the prose
+is written afterwards from it.
 
 Files: `.pipeline/validate/<slug>/{claims.json, plan.json, skeptic.json,
 skeptic.md, plan.frozen.json, ledger.jsonl, judge.json, verdict.json,
 VERDICT.md}`. GO carries `anchors` (the claims, verbatim) and the kill
 numbers into `spec.json`; NO-GO appends to `DEAD_ENDS.md`.
 
-Budget: `validate.usd` in `pipeline/validate.toml`, default $5, metered
-like every other child. ARD is not part of this stage: it indexes tools,
-not data sources. A data-source funnel is a possible later project.
+Budget: `validate.usd` in `pipeline/validate.toml`, default $5 for the
+eight-role path (measured estimate $3–4: three Fable contexts at $0.2–0.5,
+the fetcher $1–2, the judge under $1) and $1.5 for the under-$20 path,
+metered like every other child. ARD is not part of this stage: it indexes
+tools, not data sources. A data-source funnel is a possible later project.
 
 Tests: `validate.py` against a fake fetcher and hand-written ledgers: the
 stricter-number merge, the disconfirming-source requirement, freeze
@@ -173,9 +207,13 @@ write. Then one real run on an idea of the human's.
   dimensions, validated by the script; duplicates by a Haiku "same
   complaint?" call over normalized titles, validated to an id list. Keyword
   mapping stays as the fallback when the model is unavailable.
-- `ux_score.py`: persona findings deduplicated and a clean walkthrough's
-  "resolved" decision made by a Haiku call over the finding and the trail,
-  validated to row ids. The hash rule stays as the fallback.
+- Persona findings deduplicated and a clean walkthrough's "resolved"
+  decision made by a Haiku call over the finding and the trail, validated
+  to row ids, **in `pipeline/persona_run.py`**, which is driver-side and
+  metered through the ledger. `ux_score.py` stays pure: it runs inside
+  `score.py`, outside the cap, the live meter and the kill switch, and
+  nothing below `score.py` may call a model. The hash rule stays as the
+  fallback.
 - Not changed: the ARD intent gate (regex, 3 ms, precision 1.0), keep/undo,
   done/not, go/no-go, screenshot gates.
 
@@ -196,7 +234,10 @@ write. Then one real run on an idea of the human's.
   overturned. A `kit-eval` scorer runs the fixture suites end to end plus a
   replay of recorded stream logs through `tail.py` asserting cost agreement,
   plus the pass rate on that corpus. That is what Nightshift climbs on this
-  repo. The corpus is pinned (4.0).
+  repo. The corpus is pinned (4.0). Recorded streams enter the corpus only
+  through `retro/redact.py`, which keeps event types, usage, costs and hook
+  events and drops every text field; a test asserts no text survives
+  (principle 9).
 - Kit edits that change a pinned scorer file mark every project's manifest
   stale; `run.sh` says so at start and `score.py --manifest-write` re-signs.
 
