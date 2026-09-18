@@ -26,6 +26,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -109,10 +110,14 @@ def check_acceptance(spec, spec_path, workdir, accept_cmd):
         return {"name": "acceptance", "ok": None, "detail": "accept.py missing"}
 
     failed = []
+    # accept.py's default --out is ./acceptance.json, which would land in the
+    # repo root and fail the git-clean row two lines later (Inbox Triage v0.3).
+    out_dir = Path(tempfile.mkdtemp(prefix="ship-accept-"))
     for m in milestones:
         mid = m.get("id")
         base = shlex.split(accept_cmd) if accept_cmd else [sys.executable, str(accept_script)]
-        cmd = base + ["--spec", str(spec_path), "--milestone", str(mid), "--workdir", str(workdir)]
+        cmd = base + ["--spec", str(spec_path), "--milestone", str(mid), "--workdir", str(workdir),
+                      "--out", str(out_dir / f"acceptance-{mid}.json")]
         proc = run(cmd, cwd=str(workdir), timeout=600)
         if proc.returncode != 0:
             failed.append(f"{mid} (exit {proc.returncode})")

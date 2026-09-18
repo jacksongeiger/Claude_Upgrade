@@ -69,6 +69,7 @@ FAKE_ACCEPT = textwrap.dedent("""\
     ap.add_argument("--spec")
     ap.add_argument("--milestone")
     ap.add_argument("--workdir")
+    ap.add_argument("--out")
     args = ap.parse_args()
     fail_file = Path(args.workdir) / ".fail_milestones"
     fail_set = set(fail_file.read_text().split()) if fail_file.exists() else set()
