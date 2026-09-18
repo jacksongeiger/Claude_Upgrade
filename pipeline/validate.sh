@@ -55,7 +55,12 @@ PY
 )
 
 # ---- budget: the stage total is the sum of this slug's ledger rows ------------
-spent() { jq -s --arg s "validate:$SLUG:" 'map(select(.stage | startswith($s)) | .cost_usd) | add // 0' "$PIPE/ledger.jsonl" 2>/dev/null || echo 0; }
+spent() {  # one number, always: jq 1.7 prints 0 AND exits 2 on a missing file, which once came out as "0\n0"
+    local v=""
+    [ -f "$PIPE/ledger.jsonl" ] && v=$(jq -s --arg s "validate:$SLUG:" 'map(select(.stage | startswith($s)) | .cost_usd) | add // 0' "$PIPE/ledger.jsonl" 2>/dev/null | head -1)
+    case "$v" in ''|null) v=0 ;; esac
+    echo "$v"
+}
 remaining() { python3 -c "print(round($CAP - $(spent), 4))"; }
 child() {  # child ROLE PROMPT MODEL CEILING TURNS [--sub ...]
     local role="$1" prompt="$2" model="$3" ceil="$4" turns="$5"; shift 5
@@ -72,6 +77,7 @@ child() {  # child ROLE PROMPT MODEL CEILING TURNS [--sub ...]
         --sub "BAND_RULE=$BAND_RULE" --sub-file "REACHABLE=$DIR/reachable.txt" --sub "PREVIOUS=$PREVIOUS" "$@" > "$DIR/$role.run" 2>>"$DIR/driver.log"
     local rc=$?
     note "$role rc=$rc cost=\$$(spent) total"
+    [ "$rc" = 0 ] || note "$role exited $rc (ceiling was \$$budget; a valid file still counts, the schema check decides)"
     return $rc
 }
 schema() { python3 "$KIT/validate.py" schema --dir "$DIR" --file "$1" | tee -a "$DIR/driver.log" | jq -e .ok >/dev/null; }

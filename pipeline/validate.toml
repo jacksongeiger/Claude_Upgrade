@@ -1,13 +1,14 @@
 # Validation stage settings. The human edits the numbers; the referee reads them.
 
 [budget]
-# stage total across every role and PIVOT pass, in USD. Measured on the
-# first real run (2026-09-18): a Fable author $0.87, setter $0.69, a Sonnet
-# fetcher $0.33; a PIVOT pass re-runs the author and setter and re-fetches
-# only what changed.
-usd = 12.0
+# stage total across every role and PIVOT pass, in USD. Measured on real
+# runs (2026-09-18): small band author $0.87, setter $0.69, fetcher $0.33;
+# mid band (six claims, 21 measures) author $0.38, setter $1.01, skeptic
+# $1.02, fetcher $1.37, judge $0.35. A PIVOT pass re-runs the author and
+# setter and re-fetches only what changed.
+usd = 15.0
 # the under-$20 path (author -> setter -> fetcher -> referee)
-usd_small = 4.5
+usd_small = 7.0
 
 [bands]
 # build budget bands, by the --build-usd named at invocation
@@ -42,9 +43,11 @@ fetcher = "sonnet"
 judge = "sonnet"
 
 [caps]
-# per-child ceilings; the stage total above still binds
-author = 1.0
-setter = 1.0
-skeptic = 1.0
-fetcher = 2.5
-judge = 1.0
+# per-child ceilings; the stage total above still binds. A child that hits
+# its ceiling exits 1 with its file already written; the schema check decides.
+# The mid-band setter and skeptic both crossed $1.00 on six claims.
+author = 1.5
+setter = 2.0
+skeptic = 2.0
+fetcher = 3.0
+judge = 1.5

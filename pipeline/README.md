@@ -183,12 +183,15 @@ below → PIVOT (5; the driver re-runs the author once with the ledger, a
 second PIVOT is NO-GO); a required source blocked here per `reachable.json`
 → infra (4, run it where the host answers); unmatched measure at freeze or
 cap reached → needs-human (3); else GO (0). The stage total (`validate.toml
-budget.usd`, $12; $4.50 on the small band) is the sum of this slug's ledger
+budget.usd`, $15; $7 on the small band) is the sum of this slug's ledger
 rows across PIVOT passes; a PIVOT pass keeps the ledger and re-fetches only
-what the revised claims need. Measured on the first real run (2026-09-18,
-a $15 idea in the cloud): author $0.87, setter $0.69, fetcher $0.33, the
-verdict PIVOT on two supporting claims killed by registry numbers; the $2
-cap of the plan could not afford the re-run, hence $4.50.
+what the revised claims need. Measured on real runs (2026-09-18): a $15
+idea in the cloud went PIVOT then NO-GO for $4.09 (author $0.87, setter
+$0.69, fetcher $0.33 per pass); a $60 idea ran all eight roles for $4.07
+(author $0.38, setter $1.01, skeptic $1.02, fetcher $1.37, judge $0.35).
+Per-role ceilings (`[caps]`) are what those numbers plus headroom need; a
+child that hits its ceiling exits 1 with its file already written, and the
+schema check decides whether the run continues.
 
 Files under `.pipeline/validate/<slug>/` (slug = sha256(idea)[:8]); `bodies/`
 is gitignored, the rest is committed. GO hands off with `validate.py

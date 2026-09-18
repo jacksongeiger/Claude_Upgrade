@@ -85,7 +85,7 @@ def judge_all(d, score=2):
 
 def test_init_bands_and_roles(tmp_path):
     d, out = project(tmp_path, 10)
-    assert out["band"] == "small" and out["roles"] == ["author", "setter", "fetcher", "referee"] and out["cap_usd"] == 4.5
+    assert out["band"] == "small" and out["roles"] == ["author", "setter", "fetcher", "referee"] and out["cap_usd"] == 7.0
     assert len(out["slug"]) == 8 and (d / "idea.json").exists() and (d / "bodies").is_dir()
     _, out2 = project(tmp_path / "b", 50)
     assert out2["band"] == "mid" and "skeptic" in out2["roles"] and "judge" in out2["roles"]
@@ -411,3 +411,36 @@ def test_required_source_fetched_under_another_claim_counts(tmp_path):
     ledger(d, rows); judge_all(d)
     rc, out, _ = run(["verdict", "--dir", str(d), "--no-refetch"])
     assert rc == 0, out
+
+
+def test_schema_rejects_sources_that_are_not_urls(tmp_path):
+    """2026-09-18 real run: a skeptic listed '.pipeline/validate/<slug>/evidence/c4_eval.json' as a required
+    disconfirming source; the fetcher can only fetch URLs, so the claim came out 'unobtainable'."""
+    d = frozen_project(tmp_path)
+    plan = json.loads((d / "plan.json").read_text())
+    plan["claims"][0]["measures"][0]["sources"][0]["where"] = ".pipeline/validate/x/evidence/e.json"
+    (d / "plan.json").write_text(json.dumps(plan))
+    rc, out, _ = run(["schema", "--dir", str(d), "--file", "plan"])
+    assert rc != 0 and any("http(s) URL" in p for p in out["problems"])
+    sk = json.loads((d / "skeptic.json").read_text())
+    sk["claims"][0]["disconfirming_sources"][0]["where"] = "evidence/c4_overrides.json"
+    (d / "skeptic.json").write_text(json.dumps(sk))
+    rc, out, _ = run(["schema", "--dir", str(d), "--file", "skeptic"])
+    assert rc != 0 and any("must be an http(s) URL" in p for p in out["problems"])
+
+
+def test_verdict_level_overrule_needs_no_measure_and_annotates_dead_ends(tmp_path):
+    d = frozen_project(tmp_path)
+    rows = good_rows(); rows[0]["value"] = 20000
+    ledger(d, rows); judge_all(d)
+    assert run(["verdict", "--dir", str(d), "--no-refetch"])[0] == 2
+    project = Path(json.loads((d / "idea.json").read_text())["project"])
+    assert "Ruled out because" in (project / "DEAD_ENDS.md").read_text()
+    rc, out, _ = run(["overrule", "--dir", str(d), "--by", "jackson", "--reason", "building it as the pipeline's test project"])
+    assert rc == 0
+    rc, out, _ = run(["verdict", "--dir", str(d), "--no-refetch"])
+    assert rc == 0 and out["verdict"] == "GO"
+    dead = (project / "DEAD_ENDS.md").read_text()
+    assert "Ruled out because" in dead and "**Overruled:**" in dead and "jackson" in dead
+    v = json.loads((d / "verdict.json").read_text())
+    assert v["overruled"]["scope"] == "verdict" and v["overruled"]["measure"] is None

@@ -147,6 +147,10 @@ def cmd_init(a):
 # schema checks (a child's file, before the next role reads it)
 # ---------------------------------------------------------------------------
 
+def _is_http(where):
+    return isinstance(where, str) and re.match(r"^https?://[^\s/]+", where) is not None
+
+
 def _measure_ok(m, problems, where):
     if not isinstance(m, dict):
         problems.append(f"{where}: measure is not an object"); return
@@ -164,8 +168,11 @@ def _measure_ok(m, problems, where):
         for i, s in enumerate(srcs):
             if not isinstance(s, dict) or not s.get("where"):
                 problems.append(f"{where}: source {i} needs 'where'")
+                continue
             if s.get("kind", "url") not in ("url", "experiment", "cmd"):
                 problems.append(f"{where}: source {i} kind must be url, cmd or experiment")
+            elif s.get("kind", "url") == "url" and not _is_http(s["where"]):
+                problems.append(f"{where}: source {i} 'where' must be an http(s) URL for kind url (a local path or an experiment is kind experiment)")
 
 
 def check_claims(obj):
@@ -257,6 +264,8 @@ def check_skeptic(obj, plan_obj):
             for i, s in enumerate(ds):
                 if not isinstance(s, dict) or not s.get("where"):
                     p.append(f"skeptic {cid}: disconfirming source {i} needs 'where'")
+                elif not _is_http(s["where"]):
+                    p.append(f"skeptic {cid}: disconfirming source {i} must be an http(s) URL the fetcher can fetch, not {s['where']!r} (an experiment goes in added_measures)")
                 elif s.get("measure") and s["measure"] not in plan_measures[cid] and s["measure"] not in {m.get("name") for m in (c.get("added_measures") or [])}:
                     p.append(f"skeptic {cid}: disconfirming source {i} names unknown measure {s['measure']!r}")
     return p
@@ -579,9 +588,26 @@ def cmd_verdict(a):
     (d / "VERDICT.md").write_text(render_md(out, frozen), encoding="utf-8")
     if verdict == "NO-GO":
         append_dead_end(Path(idea["project"]), out)
+    elif overruled and prior and prior.get("verdict") == "NO-GO":
+        annotate_dead_end(Path(idea["project"]), out)
     print(json.dumps({"ok": True, "verdict": verdict, "exit": code,
                       "claims": {k: v["status"] for k, v in claims_out.items()}, "infra": infra}))
     return code
+
+
+def annotate_dead_end(project, v):
+    """The NO-GO entry stays in DEAD_ENDS.md; the overrule is written under it so the record shows both."""
+    path = project / "DEAD_ENDS.md"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return
+    o = v["overruled"]
+    line = f"**Overruled:** {o.get('at', '')[:10]} by {o.get('by')} — {o.get('reason')} (verdict GO on human authority; ledger unchanged)\n"
+    if line.strip() in text:
+        return
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(line)
 
 
 def render_md(v, frozen):
@@ -631,8 +657,12 @@ def append_dead_end(project, v):
 
 def cmd_overrule(a):
     d = Path(a.dir)
-    dump(d / "overrule.json", {"by": a.by, "reason": a.reason, "measure": a.measure, "kill_value": float(a.kill_value),
-                               "direction": a.direction, "at": now()})
+    if a.measure and a.kill_value is None:
+        print(json.dumps({"ok": False, "error": "--measure needs --kill-value and --direction"})); return EXIT_USAGE
+    dump(d / "overrule.json", {"by": a.by, "reason": a.reason, "measure": a.measure,
+                               "kill_value": float(a.kill_value) if a.kill_value is not None else None,
+                               "direction": a.direction, "at": now(),
+                               "scope": "measure" if a.measure else "verdict"})
     try:
         project = Path(load(d / "idea.json")["project"])
         with open(project / ".pipeline" / "events.log", "a", encoding="utf-8") as f:
@@ -680,7 +710,7 @@ def main(argv=None):
     s = sub.add_parser("verdict"); s.add_argument("--dir", required=True); s.add_argument("--reachable"); s.add_argument("--fetcher")
     s.add_argument("--no-refetch", action="store_true"); s.add_argument("--toml"); s.set_defaults(func=cmd_verdict)
     s = sub.add_parser("overrule"); s.add_argument("--dir", required=True); s.add_argument("--by", required=True); s.add_argument("--reason", required=True)
-    s.add_argument("--measure", required=True); s.add_argument("--kill-value", required=True); s.add_argument("--direction", choices=["min", "max"], required=True)
+    s.add_argument("--measure"); s.add_argument("--kill-value", type=float); s.add_argument("--direction", choices=["min", "max"])
     s.set_defaults(func=cmd_overrule)
     s = sub.add_parser("handoff"); s.add_argument("--dir", required=True); s.add_argument("--spec", required=True); s.set_defaults(func=cmd_handoff)
     a = ap.parse_args(argv)
