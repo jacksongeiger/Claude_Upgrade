@@ -91,6 +91,18 @@ run_driver flat --cap 5 --hours 1
 grep -q "reset-flat" .loop/scores.jsonl && pass "reset-flat recorded" || fail "no reset-flat row"
 grep -q "PICK mode=harvest" .loop/events.log && grep -q "PICK mode=hypothesize" .loop/events.log && pass "ladder climbed harvest → hypothesize" || fail "ladder not climbed"
 
+# 2b. a flat night that closed a REPORTED defect (production row) with a bigger suite is kept, not reset
+P=$(mkproject); cd "$P"
+sed -i 's/source: human/source: production/' .loop/backlog.yaml; git commit -qam "row from the inbox"
+run_driver report --cap 5 --hours 1 --iters 1
+[ "$(last_outcome)" = "kept" ] && pass "flat + reported row + suite grew → kept" || fail "outcome=$(last_outcome)"
+grep -q "KEPT.*reason=closed-report rows=bl-001" .loop/events.log && pass "KEPT names the closed row" || fail "no closed-report KEPT line: $(grep KEPT .loop/events.log | tail -1)"
+[ "$(cat .loop/wt/loop/tests.txt)" = "PASS PASS PASS FAIL FAIL FAIL" ] && pass "the fix stayed on the loop branch" || fail "tree reset: $(cat .loop/wt/loop/tests.txt)"
+# the same flat night on a SPEC/human row is still reset
+P=$(mkproject); cd "$P"
+run_driver report --cap 5 --hours 1 --iters 1
+[ "$(last_outcome)" = "reset-flat" ] && pass "flat on a human row still resets" || fail "outcome=$(last_outcome)"
+
 # 3. regress → tree reset, stop regression
 P=$(mkproject); cd "$P"
 run_driver regress --cap 5 --hours 1

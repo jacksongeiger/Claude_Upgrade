@@ -69,6 +69,7 @@ emit '{"type":"assistant","message":{"model":"claude-sonnet-5","content":[{"type
 case "$MODE" in
   improve)  echo "PASS PASS PASS PASS" > tests.txt ;;
   flat)     echo "# comment" >> README.md ;;
+  report)   echo "PASS PASS PASS FAIL FAIL FAIL" > tests.txt ;;   # same pass rate, one more test each way: flat score, larger suite
   regress)  echo "PASS FAIL FAIL FAIL" > tests.txt ;;
   nothing)  ;;
 esac

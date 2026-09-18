@@ -550,7 +550,31 @@ PY
     # ---- DECIDE (arithmetic only) ---------------------------------------
     STEP="DECIDE"; beat
     state_set '.phase="DECIDE"'
-    fix_outcome() {  # rewrite the pending row's outcome
+    reported_defect_closed() {  # prints the target row ids when every one is a production/persona row and the suite grew this iteration; else exits 1
+    python3 - "$ITER_DIR" "$WT/.loop/backlog.yaml" "$LOOP/scores.jsonl" "$KIT" "$ITER" <<'PY'
+import json, sys
+it, backlog, scores_path, kit, n = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5])
+sys.path.insert(0, kit)
+import backlog_io
+try:
+    ids = list(json.load(open(it + "/target.json")).get("task_ids") or [])
+    rows = {r.get("id"): r for r in backlog_io.load(backlog)}
+    scores = [json.loads(l) for l in open(scores_path) if l.strip()]
+except (OSError, ValueError):
+    sys.exit(1)
+if not ids or not all(rows.get(i, {}).get("source") in ("production", "persona") for i in ids):
+    sys.exit(1)
+def n_tests(r):
+    return (((r.get("dims") or {}).get("tests") or {}).get("raw") or {}).get("n_tests")
+now = [r for r in scores if r.get("iter") == n]
+prev = [r for r in scores if r.get("iter") != n and r.get("outcome") in ("kept", "baseline")]
+if not now or not prev or n_tests(now[-1]) is None or n_tests(prev[-1]) is None or n_tests(now[-1]) <= n_tests(prev[-1]):
+    sys.exit(1)
+print(",".join(sorted(ids)))
+PY
+}
+
+fix_outcome() {  # rewrite the pending row's outcome
         python3 - "$LOOP/scores.jsonl" "$ITER" "$1" <<'PY'
 import sys, json, pathlib
 p = pathlib.Path(sys.argv[1]); it = int(sys.argv[2]); oc = sys.argv[3]
@@ -582,12 +606,27 @@ PY
         event REGRESSION delta="$DELTA"
         stop regression "delta $DELTA below -$REGRESS_EPS; tree reset to $PRE_SHA, rejected sha tagged"; break
     elif jq -en --argjson d "$DELTA" --argjson e "$FLAT_EPS" '($d | fabs) < $e' >/dev/null; then
-        git -C "$WT" tag -f "nightshift/flat/iter-$ITER" "$HEAD_SHA" >/dev/null 2>&1 || true
-        git -C "$WT" reset --hard "$PRE_SHA" >>"$RUN/loop.log" 2>&1
-        fix_outcome reset-flat
-        state_set '.flat += 1'
-        OUTCOME="reset-flat"
-        event RESET reason=flat delta="$DELTA"
+        # A reported defect (a production or persona row) is a dimension the
+        # scoreboard does not have yet; the test the fix lands is its
+        # measurement. So a flat night that merged for such rows and grew the
+        # suite is kept, not reset (Inbox Triage, 2026-09-18: the first
+        # night's fix for an inbox bug was undone at delta 0.08). Spec rows
+        # keep the strict rule; a regression is still a regression.
+        CLOSED=""
+        [ "$HEAD_SHA" = "$PRE_SHA" ] || CLOSED=$(reported_defect_closed 2>>"$RUN/loop.log" || true)
+        if [ -n "$CLOSED" ]; then
+            fix_outcome kept
+            state_set --argjson c "$COMPOSITE" --argjson d "$DELTA" '.score=$c | .delta=$d | .flat=0 | .best=([.best // 0, $c] | max)'
+            OUTCOME="kept"
+            event KEPT delta="$DELTA" composite="$COMPOSITE" reason=closed-report rows="$CLOSED"
+        else
+            git -C "$WT" tag -f "nightshift/flat/iter-$ITER" "$HEAD_SHA" >/dev/null 2>&1 || true
+            git -C "$WT" reset --hard "$PRE_SHA" >>"$RUN/loop.log" 2>&1
+            fix_outcome reset-flat
+            state_set '.flat += 1'
+            OUTCOME="reset-flat"
+            event RESET reason=flat delta="$DELTA"
+        fi
     else
         fix_outcome kept
         state_set --argjson c "$COMPOSITE" --argjson d "$DELTA" '.score=$c | .delta=$d | .flat=0 | .best=([.best // 0, $c] | max)'

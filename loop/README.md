@@ -216,6 +216,17 @@ what `Monitor` and `/jg-loop watch` grep. Event names: `iteration_start`,
 `ASK`, `REGRESSION`, `STOP`. `STOP` and `ASK` lines must appear in `.log` for
 every stop path — including the crash trap.
 
+## Keep or reset
+
+An iteration is kept when the composite rises by more than the weighted
+`eps`, reset when it falls by more than `regress_eps` (after a drift
+re-score of the pre-iteration tree), and reset as flat otherwise — with one
+exception: a flat iteration whose target rows are all reported defects
+(`source: production` or `persona`), whose commits landed, and whose test
+count grew is kept (`KEPT reason=closed-report rows=…`). A reported bug is a
+dimension the scoreboard does not have yet; the test the fix lands is its
+measurement. Spec and human rows keep the strict rule.
+
 ## Stop conditions (all set `stop_reason`, append `STOP <reason>` to events.log, notify)
 
 cap · regression · regression-drift · flat · needs-human · hours · manual ·
