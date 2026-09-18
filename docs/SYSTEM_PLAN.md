@@ -1,8 +1,9 @@
 # The project execution system: plan for the finished thing
 
-Revision 3, 2026-09-18. Revisions 1 and 2 were reviewed cold by context-free
-reviewers (`docs/REVIEW-2026-09-18.md`, `docs/REVIEW-2026-09-18-r2.md`); this
-revision answers every structural finding of both. It is written to be read by someone with
+Revision 4 (final), 2026-09-18. Revisions 1–3 were reviewed cold by
+context-free reviewers (`docs/REVIEW-2026-09-18.md`, `-r2.md`, `-r3.md`);
+the third called REVISE once more with no further review needed, and this
+revision makes those six changes. The next step is the build. It is written to be read by someone with
 no prior context.
 
 ## 1. What the system is for
@@ -72,7 +73,11 @@ suites and can edit its own ARD judge (see 4.0).
   on the planner's honesty; the deny rule and the hook below are extra.
   A mismatch stops the run, as today.
 - `loop/check_plan.py` denies any `owned_paths` entry matching a pinned
-  file, and `hooks/safety` trips on an edit to one.
+  file, and `hooks/guard.sh` trips on an edit to one (it needs the manifest
+  path; `child.sh` passes `NIGHTSHIFT_CONFIG` the way `run.sh` does).
+- Order note: this step closes a stated principle violation and takes half
+  a day, so it stays first; it is not on the validation path, and §4.3,
+  §4.5 and most of §4.6 can follow the first real validation run.
 - This repo's Nightshift config: `main_branch: main`, three tests scorers
   (`discovery`, `loop/tests`, `pipeline/tests`), re-baselined.
 - `loop/init.py` and `pipeline/mkconfig.py` pin the same set for every
@@ -101,11 +106,35 @@ its own feasibility question.
 Invocation: `/jg-validate --build-usd N "<idea or URL>"`. The budget is
 named up front because the spec does not exist yet. The slug is the first
 8 hex of sha256(idea text). `verdict.json` stores the idea text and
-`validated_budget_usd`. `spec_check.py` gains the gate: exit 3 when no
-verdict exists or the verdict is NO-GO without `overruled` (unless
-`--no-validate` is passed and logged), and exit 2 when
+`validated_budget_usd`.
+
+Where it lives: validation runs in a project directory. For a new idea,
+`/jg-new-project` creates the folder first (its own inline feasibility
+check in §1 is removed; §1 becomes "run `/jg-validate`") and validation
+runs inside it; a NO-GO for a project that then never gets built appends to
+the kit's `DEAD_ENDS.md` (the "parent project location" that command
+already names). For an existing project it runs in place. Files:
+`.pipeline/validate/<slug>/` with `bodies/` gitignored and `claims.json`,
+`plan.frozen.json`, `ledger.jsonl`, `judge.json`, `verdict.json`,
+`VERDICT.md` committed; `pipeline/README.md`'s ignore list gains the entry.
+
+The driver: `pipeline/validate.sh` is the only entry point the command
+calls. It runs every role as a fresh child through `child.sh`, does the
+redaction of the setter's numbers as a script step, records each child's
+cost in the ledger, treats `validate.usd` as the **stage total** across
+PIVOT passes (a PIVOT pass reuses unchanged ledger rows and re-fetches only
+what the revised claims need), and stops at the cap with exit 3 and no
+verdict written. No model sequences the roles.
+
+The gate: on GO, `spec.json` gets `validation: {slug, verdict_sha256,
+validated_budget_usd}` beside the anchors. `spec_check.py --gate-validate`
+reads the verdict at that slug, verifies the sha, and exits 3 when the
+verdict is missing or NO-GO without `overruled`, exit 2 when
 `budget.build_usd > validated_budget_usd` (validate again at the higher
-tier). Today `spec_check.py` reads neither; this is new code.
+tier). The gate runs at "signed" in the interview and in `build.sh` before
+the first milestone, and whenever `spec.validation` is present; specs
+without it (every existing project and fixture) are reported, not failed.
+Today `spec_check.py` reads none of this; it is new code.
 
 Roles, each a separate context, each writing a file the next reads:
 
@@ -130,15 +159,18 @@ Roles, each a separate context, each writing a file the next reads:
    Writes `plan.frozen.json` with its sha and `frozen_at`. From here the
    plan is read-only to every child.
 5. **Fetcher** (Sonnet, fresh, read-only plan): for every planned source,
-   calls `pipeline/fetch.py` and appends a ledger row: claim, measure,
-   source `{kind, url|cmd, extracted_by, body_hash}`, value, unit, date,
-   author or origin (for independence), note. It may add sources it finds;
-   it may not remove planned ones. A source it cannot reach becomes a row
-   with `value: null` and `reason: egress | 404 | paywall | timeout`. It
-   never writes an estimate.
-6. **Judge** (Sonnet, fresh, sees plan + ledger, fixed rubric): one question
-   per ledger row: does the source say what the row claims, 0/1/2, with the
-   quoted line. Nothing else.
+   calls `pipeline/fetch.py`, which writes the extracted text to
+   `bodies/<body_hash>.txt` (size-capped) and appends a ledger row: claim,
+   measure, source `{kind, url|cmd, extracted_by, body_hash}`, value, unit,
+   date, origin (a URL host or a handle, never free text; the referee
+   rejects anything else), note. It may add sources it finds; it may not
+   remove planned ones. A source it cannot reach becomes a row with
+   `value: null` and `reason: egress | 404 | paywall | timeout`. It never
+   writes an estimate.
+6. **Judge** (Sonnet, fresh, read-only, no Bash, as `persona-judge` already
+   is): reads plan, ledger and the body files, and answers one question per
+   ledger row: does the source say what the row claims, 0/1/2, with the
+   quoted line from the body. Nothing else.
 7. **Referee** (`validate.py verdict`, script): re-runs every re-runnable
    source through `fetch.py` and compares the **extracted value**, not the
    body: drift is when the value is absent on re-fetch or has crossed the
@@ -171,14 +203,14 @@ can test, and any real pain has three forum posts. Tier 2 costs one query.
 
 | build budget | required | roles that run |
 |---|---|---|
-| under $20 | core at tier 2 (one re-runnable row clearing its kill number) | author → fetcher → referee; the author sets the one measure and number, the referee applies it |
+| under $20 | core at tier 2 (one re-runnable row clearing its kill number) | author → setter → fetcher → referee: the setter, not the author, writes the measure and the kill number (the author never sets its own bar); no skeptic, no judge; path budget $2 |
 | $20–100 | core at tier 2, every other claim at tier 1 (three independent rows) | all eight |
-| over $100 | every claim at tier 2, plus one tier-3 row from an experiment (a landing page, a concierge run, a personal usage log) before milestone 2 | all eight |
+| over $100 | every claim at tier 2, plus one tier-3 row from an experiment (a landing page, a concierge run, a personal usage log) before milestone 2; enforced by `milestone.py next`, which exits 3 for any milestone with dependencies while the ledger has no tier-3 row | all eight |
 
 Verdict rules: core claim killed or below its required tier → NO-GO (exit
 2). Any non-core claim killed or below its required tier → PIVOT (exit 5,
-returns to the author with the ledger; a second PIVOT on the same idea is
-NO-GO). All required tiers met and nothing killed → GO (exit 0).
+new in the pipeline's exit-code table, returns to the author with the
+ledger; a second PIVOT on the same idea is NO-GO). All required tiers met and nothing killed → GO (exit 0).
 Needs-human (an unmatched measure at freeze, an overrule pending) → exit
 3, as everywhere in the pipeline. Infra (a required source blocked here,
 the referee cannot re-fetch) → exit 4. The verdict is arithmetic; the prose
@@ -189,24 +221,33 @@ skeptic.md, plan.frozen.json, ledger.jsonl, judge.json, verdict.json,
 VERDICT.md}`. GO carries `anchors` (the claims, verbatim) and the kill
 numbers into `spec.json`; NO-GO appends to `DEAD_ENDS.md`.
 
-Budget: `validate.usd` in `pipeline/validate.toml`, default $5 for the
-eight-role path (measured estimate $3–4: three Fable contexts at $0.2–0.5,
-the fetcher $1–2, the judge under $1) and $1.5 for the under-$20 path,
-metered like every other child. ARD is not part of this stage: it indexes
+Budget: `validate.usd` in `pipeline/validate.toml` is the stage total,
+default $8 for the eight-role path (one pass measured estimate $3–4: three
+Fable contexts at $0.2–0.5, the fetcher $1–2, the judge under $1; a PIVOT
+pass re-fetches only what changed) and $2 for the under-$20 path, enforced
+by `validate.sh` across passes. ARD is not part of this stage: it indexes
 tools, not data sources. A data-source funnel is a possible later project.
 
 Tests: `validate.py` against a fake fetcher and hand-written ledgers: the
-stricter-number merge, the disconfirming-source requirement, freeze
-immutability (a child that edits the frozen plan is caught by sha), drift,
-the tier table, every verdict rule, the spec_check gate, the DEAD_ENDS
-write. Then one real run on an idea of the human's.
+stricter-number merge, the unmatched-measure rejection, the
+disconfirming-source requirement, freeze immutability (a child that edits
+the frozen plan is caught by sha), value-based drift, origin validation,
+the tier table, every verdict rule, the stage-total cap across a PIVOT,
+the spec_check gate, the DEAD_ENDS write; `validate.sh` end to end with
+`fake_claude.sh`. Then the first real run: an idea of the human's at a
+budget under $20, in the cloud, because that path needs only registries
+and the GitHub API, which the cloud reaches. The first run at $20 or more
+happens on the Mac (§4.7), directly after, since it needs the forum and
+search hosts the cloud blocks.
 
 ### 4.3 Judgment where rules are doing judgment's job (Haiku behind a script)
 
 - `feedback.py`: dimension by a Haiku call returning one of the allowed
   dimensions, validated by the script; duplicates by a Haiku "same
   complaint?" call over normalized titles, validated to an id list. Keyword
-  mapping stays as the fallback when the model is unavailable.
+  mapping stays as the fallback when the model is unavailable. It also
+  re-checks an overruled NO-GO (§4.2 step 8) and any GO's kill numbers
+  against the inbox, and reports contradictions to the retro.
 - Persona findings deduplicated and a clean walkthrough's "resolved"
   decision made by a Haiku call over the finding and the trail, validated
   to row ids, **in `pipeline/persona_run.py`**, which is driver-side and
@@ -251,8 +292,11 @@ the retro; not a scorer.
 
 ### 4.6 Housekeeping
 
-- Retire `commands/jg-feasibility.md` (points at `/jg-validate`); rename the
+- Retire `commands/jg-feasibility.md` (points at `/jg-validate`); replace
+  `commands/jg-new-project.md` §1 with "run `/jg-validate`"; rename the
   strategic review to `/jg-review-approach` so `skeptic` means one thing.
+  These three land before the human validates anything, or the cheap path
+  gets used.
 - Annotate the `DEAD_ENDS.md` entry on custom subagents as superseded, with
   the reason (agents became the unit every stage dispatches).
 - No AgentShield row until ECC is installed on the Mac.
