@@ -9,11 +9,11 @@ Claude_Upgrade/
   CLAUDE.md              # global instructions for Claude Code
   install.sh             # one-shot setup: symlinks everything into ~/.claude/
   commands/              # slash commands (each file is the full prompt)
-    jg-feasibility.md
+    jg-feasibility.md      (retired: points at /jg-validate)
     jg-review.md
     jg-changelog.md
     jg-status.md
-    jg-skeptic.md
+    jg-review-approach.md
   templates/
     CLAUDE.general.md    # generic per-project template
     CLAUDE.python.md     # Python project template
@@ -25,7 +25,7 @@ Claude_Upgrade/
   README.md
 ```
 
-All command files are prefixed `jg-` so they don't collide with built-in Claude Code commands or skills of the same name (`/review`, `/status`, etc.). Invoke them as `/jg-review`, `/jg-feasibility`, and so on.
+All command files are prefixed `jg-` so they don't collide with built-in Claude Code commands or skills of the same name (`/review`, `/status`, etc.). Invoke them as `/jg-validate`, `/jg-spec`, and so on.
 
 ## Setup
 

@@ -1,7 +1,16 @@
-Run a full feasibility investigation on the current project or idea before any code is written.
-1. Identify the single core assumption the entire project depends on being true.
-2. Research and validate that assumption thoroughly — check market conditions, API availability, fees, data availability, competition, or whatever is most relevant.
-3. Present findings clearly and concisely.
-4. Give an explicit GO or NO-GO recommendation with reasoning.
-5. If NO-GO, log the idea and findings in DEAD_ENDS.md.
-6. Wait for user confirmation before proceeding to build.
+---
+description: Retired. Idea validation is /jg-validate; this command only points there.
+---
+
+`/jg-feasibility` is retired. It asked "can this be built" and answered from
+the model's own reading; the validation stage asks "should this exist" and
+answers from evidence with sources, kill numbers written before the evidence
+is read, and a verdict a script computes.
+
+Run instead:
+
+    /jg-validate --build-usd <N> "<idea or URL>"
+
+The contract is `pipeline/README.md`, "Stage 0 — /jg-validate". A NO-GO still
+lands in `DEAD_ENDS.md`; a GO carries its claims and kill numbers into
+`spec.json`, where `/jg-spec` refuses to sign without them.

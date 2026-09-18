@@ -12,6 +12,7 @@ Mode: {{MODE}} (`interactive`: ask the human with the terminal question tool;
 `answers`: the human's answers are pre-supplied below, one object per round —
 use them and never ask)
 Pre-supplied answers: {{ANSWERS}}
+Validation verdict path, if any: {{VERDICT}}
 
 ## The rounds
 
@@ -49,14 +50,19 @@ Then set `needs` to everything the checks imply (`unit-tests`, `coverage`
 when a success line names it, `persona`, `lighthouse`, `perf`, `evals`)
 plus `ui`, `llm`, `db`, `auth`, `deploy` as the stack requires.
 
-**Round 4 — success, budget, feasibility.** Up to six numbered success
+**Round 4 — success, budget, the verdict.** Up to six numbered success
 lines, each measurable and ≤ 120 characters; `budget.build_usd` and
-`budget.nightshift_cap_usd`. Then the feasibility question the project's
-CLAUDE.md requires: name the one assumption the project depends on (an API
-that must exist, data that must be available, a fee that must be low
-enough). If you can check it now, check it. If it fails, write the entry to
-`DEAD_ENDS.md` (idea, what was checked, why it was ruled out) and stop with
-"no-go". If it needs the human, say what and stop with "needs-human".
+`budget.nightshift_cap_usd`. Then read the validation verdict instead of
+asking your own feasibility question: `.pipeline/validate/*/verdict.json`
+(the path is in `{{VERDICT}}` when the driver found one). If it is GO, copy
+its `anchors` into `spec.anchors`, its kill numbers into the success lines
+(one line each, verbatim numbers), and set `spec.validation` to
+`{slug, verdict_sha256, validated_budget_usd}` from it. If
+`budget.build_usd` is above `validated_budget_usd`, say so and stop with
+"needs-human: validate again at the higher budget". If there is no verdict
+and the mode is interactive, say so and stop with "needs-human: run
+/jg-validate first" unless the human typed "skip validation", which you
+record in the spec as `validation: {"skipped": true, "by": "human"}`.
 
 ## Writing the files
 

@@ -28,8 +28,12 @@ a spec that does not validate.
 - Adjectives are not checks. "Fast", "clean", "intuitive" become a `perf`,
   `lighthouse`/`gate` or `persona` entry with a number, or they become
   `manual` and are counted against the 20% limit.
-- Feasibility first, per CLAUDE.md: name the one assumption the project
-  depends on and check it before the gate. A no-go goes to `DEAD_ENDS.md`.
+- Validation first: round 4 reads `.pipeline/validate/*/verdict.json`
+  (`/jg-validate`) instead of running its own feasibility check. No verdict
+  means needs-human, unless the human types "skip validation".
+- The gate runs `python3 $KIT/spec_check.py spec.json --gate-validate`
+  before "signed" is accepted: a missing or NO-GO verdict, or a build budget
+  above the validated one, refuses the signature.
 - The gate is the word "signed" typed by the human. Only then commit
   `spec.json`, `SPEC.md`, `GOAL.md` as `spec: v1 signed`. Never commit
   before it, never push.
