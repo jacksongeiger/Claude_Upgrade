@@ -535,3 +535,41 @@ def test_acceptance_cmd_not_on_allowlist_rejected(tmp_path):
     rc, out, err = run_check([str(plan_path), "--repo", str(tmp_path), "--config", str(config_path)])
     assert rc == 2
     assert "not on the child allowlist" in out
+
+
+# ---------------------------------------------------------------------------
+# pinned scorer files are nobody's to own
+# ---------------------------------------------------------------------------
+
+def _pinned_config(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "eval").mkdir(parents=True)
+    (repo / "corpora").mkdir()
+    (repo / "eval" / "harness.py").write_text("x\n")
+    (repo / "corpora" / "cases.yaml").write_text("x\n")
+    cfg = tmp_path / "config.json"
+    write_json(cfg, {"project_dir": str(repo), "max_fanout": 3,
+                     "scorers": [{"name": "eval", "script": "cmd", "cmd": "python3 eval/harness.py",
+                                  "pins": ["eval/harness.py", "corpora/*.yaml"]}]})
+    return repo, cfg
+
+
+def test_owning_a_pinned_file_fails(tmp_path):
+    repo, cfg = _pinned_config(tmp_path)
+    plan = write_plan_target(tmp_path / "it", [base_subtask(owned_paths=["corpora/cases.yaml"])], ["bl-1"])
+    rc, out, _ = run_check([str(plan), "--config", str(cfg), "--repo", str(repo)])
+    assert rc == 2 and "pinned scorer file" in out
+
+
+def test_owning_a_directory_that_contains_a_pinned_file_fails(tmp_path):
+    repo, cfg = _pinned_config(tmp_path)
+    plan = write_plan_target(tmp_path / "it", [base_subtask(owned_paths=["eval/"])], ["bl-1"])
+    rc, out, _ = run_check([str(plan), "--config", str(cfg), "--repo", str(repo)])
+    assert rc == 2 and "pinned scorer file" in out
+
+
+def test_owning_other_files_still_passes(tmp_path):
+    repo, cfg = _pinned_config(tmp_path)
+    plan = write_plan_target(tmp_path / "it", [base_subtask(owned_paths=["src/app.py"])], ["bl-1"])
+    rc, out, _ = run_check([str(plan), "--config", str(cfg), "--repo", str(repo)])
+    assert rc == 0, out

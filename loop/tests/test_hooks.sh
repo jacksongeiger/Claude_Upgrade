@@ -21,6 +21,16 @@ for cmd in "pip install -e ." "pip install -e '.[tests]'" "./venv/bin/pip instal
   denied "$(guard Bash "{\"command\":\"$cmd\"}")" && fail "denied: $cmd" || pass "allow: $cmd"
 done
 denied "$(guard Write "{\"file_path\":\"$WT/new.py\",\"content\":\"x\"}")" && fail "denied in-worktree write" || pass "allow write inside worktree"
+# pinned scorer files (scorers[].pins in the config the driver exports)
+PINCFG="$D/ns-config.json"; printf '{"scorers":[{"name":"eval","script":"cmd","cmd":"python3 eval/h.py","pins":["eval/h.py","corpora/*.yaml"]}]}' > "$PINCFG"
+mkdir -p "$WT/eval" "$WT/corpora"; echo x > "$WT/eval/h.py"; echo x > "$WT/corpora/c.yaml"
+denied "$(NIGHTSHIFT_CONFIG="$PINCFG" guard Write "{\"file_path\":\"$WT/corpora/c.yaml\",\"content\":\"x\"}")" && pass "deny: write to a pinned corpus" || fail "allowed write to a pinned corpus"
+denied "$(NIGHTSHIFT_CONFIG="$PINCFG" guard Edit "{\"file_path\":\"eval/h.py\",\"old_string\":\"x\",\"new_string\":\"y\"}")" && pass "deny: edit of a pinned eval" || fail "allowed edit of a pinned eval"
+denied "$(NIGHTSHIFT_CONFIG="$PINCFG" guard Bash "{\"command\":\"sed -i s/a/b/ corpora/c.yaml\"}")" && pass "deny: sed -i on a pinned file" || fail "allowed sed -i on a pinned file"
+denied "$(NIGHTSHIFT_CONFIG="$PINCFG" guard Bash "{\"command\":\"echo x > eval/h.py\"}")" && pass "deny: redirect into a pinned file" || fail "allowed redirect into a pinned file"
+denied "$(NIGHTSHIFT_CONFIG="$PINCFG" guard Bash "{\"command\":\"cat eval/h.py\"}")" && fail "denied reading a pinned file" || pass "allow: reading a pinned file"
+denied "$(NIGHTSHIFT_CONFIG="$PINCFG" guard Write "{\"file_path\":\"$WT/src/x.py\",\"content\":\"x\"}")" && fail "denied an unpinned write" || pass "allow: unpinned write with pins configured"
+grep -q "DENY safety pinned" "$D/repo/.loop/events.log" && pass "pinned deny is a safety trip" || fail "pinned deny not logged as safety"
 denied "$(guard Write "{\"file_path\":\"$D/repo/f\",\"content\":\"x\"}")" && pass "deny write to main checkout" || fail "allowed write to main checkout"
 denied "$(guard Edit "{\"file_path\":\"$WT/.claude/settings.json\"}")" && pass "deny write under .claude/" || fail "allowed .claude/ write"
 denied "$(guard Edit "{\"file_path\":\"$WT/.loop/backlog.yaml\"}")" && pass "deny write under .loop/" || fail "allowed .loop/ write"

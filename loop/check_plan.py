@@ -36,6 +36,29 @@ VALID_MODELS = ("sonnet", "opus")
 # helpers
 # ---------------------------------------------------------------------------
 
+
+def _score_module():
+    import importlib.util
+    path = Path(__file__).resolve().parent / "score.py"
+    spec = importlib.util.spec_from_file_location("nightshift_score", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _score_pin_globs(config):
+    return _score_module().pin_globs(config)
+
+
+def _score_pinned_paths(config, root):
+    return _score_module().pinned_paths(config, root)
+
+
+def _repo_root_hint(args, config):
+    """Where to expand pin globs: --repo, else the config's project_dir."""
+    return getattr(args, "repo", None) or config.get("project_dir") or "."
+
+
 def _git_toplevel(start_dir):
     try:
         out = subprocess.run(
@@ -178,6 +201,32 @@ def cmd_check(args):
             else:
                 normed.append(npath)
         norm_owned[sid] = normed
+
+    # -- pinned scorer files are nobody's to own ----------------------------
+    # A scorer that lives in the repo is the judge of the code around it; the
+    # manifest pins it (score.py `pins`) and this is the first line that says
+    # no. The hash check at score time is the one that cannot be argued with.
+    if config is not None:
+        try:
+            import fnmatch
+            pins = _score_pin_globs(config)
+            pinned = _score_pinned_paths(config, str(_repo_root_hint(args, config)))
+        except Exception:  # noqa: BLE001 - a pin lookup must never crash the check
+            pins, pinned = [], []
+        for sid, paths in norm_owned.items():
+            for p in paths:
+                hit = None
+                for g in pins:
+                    if fnmatch.fnmatch(p, g) or fnmatch.fnmatch(p.rstrip("/"), g):
+                        hit = g
+                        break
+                if hit is None:
+                    for f in pinned:
+                        if f == p or f.startswith(p.rstrip("/") + "/"):
+                            hit = f
+                            break
+                if hit is not None:
+                    problems.append(f"subtask {sid}: owned path '{p}' is a pinned scorer file ({hit}); scorers, thresholds and corpora are not the executor's to change")
 
     # -- pairwise disjoint owned_paths ---------------------------------------
     sids = list(norm_owned.keys())

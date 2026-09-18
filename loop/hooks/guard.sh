@@ -44,6 +44,29 @@ _project_root() {
     printf '%s' "${CLAUDE_PROJECT_DIR:-}"
 }
 
+# Pinned scorer files: the judges of the code (an in-repo eval, its corpus, a
+# bench). Listed as globs under scorers[].pins in the Nightshift config the
+# driver exports as NIGHTSHIFT_CONFIG; the manifest hash check at score time
+# is the lock, this is the early warning.
+_pin_globs() {
+    [ -n "${NIGHTSHIFT_CONFIG:-}" ] && [ -r "${NIGHTSHIFT_CONFIG}" ] || return 0
+    jq -r '[.scorers[]? | select(.enabled != false) | .pins[]?] | .[]' "$NIGHTSHIFT_CONFIG" 2>/dev/null
+}
+_pinned() {  # _pinned <repo-relative path> → 0 if it matches a pin glob
+    local rel="$1" g
+    while IFS= read -r g; do
+        [ -n "$g" ] || continue
+        g=${g#./}
+        # shellcheck disable=SC2254 - the glob is the point
+        case "$rel" in $g) return 0 ;; esac
+        # a pinned directory prefix (corpora/*.yaml covers corpora/x.yaml; a
+        # write to the directory's parent path is not a file write)
+    done <<EOF3
+$(_pin_globs)
+EOF3
+    return 1
+}
+
 command -v jq >/dev/null 2>&1 || { echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"guard: jq missing"}}'; exit 0; }
 
 tool=$(printf '%s' "$input" | jq -r '.tool_name // empty')
@@ -91,6 +114,15 @@ EOF2
             exit 0
         fi
     fi
+    # Editing a pinned scorer file through the shell (redirect, sed -i, tee,
+    # mv, cp, rm, truncate) is the same trip as editing it with Write.
+    if printf '%s' "$cmd" | grep -Eq '(>|>>|\bsed[[:space:]]+-i|\btee\b|\bmv\b|\bcp\b|\brm\b|\btruncate\b|\bpatch\b)'; then
+        for tok in $(printf '%s' "$cmd" | tr '|;&()<>' '       ' | tr -s ' '); do
+            t=${tok#./}
+            t=${t#"$cwd"/}
+            _pinned "$t" && deny "pinned scorer file, not the executor's to change: $t" "safety"
+        done
+    fi
     # Installs and escapes.
     if printf '%s' "$cmd" | grep -Eq '\brdx[[:space:]]+install\b|\bnpm[[:space:]]+(i|install|ci)\b|\bpip3?[[:space:]]+install\b|\buv[[:space:]]+(add|pip)\b|\bbrew[[:space:]]|\bcargo[[:space:]]+(add|install)\b|curl[^|]*\|[[:space:]]*(ba)?sh\b|\bsudo[[:space:]]|rm[[:space:]]+-rf[[:space:]]+(/|~|\$HOME|\.\.)|\bclaude[[:space:]]+plugin\b|\bclaude[[:space:]]+mcp\b'; then
         deny "unattended run: installs and escapes are denied, record the need in your report: $cmd" "install"
@@ -123,6 +155,7 @@ EOF2
       .claude/*|.loop/*|.git/*|.claude|.loop|.git)
         deny "writes under .claude/ .loop/ .git/ are denied: $rel" "safety" ;;
     esac
+    _pinned "$rel" && deny "pinned scorer file, not the executor's to change: $rel" "safety"
     exit 0
     ;;
   *)

@@ -216,3 +216,74 @@ def test_default_out_path_under_project_root(tmp_path):
     assert proc.returncode == 0, proc.stderr
     expected_out = project / ".loop" / "scores.jsonl"
     assert expected_out.exists()
+
+
+# ---------------------------------------------------------------------------
+# pins: in-repo judges are hashed where the scorers run
+# ---------------------------------------------------------------------------
+
+def _pinned_project(tmp_path):
+    """A project whose eval lives inside the repo, plus a worktree copy."""
+    proj = tmp_path / "proj"
+    (proj / "eval").mkdir(parents=True)
+    (proj / "corpora").mkdir()
+    (proj / "eval" / "harness.py").write_text("print('{\"ok\": true, \"value\": 90}')\n")
+    (proj / "corpora" / "cases.yaml").write_text("- id: a\n")
+    config = proj / "config.json"
+    write_config(config, [
+        {"name": "eval", "script": "cmd", "weight": 1.0, "runs": 1,
+         "cmd": "python3 eval/harness.py", "pins": ["eval/harness.py", "corpora/*.yaml"]},
+    ])
+    import shutil
+    wt = tmp_path / "wt"
+    shutil.copytree(proj, wt)
+    return proj, config, wt
+
+
+def test_pins_are_written_repo_relative_and_verified_in_the_workdir(tmp_path):
+    proj, config, wt = _pinned_project(tmp_path)
+    manifest = tmp_path / "manifest.sha256"
+    proc = run_score(["--manifest-write", str(manifest), "--config", str(config)])
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    text = manifest.read_text()
+    assert "repo:eval/harness.py" in text and "repo:corpora/cases.yaml" in text
+    # an untouched worktree verifies
+    proc = run_score(base_args(config, wt, out=tmp_path / "s.jsonl", manifest=manifest))
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_editing_a_pinned_file_in_the_worktree_is_a_manifest_mismatch(tmp_path):
+    proj, config, wt = _pinned_project(tmp_path)
+    manifest = tmp_path / "manifest.sha256"
+    run_score(["--manifest-write", str(manifest), "--config", str(config)])
+    (wt / "corpora" / "cases.yaml").write_text("- id: a\n- id: relabelled\n")
+    proc = run_score(base_args(config, wt, out=tmp_path / "s.jsonl", manifest=manifest))
+    assert proc.returncode == 4
+    assert "repo:corpora/cases.yaml" in proc.stdout
+
+
+def test_a_new_file_matching_a_pin_glob_is_a_mismatch_too(tmp_path):
+    proj, config, wt = _pinned_project(tmp_path)
+    manifest = tmp_path / "manifest.sha256"
+    run_score(["--manifest-write", str(manifest), "--config", str(config)])
+    (wt / "corpora" / "extra.yaml").write_text("- id: planted\n")
+    proc = run_score(base_args(config, wt, out=tmp_path / "s.jsonl", manifest=manifest))
+    assert proc.returncode == 4
+    assert "repo:corpora/extra.yaml" in proc.stdout
+
+
+def test_deleting_a_pinned_file_is_a_mismatch(tmp_path):
+    proj, config, wt = _pinned_project(tmp_path)
+    manifest = tmp_path / "manifest.sha256"
+    run_score(["--manifest-write", str(manifest), "--config", str(config)])
+    (wt / "corpora" / "cases.yaml").unlink()
+    proc = run_score(base_args(config, wt, out=tmp_path / "s.jsonl", manifest=manifest))
+    assert proc.returncode == 4
+
+
+def test_pins_that_match_nothing_refuse_to_write(tmp_path):
+    proj, config, wt = _pinned_project(tmp_path)
+    write_config(config, [{"name": "eval", "script": "cmd", "weight": 1.0, "runs": 1,
+                           "cmd": "true", "pins": ["nowhere/*.py"]}])
+    proc = run_score(["--manifest-write", str(tmp_path / "m"), "--config", str(config)])
+    assert proc.returncode == 1 and "pins match no file" in proc.stdout

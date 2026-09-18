@@ -40,6 +40,19 @@ git add -A; git commit -qm "spec derived"
 # 2. milestone ordering
 [ "$(python3 "$KIT/milestone.py" --spec spec.json --state .pipeline/build/state.json next)" = "m1" ] && pass "next milestone is m1" || fail "next != m1"
 
+# 2b. mkconfig pins an in-repo judge (a perf bench script) so the loop cannot edit it
+mkdir -p bench; printf 'echo "{\"ms\": 1}"\n' > bench/run.sh
+python3 - <<'PY'
+import json; s=json.load(open("spec.json")); s["needs"]=["unit-tests","perf"]
+s["features"][0]["acceptance"].append({"type":"perf","cmd":"bash bench/run.sh","metric":"ms","max":10})
+json.dump(s, open("spec.json","w"))
+PY
+python3 "$KIT/spec_check.py" spec.json --derive >/dev/null
+python3 "$KIT/mkconfig.py" --project "$P" --spec spec.json --out "$D/mk/config.json" >/dev/null 2>&1
+jq -e '.scorers[] | select(.name=="perf") | .pins == ["bench/run.sh"]' "$D/mk/config.json" >/dev/null && pass "mkconfig pins the bench script" || fail "mkconfig pins: $(jq -c '.scorers[] | select(.name=="perf")' "$D/mk/config.json")"
+grep -q "repo:bench/run.sh" "$D/mk/manifest.sha256" && pass "manifest carries the pinned bench" || fail "manifest lacks repo:bench/run.sh"
+git checkout -q spec.json .loop/backlog.yaml 2>/dev/null; rm -rf bench .pipeline/acceptance-index.json; python3 "$KIT/spec_check.py" spec.json --derive >/dev/null; git add -A; git commit -qm "restore" >/dev/null
+
 # 3. build.sh with the fake claude: config from mkconfig, m1 then m2
 NIGHTSHIFT_CLAUDE="$LOOP/tests/fake_claude.sh" FAKE_CLAUDE_MODE=improve bash "$KIT/build.sh" --project "$P" --milestone all --cap 5 > "$D/build.out" 2>&1; RC=$?
 [ "$RC" = "0" ] && pass "build.sh exits 0 on two accepted milestones" || { fail "build.sh rc=$RC"; tail -5 "$D/build.out"; tail -5 .pipeline/run/build.log; }

@@ -37,7 +37,7 @@ Runtime: `python3` (3.9+, stdlib only — no venv, no pip), `bash`, `git`, `jq`.
 ~/.claude/nightshift/<slug>/      per-project config — OUTSIDE the worktree, executors cannot reach it
   config.json
   goal.md
-  manifest.sha256                 sha256 of config.json + every enabled scorer file; verified before every score
+  manifest.sha256                 sha256 of config.json + every scorer file + every pinned in-repo judge, verified in the worktree before every score
 
 <project>/.loop/                  runtime state
   backlog.yaml                    committed; the one human-editable steering surface
@@ -261,12 +261,27 @@ of the allowlist; the prompts say so and check_plan treats them as denied.
   `git worktree list`) and `install` → denied and logged, no trip. The trip
   looks only at events written during the current iteration.
 
-**Kit upgrades and the manifest.** `manifest.sha256` pins `config.json` and
-every scorer script. Changing a scorer in the kit (a bug fix included) makes
+**Kit upgrades and the manifest.** `manifest.sha256` pins `config.json`,
+every scorer script, and every in-repo file a scorer's `pins` globs name
+(`repo:<path>` lines). Changing a scorer in the kit (a bug fix included) makes
 every project's manifest mismatch and the next run stop with
 `score-infra-broken` — by design: a scorer change is a scoring change. After
 pulling a kit update, re-sign each project once:
 `python3 $KIT/score.py --manifest-write ~/.claude/nightshift/<slug>/manifest.sha256 --config ~/.claude/nightshift/<slug>/config.json`.
+
+**Pins: the judge is not the executor's to edit.** A scorer that lives in the
+repo (an eval harness, its thresholds, a labelled corpus, a bench script) is
+the judge of the code around it. `scorers[].pins` lists those files as
+repo-relative globs; `score.py` hashes them **in the worktree it scores**, so
+an executor's edit, a merge that touches one, or a new file matching a
+corpus glob is a manifest mismatch and the run stops. `check_plan.py` refuses
+a plan that owns a pinned path, and the guard denies a write to one (by tool
+or by shell redirect) as a safety trip. `init.py` and `mkconfig.py` derive a
+conservative default (the named script or module, a `corpora`/`fixtures`/
+`evals` directory beside it); a project that knows better names its own.
+Measured need: on this repo, three loop iterations raised coverage and left
+the ARD eval untouched, and the cheapest way to move that eval was to edit
+its corpus from inside the worktree.
 
 `.loop/run/live.json` (inside the loop worktree, written by tail.py on every
 stream line): `{live_spend_usd, budget_usd, remaining_usd}`. The planner reads

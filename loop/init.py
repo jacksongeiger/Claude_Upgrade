@@ -133,7 +133,28 @@ def baseline_run(name, entry, workdir, n=3):
     )
 
 
-def candidate_scorers(assess_data, goal_text):
+def _attach_pins(entry, root):
+    pins = list(entry.get("pins") or [])
+    if entry.get("bench_cmd"):
+        pins += _score_mod().derive_pins(entry["bench_cmd"], root)
+    if entry.get("cmd") and entry.get("name") not in ("tests",):
+        pins += _score_mod().derive_pins(entry["cmd"], root)
+    if entry.get("dir"):
+        pins.append(str(entry["dir"]).rstrip("/") + "/*")
+    if pins:
+        entry["pins"] = sorted(set(pins))
+    return entry
+
+
+def _score_mod():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("nightshift_score", KIT / "score.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def candidate_scorers(assess_data, goal_text, project_dir=None):
     """Which scorers *policy* proposes, before baselining/refusal."""
     cands = []
     tests = assess_data.get("tests", {}) or {}
@@ -151,6 +172,12 @@ def candidate_scorers(assess_data, goal_text):
     evals = assess_data.get("evals", {}) or {}
     if assess_data.get("llm_calls") and evals.get("present"):
         cands.append(("evals", {"name": "evals", "dir": evals.get("dir")}))
+
+    # In-repo judges (a bench script, an evals directory) get pinned so the
+    # loop cannot edit what scores it; score.py hashes them in the worktree.
+    root = str(project_dir or assess_data.get("project_dir") or "")
+    for _name, entry in cands:
+        _attach_pins(entry, root)
 
     ui = assess_data.get("ui", {}) or {}
     if ui.get("present"):
@@ -243,7 +270,7 @@ def build_unblock_hints(assess_data):
 def propose(project_dir, assess_data, goal_text, cap, hours):
     project_dir = Path(project_dir).resolve()
     slug = compute_slug(project_dir)
-    cands = candidate_scorers(assess_data, goal_text)
+    cands = candidate_scorers(assess_data, goal_text, project_dir)
 
     enabled = []
     dropped = []

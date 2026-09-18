@@ -445,3 +445,21 @@ def test_guess_commands_prefixes_submodule_init_when_gitmodules_present():
     }
     setup_cmd, _ = init.guess_commands(assess_data)
     assert setup_cmd == "git submodule update --init --recursive && npm ci"
+
+
+def test_in_repo_judges_get_pinned_by_default(tmp_path):
+    """A bench script or an evals dir named by a scorer is a judge of the
+    code; init pins it so the loop cannot edit what scores it."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("init_mod", LOOP_DIR / "init.py")
+    init_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(init_mod)
+    (tmp_path / "bench").mkdir()
+    (tmp_path / "bench" / "run.mjs").write_text("x")
+    (tmp_path / "evals").mkdir()
+    assess = {"tests": {"test_cmd": "pytest -q"}, "bench": {"present": True, "cmd": "node bench/run.mjs"},
+              "evals": {"present": True, "dir": "evals"}, "llm_calls": True, "ui": {"present": False}}
+    cands = dict(init_mod.candidate_scorers(assess, "", project_dir=tmp_path))
+    assert cands["perf"]["pins"] == ["bench/run.mjs"]
+    assert cands["evals"]["pins"] == ["evals/*"]
+    assert "pins" not in cands["tests"]

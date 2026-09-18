@@ -39,6 +39,7 @@ def main(argv=None):
         print(f"mkconfig: assess.py failed: {e}", file=sys.stderr)
         return 4
     import init as loop_init  # noqa: E402
+    import score as loop_score  # noqa: E402
     setup_cmd, test_cmd = loop_init.guess_commands(assess)
     tests = assess.get("tests") or {}
     proposed = project / ".pipeline" / "scorers.proposed.json"
@@ -79,6 +80,17 @@ def main(argv=None):
                 entry.update({"cmd": bench or "echo '{\"value\": 0}'", "script": "cmd"})
         elif name == "evals":
             entry.update({"dir": (assess.get("evals") or {}).get("dir") or "evals"})
+        # pin the in-repo judges (bench scripts, evals dirs) so the loop
+        # cannot edit what scores it; score.py hashes them in the worktree
+        pins = []
+        if entry.get("bench_cmd"):
+            pins += loop_score.derive_pins(entry["bench_cmd"], str(project))
+        if entry.get("cmd") and name != "tests":
+            pins += loop_score.derive_pins(entry["cmd"], str(project))
+        if entry.get("dir"):
+            pins.append(str(entry["dir"]).rstrip("/") + "/*")
+        if pins:
+            entry["pins"] = sorted(set(pins))
         scorers.append(entry)
     budget = spec.get("budget") or {}
     cfg = {

@@ -46,8 +46,82 @@ def enabled_scorers(config):
     return [e for e in config.get("scorers", []) if e.get("enabled", True)]
 
 
-def expected_manifest(config, config_path, script_dir):
-    """label -> sha256 (or None if the file is missing)."""
+def pin_globs(config):
+    """Every `pins` glob of every enabled scorer, repo-relative."""
+    out = []
+    for entry in enabled_scorers(config):
+        for g in entry.get("pins") or []:
+            if isinstance(g, str) and g.strip():
+                out.append(g.strip().lstrip("./"))
+    return sorted(set(out))
+
+
+def pinned_paths(config, root):
+    """Repo-relative files the pins match under `root`, sorted.
+
+    A scorer that lives inside the repo (an eval harness, a labelled corpus,
+    a bench script) is the judge of the code around it. Measured on this
+    repo: the ARD eval, its thresholds and its corpus sat in the worktree the
+    executors edit, so "an executor cannot edit its own judge" was false and
+    the manifest, which pinned only kit files, could not see it. Pins name
+    those files; they are hashed where the scorers run, in the worktree."""
+    import glob as _glob
+    found = set()
+    for g in pin_globs(config):
+        for hit in _glob.glob(os.path.join(root, g), recursive=True):
+            if os.path.isfile(hit):
+                found.add(os.path.relpath(hit, root).replace(os.sep, "/"))
+    return sorted(found)
+
+
+def derive_pins(cmd, root):
+    """A conservative default for a scorer that runs something in the repo.
+
+    Pins the script or module the command names and, for a Python module,
+    a `corpora`, `fixtures` or `evals` directory beside its package. It
+    never pins a whole package: the loop must still be able to improve the
+    code the eval measures. A project that knows better sets `pins` itself
+    (this repo names four files and its corpus)."""
+    import re as _re
+    import shlex
+    pins = []
+    if not cmd or not root:
+        return pins
+    try:
+        toks = shlex.split(cmd)
+    except ValueError:
+        toks = cmd.split()
+    cwd = ""
+    for i, t in enumerate(toks):
+        if t == "cd" and i + 1 < len(toks):
+            cwd = toks[i + 1].strip("./")
+    def rel(pth):
+        return (cwd + "/" + pth) if cwd and not pth.startswith(cwd + "/") else pth
+    for i, t in enumerate(toks):
+        if t == "-m" and i + 1 < len(toks):
+            mod = toks[i + 1]
+            modpath = rel(mod.replace(".", "/") + ".py")
+            if os.path.isfile(os.path.join(root, modpath)):
+                pins.append(modpath)
+                pkg_parent = os.path.dirname(os.path.dirname(modpath)) or "."
+                for d in ("corpora", "fixtures", "evals"):
+                    dd = os.path.join(root, pkg_parent, d)
+                    if os.path.isdir(dd):
+                        pins.append(f"{pkg_parent}/{d}/*".lstrip("./"))
+            continue
+        if _re.match(r"^[\w./-]+\.(py|mjs|cjs|js|sh|ts)$", t):
+            sp = rel(t.lstrip("./"))
+            if os.path.isfile(os.path.join(root, sp)):
+                pins.append(sp)
+    return sorted(set(pins))
+
+
+def expected_manifest(config, config_path, script_dir, workdir=None):
+    """label -> sha256 (or None if the file is missing).
+
+    Kit scorers are hashed in the kit; pinned repo files are hashed under
+    `workdir` (the loop worktree at score time, the project at write time)
+    and labelled `repo:<path>`."""
     expected = {}
     expected["config.json"] = sha256_file(config_path) if os.path.exists(config_path) else None
     for entry in enabled_scorers(config):
@@ -57,6 +131,11 @@ def expected_manifest(config, config_path, script_dir):
         label = f"scorers/{script}.py"
         full = os.path.join(script_dir, "scorers", f"{script}.py")
         expected[label] = sha256_file(full) if os.path.exists(full) else None
+    root = workdir or config.get("project_dir")
+    if root and pin_globs(config):
+        for rel in pinned_paths(config, root):
+            full = os.path.join(root, rel)
+            expected[f"repo:{rel}"] = sha256_file(full) if os.path.exists(full) else None
     return expected
 
 
@@ -74,18 +153,28 @@ def read_manifest(path):
     return actual
 
 
-def verify_manifest(manifest_path, config, config_path, script_dir):
-    """Returns the label of the first mismatching/missing file, or None if ok."""
-    expected = expected_manifest(config, config_path, script_dir)
+def verify_manifest(manifest_path, config, config_path, script_dir, workdir=None):
+    """Returns the label of the first mismatching/missing file, or None if ok.
+
+    Pinned repo files are checked both ways: every `repo:` label in the
+    manifest must hash the same under `workdir` (edited or deleted → label),
+    and every file the pin globs match under `workdir` must be in the
+    manifest (a new corpus file the eval would read → label)."""
     try:
         actual = read_manifest(manifest_path)
     except OSError as e:
         return f"manifest ({e})"
+    expected = expected_manifest(config, config_path, script_dir, workdir)
     for label, exp_hash in expected.items():
         if exp_hash is None:
             return label
         if actual.get(label) != exp_hash:
             return label
+    root = workdir or config.get("project_dir")
+    if root and pin_globs(config):
+        for label in actual:
+            if label.startswith("repo:") and label not in expected:
+                return label  # pinned at write time, gone from the worktree
     return None
 
 
@@ -93,11 +182,15 @@ def cmd_manifest_write(args):
     with open(args.config) as f:
         config = json.load(f)
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    expected = expected_manifest(config, args.config, script_dir)
+    root = args.workdir or config.get("project_dir")
+    expected = expected_manifest(config, args.config, script_dir, root)
     for label, digest in expected.items():
         if digest is None:
             print(json.dumps({"ok": False, "error": f"file not found: {label}"}))
             return 1
+    if pin_globs(config) and not any(k.startswith("repo:") for k in expected):
+        print(json.dumps({"ok": False, "error": f"pins match no file under {root}: {pin_globs(config)}"}))
+        return 1
     lines = [f"{expected[label]}  {label}" for label in sorted(expected)]
     with open(args.manifest_write, "w") as f:
         f.write("\n".join(lines) + "\n")
@@ -244,7 +337,7 @@ def main(argv=None):
     label = make_label(args.iter, ts)
 
     if args.manifest:
-        mismatch = verify_manifest(args.manifest, config, args.config, script_dir)
+        mismatch = verify_manifest(args.manifest, config, args.config, script_dir, args.workdir)
         if mismatch:
             print(json.dumps({"ok": False, "error": f"manifest mismatch: {mismatch}"}))
             row = {
