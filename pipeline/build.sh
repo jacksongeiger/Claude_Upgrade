@@ -69,7 +69,9 @@ if jq -e '.validation' "$SPEC" >/dev/null 2>&1; then
     python3 "$KIT/spec_check.py" "$SPEC" --gate-validate >"$PROJECT/.pipeline/run/gate-validate.out" 2>&1 || { cat "$PROJECT/.pipeline/run/gate-validate.out" >&2; echo "validation gate refused — see above" >&2; exit 3; }
 fi
 if [ ! -f "$CONFIG" ]; then
-    python3 "$KIT/mkconfig.py" --project "$PROJECT" --spec "$SPEC" --out "$CONFIG" || { echo "could not write a Nightshift config" >&2; exit 4; }
+    python3 "$KIT/mkconfig.py" --project "$PROJECT" --spec "$SPEC" --out "$CONFIG"; MKRC=$?
+    # 3 = config written, manifest not signed yet (a pinned judge the build has still to create); fine for the build
+    [ "$MKRC" = 0 ] || [ "$MKRC" = 3 ] || { echo "could not write a Nightshift config" >&2; exit 4; }
 fi
 [ -f "$NSDIR/manifest.sha256" ] || python3 "$LOOP_KIT/score.py" --manifest-write "$NSDIR/manifest.sha256" --config "$CONFIG" >/dev/null
 [ -f "$NSDIR/goal.md" ] || cp "$PROJECT/GOAL.md" "$NSDIR/goal.md" 2>/dev/null || true

@@ -37,3 +37,11 @@ def test_unconfigured(tmp_path):
 def test_timeout(tmp_path):
     out = run({"name": "x", "cmd": "sleep 3; echo '{\"value\": 1}'", "timeout_s": 1}, tmp_path)
     assert out["ok"] is False and "timeout" in out["error"]
+
+
+def test_metric_and_scale_read_a_named_fraction(tmp_path):
+    """Inbox Triage: evals/run.py prints {"accuracy_tags": 0.725, "n": 40}; the spec's evals check names the key."""
+    out = run({"name": "evals", "cmd": "echo '{\"accuracy_tags\": 0.725, \"n\": 40}'", "metric": "accuracy_tags", "scale": 100}, tmp_path)
+    assert out["ok"] is True and abs(out["value"] - 72.5) < 1e-9 and out["raw"]["n"] == 40 and out["raw"]["metric"] == "accuracy_tags"
+    out = run({"name": "evals", "cmd": "echo '{\"value\": 5}'", "metric": "accuracy_tags"}, tmp_path)
+    assert out["ok"] is False and "accuracy_tags" in out["error"]

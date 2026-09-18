@@ -7,9 +7,10 @@ Config:
 
 The command runs in the workdir via `bash -c` and must print, somewhere in its
 stdout, ONE JSON object on its own line containing at least `"value"` (a
-number 0–100, higher is better). Anything else in that object is kept as
-`raw`. Any other output is ignored. Non-zero exit, timeout, or no such line
-→ ok:false.
+number 0–100, higher is better) — or the key named by `metric`, multiplied
+by `scale` (100 for a 0–1 fraction). Anything else in that object is kept
+as `raw`. Any other output is ignored. Non-zero exit, timeout, or no such
+line → ok:false.
 
 This is how a project's own eval harness, benchmark, or quality gate becomes a
 scoreboard dimension in one line of config, without writing a new scorer.
@@ -32,6 +33,14 @@ def main(argv: list[str]) -> int:
     cfg = json.loads(a.config)
     name = cfg.get("name", "cmd")
     cmd = cfg.get("cmd")
+    # `metric` names the key to read (default "value"); `scale` multiplies it
+    # (100 for a 0-1 fraction). This is how a spec's evals check — a runner
+    # printing {"accuracy_tags": 0.9, ...} — becomes a scoreboard dimension.
+    metric = cfg.get("metric") or "value"
+    try:
+        scale = float(cfg.get("scale") or 1)
+    except (TypeError, ValueError):
+        scale = 1.0
     out = {"name": name, "value": 0.0, "ok": False, "error": None, "raw": {}}
     if not cmd:
         out["error"] = "not configured: cmd required"
@@ -55,20 +64,22 @@ def main(argv: list[str]) -> int:
                 obj = json.loads(line)
             except ValueError:
                 continue
-            if isinstance(obj, dict) and "value" in obj:
+            if isinstance(obj, dict) and metric in obj:
                 found = obj
                 break
     if found is None:
-        out["error"] = (f"no JSON line with a value field (exit {proc.returncode}); "
+        out["error"] = (f"no JSON line with a {metric!r} field (exit {proc.returncode}); "
                         f"stderr tail: {proc.stderr[-300:]!r}")
         print(json.dumps(out)); return 0
     try:
-        value = float(found["value"])
+        value = float(found[metric]) * scale
     except (TypeError, ValueError):
-        out["error"] = f"value is not a number: {found.get('value')!r}"
+        out["error"] = f"{metric} is not a number: {found.get(metric)!r}"
         print(json.dumps(out)); return 0
     value = max(0.0, min(100.0, value))
-    raw = {k: v for k, v in found.items() if k != "value"}
+    raw = {k: v for k, v in found.items() if k != metric}
+    if metric != "value":
+        raw["metric"] = metric
     raw["duration_s"] = round(time.time() - t0, 3)
     raw["exit"] = proc.returncode
     out.update({"value": value, "ok": True, "raw": raw})

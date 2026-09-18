@@ -52,6 +52,7 @@ def main(argv=None):
     weights = {e["name"]: e.get("weight", 1.0) for e in entries}
     serve = (spec.get("stack") or {}).get("serve") or {}
     scorers = []
+    skipped = []
     for name in scorer_names:
         entry = {"name": name, "weight": weights.get(name, 0.0), "runs": 1, "eps": 0.5, "target": 100}
         if name == "tests":
@@ -79,7 +80,25 @@ def main(argv=None):
                 bench = (assess.get("bench") or {}).get("cmd")
                 entry.update({"cmd": bench or "echo '{\"value\": 0}'", "script": "cmd"})
         elif name == "evals":
-            entry.update({"dir": (assess.get("evals") or {}).get("dir") or "evals"})
+            # The spec's evals check is a runner printing one JSON line with a
+            # metric; it becomes a cmd scorer reading that key (a 0-1 fraction
+            # scaled to 100). scorers/evals.py's case files are the other shape
+            # and need eval_cmd + cases_dir; without either there is nothing
+            # to run, and an unrunnable scorer stops Nightshift at baseline
+            # (Inbox Triage, 2026-09-18).
+            evals_checks = [c for f in spec.get("features", []) for c in f.get("acceptance", []) if c.get("type") == "evals"]
+            ev = assess.get("evals") or {}
+            if evals_checks:
+                first = evals_checks[0]
+                frac = isinstance(first.get("min"), (int, float)) and first["min"] <= 1
+                entry.update({"script": "cmd", "cmd": first["cmd"], "metric": first.get("metric") or "value",
+                              "scale": 100 if frac else 1})
+                entry["pins"] = sorted(set(loop_score.derive_pins(first["cmd"], str(project)) + [(ev.get("dir") or "evals").rstrip("/") + "/*"]))
+            elif ev.get("eval_cmd") and ev.get("dir"):
+                entry.update({"eval_cmd": ev["eval_cmd"], "cases_dir": ev["dir"], "pins": [ev["dir"].rstrip("/") + "/*"]})
+            else:
+                skipped.append("evals (no evals check in the spec and no cases dir found)")
+                continue
         # pin the in-repo judges (bench scripts, evals dirs) so the loop
         # cannot edit what scores it; score.py hashes them in the worktree
         pins = []
@@ -87,10 +106,8 @@ def main(argv=None):
             pins += loop_score.derive_pins(entry["bench_cmd"], str(project))
         if entry.get("cmd") and name != "tests":
             pins += loop_score.derive_pins(entry["cmd"], str(project))
-        if entry.get("dir"):
-            pins.append(str(entry["dir"]).rstrip("/") + "/*")
         if pins:
-            entry["pins"] = sorted(set(pins))
+            entry["pins"] = sorted(set(pins + list(entry.get("pins") or [])))
         scorers.append(entry)
     budget = spec.get("budget") or {}
     cfg = {
@@ -106,12 +123,25 @@ def main(argv=None):
     out = Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(cfg, indent=2) + "\n")
-    subprocess.run([sys.executable, str(LOOP / "score.py"), "--manifest-write", str(out.parent / "manifest.sha256"), "--config", str(out)],
-                   capture_output=True, text=True)
+    mw = subprocess.run([sys.executable, str(LOOP / "score.py"), "--manifest-write", str(out.parent / "manifest.sha256"),
+                         "--config", str(out), "--workdir", str(project)], capture_output=True, text=True)
     goal = project / "GOAL.md"
     if goal.exists():
         (out.parent / "goal.md").write_text(goal.read_text())
-    print(f"wrote {out} ({len(scorers)} scorers: {', '.join(scorer_names)})")
+    print(f"wrote {out} ({len(scorers)} scorers: {', '.join(e['name'] for e in scorers)})"
+          + (f"; skipped: {'; '.join(skipped)}" if skipped else ""))
+    try:
+        signed = json.loads(mw.stdout.strip().splitlines()[-1]).get("ok") is True
+        why = json.loads(mw.stdout.strip().splitlines()[-1]).get("error")
+    except (ValueError, IndexError, AttributeError):
+        signed, why = False, (mw.stderr or mw.stdout).strip()[-200:]
+    if not signed:
+        # Before the build, a pinned judge (evals/*, bench/*) may not exist yet;
+        # the build stage does not need the manifest, Nightshift refuses to
+        # start without it. Say so instead of leaving a silent gap
+        # (Inbox Triage, 2026-09-18: "no manifest" at the first dry run).
+        print(f"manifest not signed: {why or 'score.py --manifest-write failed'}; re-run mkconfig.py after the build so Nightshift can start")
+        return 3
     return 0
 
 

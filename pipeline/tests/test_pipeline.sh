@@ -51,6 +51,21 @@ python3 "$KIT/spec_check.py" spec.json --derive >/dev/null
 python3 "$KIT/mkconfig.py" --project "$P" --spec spec.json --out "$D/mk/config.json" >/dev/null 2>&1
 jq -e '.scorers[] | select(.name=="perf") | .pins == ["bench/run.sh"]' "$D/mk/config.json" >/dev/null && pass "mkconfig pins the bench script" || fail "mkconfig pins: $(jq -c '.scorers[] | select(.name=="perf")' "$D/mk/config.json")"
 grep -q "repo:bench/run.sh" "$D/mk/manifest.sha256" && pass "manifest carries the pinned bench" || fail "manifest lacks repo:bench/run.sh"
+# 2c. an evals check in the spec becomes a cmd scorer reading the named metric (Inbox Triage: {"accuracy_tags": 0.9})
+mkdir -p evals; cat > evals/run.sh <<'SH'
+echo '{"accuracy_tags": 0.9, "n": 4}'
+SH
+python3 - <<'PY'
+import json; s=json.load(open("spec.json")); s["needs"]=["unit-tests","perf","evals"]
+s["features"][0]["acceptance"].append({"type":"evals","cmd":"bash evals/run.sh","metric":"accuracy_tags","min":0.8})
+json.dump(s, open("spec.json","w"))
+PY
+python3 "$KIT/spec_check.py" spec.json --derive >/dev/null
+python3 "$KIT/mkconfig.py" --project "$P" --spec spec.json --out "$D/mk2/config.json" >/dev/null 2>&1
+jq -e '.scorers[] | select(.name=="evals") | .script=="cmd" and .metric=="accuracy_tags" and .scale==100 and any(.pins[]; .=="evals/*")' "$D/mk2/config.json" >/dev/null && pass "mkconfig: evals check -> cmd scorer with metric" || fail "mkconfig evals: $(jq -c '[.scorers[] | {name, script, metric, scale, pins}]' "$D/mk2/config.json" 2>&1) :: $(python3 "$KIT/mkconfig.py" --project "$P" --spec spec.json --out "$D/mk2/config.json" 2>&1 | tail -2)"
+EV_OUT=$(python3 "$LOOP/scorers/cmd.py" --config "$(jq -c '.scorers[] | select(.name=="evals")' "$D/mk2/config.json")" --workdir "$P" | tail -1)
+echo "$EV_OUT" | jq -e '.ok==true and .value==90' >/dev/null && pass "evals cmd scorer scores 90 from the fraction" || fail "evals cmd scorer: $EV_OUT"
+rm -rf evals
 git checkout -q spec.json .loop/backlog.yaml 2>/dev/null; rm -rf bench .pipeline/acceptance-index.json; python3 "$KIT/spec_check.py" spec.json --derive >/dev/null; git add -A; git commit -qm "restore" >/dev/null
 
 # 3. build.sh with the fake claude: config from mkconfig, m1 then m2

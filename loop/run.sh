@@ -191,7 +191,7 @@ fi
 STEP="preflight"
 command -v jq >/dev/null || { echo "jq required" >&2; exit 1; }
 [ -f "$CONFIG" ] || { echo "no config at $CONFIG — run /jg-loop init first" >&2; exit 1; }
-[ -f "$MANIFEST" ] || { echo "no manifest at $MANIFEST — run /jg-loop init first" >&2; exit 1; }
+[ -f "$MANIFEST" ] || { echo "no manifest at $MANIFEST — run /jg-loop init, or after a /jg-build re-run pipeline/mkconfig.py so the judges it pinned are signed" >&2; exit 1; }
 [ -f "$GOAL" ] || { echo "no goal at $GOAL — run /jg-loop init first" >&2; exit 1; }
 mkdir -p "$RUN" "$LOOP/iterations"
 if [ -f "$RUN/loop.pid" ] && kill -0 "$(cat "$RUN/loop.pid")" 2>/dev/null; then
@@ -358,7 +358,6 @@ while :; do
         stop cap "spent $SPENT + min_iter $MIN_ITER > cap $CAP"; break; fi
     [ "$FLAT" -lt "$MAX_FLAT" ] || { stop flat "$FLAT flat iterations"; break; }
     [ "$FAILED" -lt 2 ] || { stop two-failed-iterations ""; break; }
-    if [ "$MAX_ITERS" -gt 0 ] && [ "$ITER" -gt "$(( $(jq -r '.iter' "$STATE") + MAX_ITERS - (ITER - 1 - $(jq -r '.iter' "$STATE")) ))" ] 2>/dev/null; then :; fi
     state_set --argjson i "$ITER" '.iter=$i | .phase="PICK" | .step="check" | .agents=[] | .live_spend_usd=0 | .stall=null'
     # Events written before this line belong to earlier iterations/runs; the
     # safety trip below looks only at lines after it.
