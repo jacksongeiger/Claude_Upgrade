@@ -8,7 +8,8 @@ Run directory: {{DIR}}
 Hosts reachable from this machine: {{REACHABLE}}
 
 For every measure source and every `required_sources` entry of every claim,
-run exactly one command, with the claim id, the measure name (omit
+make exactly one Bash tool call holding exactly one command, with the
+claim id, the measure name (omit
 --measure for a required source that names none, pass `--measure text`),
 and `--required` for required sources:
 
@@ -17,6 +18,15 @@ python3 {{KIT}}/fetch.py get "<where>" --extract "<extract>" --run-dir {{DIR}} \
   --ledger {{DIR}}/ledger.jsonl --claim <id> --measure <name> --unit "<unit>" \
   --origin <host or handle> [--required] [--note "<one line>"]
 ```
+
+The command is that bare line and nothing else: no `cd`, no shell
+variables, no `;` or `&&` chains, no loops, no newline-separated batch,
+no `wc` afterwards. The allowlist matches a command that begins with
+`python3 {{KIT}}/`; a compound command is denied outright, and nobody can
+approve it. A denial means the command's shape was wrong, not that
+fetching is forbidden: re-issue each fetch as its own bare line.
+(Measured 2026-09-20: seven fetches batched behind `cd X; F=...; D=...`
+were denied as one and the run ended with no ledger rows.)
 
 Rules:
 - A source with `"kind":"experiment"` is the human's to produce: skip it,

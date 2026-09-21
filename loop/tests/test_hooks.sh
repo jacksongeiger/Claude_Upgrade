@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Guard + report-gate hook tests. Feeds the documented hook JSON on stdin.
 set -uo pipefail
+set +B  # bash 3.2 brace-expands {"a":..,"b":..} even inside double quotes; jq would get half an object
 KIT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 FAIL=0; pass() { echo "  ok   $1"; }; fail() { echo "  FAIL $1"; FAIL=1; }
 echo "test_hooks.sh"

@@ -155,7 +155,7 @@ assert_contains "$out" "exec-sonnet" "running loop: agent type shown"
 # 4. stale heartbeat — amber warning glyph + "stale Nm" prefix
 # ---------------------------------------------------------------------------
 
-touch -d '-10 minutes' "$TMP/.loop/heartbeat"
+touch -d '-10 minutes' "$TMP/.loop/heartbeat" 2>/dev/null || touch -A -001000 "$TMP/.loop/heartbeat"   # GNU, then BSD
 out="$(run_statusline "$(payload "$TMP")" /nonexistent/rdx.sh)"
 assert_contains "$out" "⚠" "stale heartbeat: warning glyph"
 assert_contains "$out" "stale 10m" "stale heartbeat: stale-minutes prefix"
