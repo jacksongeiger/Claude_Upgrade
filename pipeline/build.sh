@@ -211,7 +211,7 @@ PY
       CLAUDE_CONFIG_DIR=$(bash "$LOOP_KIT/child_config.sh" "$NSDIR" "$CHILD_SETTINGS"); if [ -n "$CLAUDE_CONFIG_DIR" ]; then export CLAUDE_CONFIG_DIR; else unset CLAUDE_CONFIG_DIR; fi
       python3 "$LOOP_KIT/spawn.py" --pgid-file "$RUN/child.pgid" --timeout-min "$CHILD_TIMEOUT" -- \
         "$CLAUDE_BIN" -p "$(cat "$ITER_DIR/prompt.md")" \
-        --model fable --max-budget-usd "$BUDGET" --max-turns "$CHILD_TURNS" \
+        --model "${PLANNER_MODEL:-fable}" --max-budget-usd "$BUDGET" --max-turns "$CHILD_TURNS" \
         --permission-mode acceptEdits --permission-prompts none --setting-sources project \
         --settings "$CHILD_SETTINGS" --agents "$AGENTS_JSON" \
         --output-format stream-json --include-hook-events --forward-subagent-text --verbose 2>>"$RUN/build.log"
