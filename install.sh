@@ -7,6 +7,7 @@
 #   ./install.sh --plugins                 Install the recommended plugins (--plugins --dry-run just prints them).
 #   ./install.sh --discovery               Install the rdx resource-discovery system (venv, index, hooks, statusline).
 #   ./install.sh --discovery-uninstall     Remove the rdx hooks and statusline (leaves the index on disk).
+#   ./install.sh --check                   Say what this machine is missing for each stage, with the fix.
 #   ./install.sh --discovery-off           Disable rdx without uninstalling it.
 #
 # Re-runnable: skips links that already point to the right place, replaces
@@ -18,6 +19,7 @@ set -u
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_DIR="$HOME/.claude"
 COMMANDS_DIR="$CLAUDE_DIR/commands"
+AGENTS_DIR="$CLAUDE_DIR/agents"
 SETTINGS_FILE="$CLAUDE_DIR/settings.json"
 
 install_hook_into_project() {
@@ -330,6 +332,28 @@ if [ "${1:-}" = "--project" ]; then
     exit 0
 fi
 
+if [ "${1:-}" = "--check" ]; then
+    # What every stage needs on this machine, with the fix for each miss.
+    ok=0; miss=0
+    have() { command -v "$1" >/dev/null 2>&1; }
+    row() { if eval "$2"; then echo "  ✓ $1"; ok=$((ok+1)); else echo "  ✗ $1 — $3"; miss=$((miss+1)); fi; }
+    echo "Claude_Upgrade — machine check"
+    row "claude CLI"            'have claude'   "install Claude Code"
+    row "python3"               'have python3'  "brew install python"
+    row "jq"                    'have jq'       "brew install jq"
+    row "node + npm"            'have node && have npm' "brew install node"
+    row "git"                   'have git'      "xcode-select --install"
+    row "commands linked"       '[ -L "$COMMANDS_DIR/jg-validate.md" ]' "run ./install.sh"
+    row "agents linked"         '[ -L "$AGENTS_DIR/persona.md" ]' "run ./install.sh"
+    row "global CLAUDE.md"      '[ -L "$CLAUDE_DIR/CLAUDE.md" ]' "run ./install.sh"
+    row "rdx (resource discovery)" '[ -x "$REPO_DIR/discovery/venv/bin/rdx" ] || [ -d "$REPO_DIR/discovery/venv" ]' "./install.sh --discovery"
+    row "playwright (persona, screenshot gates, tokens)" 'node -e "require(\"$REPO_DIR/pipeline/js/pw.cjs\").loadPlaywright()" >/dev/null 2>&1' "npm install -g playwright && npx playwright install chromium"
+    row "lighthouse (ship + lighthouse scorer; UI projects only)" 'have lighthouse || npm ls -g lighthouse >/dev/null 2>&1' "npm install -g lighthouse"
+    echo "$ok ok, $miss missing"
+    [ "$miss" -eq 0 ]
+    exit $?
+fi
+
 if [ "${1:-}" = "--plugins" ]; then
     install_plugins "${2:-}"
     exit 0
@@ -370,6 +394,14 @@ link "$REPO_DIR/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md"
 for cmd in "$REPO_DIR/commands/"*.md; do
     [ -f "$cmd" ] || continue
     link "$cmd" "$COMMANDS_DIR/$(basename "$cmd")"
+done
+
+# Each agent (persona, reviewer, executors, judges): user-level, so /jg-ux and
+# /jg-build can spawn them in any project, not only one Nightshift initialised
+mkdir -p "$AGENTS_DIR"
+for ag in "$REPO_DIR/agents/"*.md; do
+    [ -f "$ag" ] || continue
+    link "$ag" "$AGENTS_DIR/$(basename "$ag")"
 done
 
 register_hook SessionStart "$REPO_DIR/hooks/session-start.sh"

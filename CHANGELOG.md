@@ -108,6 +108,12 @@ setter, skeptic and fetcher prompts: a registry search's total or top hit
 measures the search engine, not a market (`text=llm changelog` returned
 90,771 "competitors"); only a named package's own count is a measure.
 
+**Usable on any project.** `install.sh` now links `agents/*.md` into
+`~/.claude/agents/` (user-level, so `/jg-ux` and `/jg-build` can spawn the
+persona, reviewer and executors in any project) and gains `--check`, which
+names what the machine lacks for each stage with the fix. Symlinks are per
+file: re-run `./install.sh` after pulling a version that added commands.
+
 **Tests:** loop 190, pipeline 180, discovery 353, all green; shell suites
 test_run / test_hooks / test_merge / test_pipeline / test_validate green;
 corpus 8/8; replay 4/4.

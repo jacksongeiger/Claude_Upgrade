@@ -38,7 +38,15 @@ cd ~/Claude_Upgrade
 `install.sh` symlinks the following into `~/.claude/`:
 
 - `CLAUDE.md` → `~/.claude/CLAUDE.md`
-- each `commands/*.md` → `~/.claude/commands/`
+- each `commands/*.md` → `~/.claude/commands/` (every `/jg-*` and `/ard`, in every project)
+- each `agents/*.md` → `~/.claude/agents/` (persona, reviewer, executors, judges)
+
+Then `./install.sh --check` says what the machine still lacks, with the fix
+for each line. For UI projects the persona, screenshot and lighthouse pieces
+need `npm install -g playwright lighthouse && npx playwright install chromium`;
+`./install.sh --discovery` sets up rdx. Re-run `./install.sh` after pulling a
+version that added commands or agents: symlinks are per file, so a new file
+is not linked until then.
 
 Because these are symlinks, any edit you make in the repo is live everywhere immediately — no re-installing. Re-running `install.sh` is safe: it skips links that already point to the right place, replaces stale links, and refuses to overwrite real files.
 
