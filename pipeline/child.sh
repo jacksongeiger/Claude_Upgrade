@@ -72,11 +72,11 @@ trap 'kill_child; exit 130' INT TERM
 
 ( cd "$CWD"
   export NIGHTSHIFT_CONFIG="$CONFIG" NIGHTSHIFT_KIT="$LOOP_KIT" PIPELINE_KIT="$KIT" PIPELINE_STAGE="$STAGE"
-  CLAUDE_CONFIG_DIR=$(bash "$LOOP_KIT/child_config.sh" "$(dirname "$CONFIG")" "$RUN/child-settings.json"); export CLAUDE_CONFIG_DIR
-  setsid bash -c 'echo $$ > "$1"; shift; exec "$@"' _ "$RUN/child.pgid" \
-    timeout "${TMO}m" "$CLAUDE_BIN" -p "$(cat "$RUN/prompt.md")" \
+  CLAUDE_CONFIG_DIR=$(bash "$LOOP_KIT/child_config.sh" "$(dirname "$CONFIG")" "$RUN/child-settings.json"); if [ -n "$CLAUDE_CONFIG_DIR" ]; then export CLAUDE_CONFIG_DIR; else unset CLAUDE_CONFIG_DIR; fi
+  python3 "$LOOP_KIT/spawn.py" --pgid-file "$RUN/child.pgid" --timeout-min "$TMO" -- \
+    "$CLAUDE_BIN" -p "$(cat "$RUN/prompt.md")" \
     --model "$MODEL" --max-budget-usd "$BUDGET" --max-turns "$TURNS" \
-    --permission-mode acceptEdits --permission-prompts none \
+    --permission-mode acceptEdits --permission-prompts none --setting-sources project \
     --settings "$RUN/child-settings.json" --agents "$AGENTS_JSON" \
     --output-format stream-json --include-hook-events --forward-subagent-text --verbose 2>>"$RUN/child.log"
 ) | tee "$RUN/stream.jsonl" \

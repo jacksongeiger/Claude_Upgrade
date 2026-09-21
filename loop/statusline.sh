@@ -22,6 +22,13 @@ RED=$'\033[31m'
 # Path to the rdx launcher. Overridable for tests; defaults to the documented
 # fixed location.
 RDX_SH="${NIGHTSHIFT_RDX_SH:-$HOME/Claude_Upgrade/discovery/rdx.sh}"
+# GNU timeout is absent on macOS; loop/spawn.py is the kit's portable one.
+_SPAWN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/spawn.py"
+with_timeout() {  # with_timeout SECS CMD...
+    local secs="$1"; shift
+    if command -v timeout >/dev/null 2>&1; then timeout "$secs" "$@"
+    else python3 "$_SPAWN" --pgid-file /dev/null --timeout-min "$(awk "BEGIN{print $secs/60}")" -- "$@"; fi
+}
 
 join_by() {
     # join_by <delim> <items...>
@@ -40,7 +47,7 @@ payload="$(cat 2>/dev/null)"
 
 line1=""
 {
-    mapfile -t line1_fields < <(
+    line1_fields=(); while IFS= read -r _f; do line1_fields+=("$_f"); done < <(
         printf '%s' "$payload" | jq -r '
             def scalar: if . == null then ""
                         elif (type == "object" or type == "array") then ""
@@ -77,7 +84,7 @@ line1=""
 
     rdx_line=""
     if [ -n "$RDX_SH" ] && [ -f "$RDX_SH" ]; then
-        rdx_line=$(printf '%s' "$payload" | timeout 0.4 bash "$RDX_SH" statusline 2>/dev/null)
+        rdx_line=$(printf '%s' "$payload" | with_timeout 0.4 bash "$RDX_SH" statusline 2>/dev/null)
         rdx_line="${rdx_line%%$'\n'*}"   # rdx renders one line; guard anyway
     fi
     [ -n "$rdx_line" ] && parts+=("$rdx_line")
@@ -100,7 +107,7 @@ line2=""
         # whitespace collapsing silently drops empty fields and shifts the
         # rest), then the agent count, then one TSV line per agent (agent
         # fields always have a non-empty fallback, so TSV+read is safe there).
-        mapfile -t state_lines < <(jq -r '
+        state_lines=(); while IFS= read -r _f; do state_lines+=("$_f"); done < <(jq -r '
             def scalar: if . == null then ""
                         elif (type == "object" or type == "array") then ""
                         else (. | tostring) end;
@@ -147,7 +154,7 @@ line2=""
                 stale=0
                 hb_file="$project/.loop/heartbeat"
                 if [ -f "$hb_file" ]; then
-                    hb_mtime=$(stat -c %Y "$hb_file" 2>/dev/null || echo "$now_epoch")
+                    hb_mtime=$(stat -c %Y "$hb_file" 2>/dev/null || stat -f %m "$hb_file" 2>/dev/null || echo "$now_epoch")
                     age=$(( now_epoch - hb_mtime ))
                     if [ "$age" -gt 180 ]; then
                         stale=1

@@ -78,7 +78,7 @@ if [ "$MODE" != "nothing" ]; then
   git commit -q -m "nightshift: fake $MODE" >/dev/null 2>&1 || true
 fi
 mkdir -p "$ITER_DIR"
-printf 'CLAUDE_CONFIG_DIR=%s\n' "${CLAUDE_CONFIG_DIR:-}" > "$ITER_DIR/child-env.txt"
+printf 'CLAUDE_CONFIG_DIR=%s\nARGS=%s\n' "${CLAUDE_CONFIG_DIR:-}" "$*" > "$ITER_DIR/child-env.txt"
 printf 'merged: t-fake (bl-001) — %s\nfailed: —\nneeds-human: —\nquestions: 0\n' "$MODE" > "$ITER_DIR/summary.md"
 # the planner edits the backlog at CLOSE; the driver must commit it
 mkdir -p .loop; printf '# fake planner touched this (%s)\n' "$MODE" >> .loop/backlog.yaml 2>/dev/null || true

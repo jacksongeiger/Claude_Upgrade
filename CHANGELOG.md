@@ -1,6 +1,40 @@
 # Changelog
 
 ---
+### v3.4 — 2026-09-20 — the kit runs on a stock Mac
+
+**Measured on macOS 15 with /bin/bash 3.2 and Claude Code 2.1.274**, where the
+first `/jg-new-project` never reached its author role. Five fixes, each named
+by the failure it removes:
+
+- `pipeline/validate.sh`: `declare -A` is bash 4; bash 3.2 read `[author]` as
+  an unset variable and died before the probe. Now a `role_file` case.
+- `loop/spawn.py` (new): `setsid` and GNU `timeout` do not exist on macOS, so
+  every child exited 127. The three drivers (`child.sh`, `build.sh`, `run.sh`)
+  start the child through spawn.py: its own session, pid recorded for the kill
+  paths, TERM then KILL on timeout, exit 124 like timeout(1).
+- `loop/child_config.sh` and the drivers: a kit-owned `CLAUDE_CONFIG_DIR` is
+  logged out on macOS because the Keychain entry is keyed to the config dir;
+  setting the variable to any value, the default path included, flips
+  `claude auth status` to loggedIn:false. With no `.credentials.json` to link
+  it now returns empty, the driver leaves the variable unset, and
+  `--setting-sources project` keeps user hooks and plugins out (measured:
+  0 plugins loaded, only the `--settings` hooks fire).
+- `pipeline/prompts/validate-fetcher.md`: the fetcher batched seven fetches
+  behind `cd X; F=…` into one Bash call, which no allowlist rule matches; the
+  auto-deny told it never to retry and the run ended INFRA with no ledger
+  rows. One bare `python3 …/fetch.py` call per source is now the stated shape.
+- `loop/statusline.sh`: `mapfile`, `timeout 0.4` and `stat -c` replaced with
+  bash-3.2 read loops, the spawn.py timeout, and a BSD `stat -f` fallback.
+- `loop/tests`: the statusline test ages its heartbeat with GNU `touch -d`,
+  now falling back to BSD `touch -A`; the hooks test runs under `set +B`,
+  because bash 3.2 brace-expands `{"a":..,"b":..}` even inside double
+  quotes and handed jq half an object. Both suites pass under /bin/bash 3.2.
+
+First full macOS run afterwards: author → setter → freeze → fetcher → referee,
+7 evidence rows, a NO-GO computed, $3.23.
+
+---
 ### v3.3 — 2026-09-18 — the validation stage, judgment behind the rules, and the retro loop
 
 **Stage 0, `/jg-validate`.** Before a spec exists, an idea is tried against

@@ -68,7 +68,7 @@ child() {  # child ROLE PROMPT MODEL CEILING TURNS [--sub ...]
     if python3 -c "import sys; sys.exit(0 if $left < 0.25 else 1)"; then
         note "cap reached before $role (spent \$$(spent) of \$$CAP)"; return 90
     fi
-    prev "${ROLE_FILES[$role]:-}"
+    prev "$(role_file "$role")"
     local budget; budget=$(python3 -c "print(min($ceil, $left))")
     note "$role model=$model budget=\$$budget"
     bash "$KIT/child.sh" --project "$PROJECT" --prompt "$prompt" --stage "validate:$SLUG:$role" \
@@ -87,7 +87,8 @@ python3 "$KIT/fetch.py" probe --out "$DIR/reachable.json" > "$DIR/probe.out" 2>>
 jq -r '.hosts | to_entries[] | "\(.key): \(if .value.reachable then "reachable" else "BLOCKED (" + (.value.reason // "?") + ")" end)"' "$DIR/reachable.json" > "$DIR/reachable.txt" 2>/dev/null || echo "probe failed" > "$DIR/reachable.txt"
 note "probe: $(jq -r '[.hosts[] | select(.reachable)] | length' "$DIR/reachable.json" 2>/dev/null || echo 0) hosts reachable"
 
-declare -A ROLE_FILES=([author]="claims.json" [setter]="plan.json" [skeptic]="skeptic.json" [fetcher]="" [judge]="judge.json")
+# the file each role writes (a case, not an associative array: macOS ships bash 3.2)
+role_file() { case "$1" in author) echo claims.json ;; setter) echo plan.json ;; skeptic) echo skeptic.json ;; judge) echo judge.json ;; *) echo "" ;; esac; }
 MODEL_AUTHOR=$(tomlget roles author); MODEL_SETTER=$(tomlget roles setter); MODEL_SKEPTIC=$(tomlget roles skeptic)
 MODEL_FETCHER=$(tomlget roles fetcher); MODEL_JUDGE=$(tomlget roles judge)
 CAP_AUTHOR=$(tomlget caps author); CAP_SETTER=$(tomlget caps setter); CAP_SKEPTIC=$(tomlget caps skeptic)

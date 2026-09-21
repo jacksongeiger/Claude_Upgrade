@@ -428,14 +428,15 @@ PY
       cd "$WT"
       export NIGHTSHIFT_CONFIG="$CONFIG" NIGHTSHIFT_KIT="$KIT" NIGHTSHIFT_ITER_DIR="$ITER_DIR"
       # the child's only config: no user hooks, no plugins (loop/child_config.sh)
-      CLAUDE_CONFIG_DIR=$(bash "$KIT/child_config.sh" "$NSDIR" "$CHILD_SETTINGS"); export CLAUDE_CONFIG_DIR
+      CLAUDE_CONFIG_DIR=$(bash "$KIT/child_config.sh" "$NSDIR" "$CHILD_SETTINGS"); if [ -n "$CLAUDE_CONFIG_DIR" ]; then export CLAUDE_CONFIG_DIR; else unset CLAUDE_CONFIG_DIR; fi
       rm -f "$RUN/child.pgid"
-      # setsid makes the child its own session leader: its pid is its pgid.
-      # Record it from inside so kill paths never have to guess with pgrep.
-      setsid bash -c 'echo $$ > "$1"; shift; exec "$@"' _ "$RUN/child.pgid" \
-        timeout "${CHILD_TIMEOUT}m" "$CLAUDE_BIN" -p "$(cat "$ITER_DIR/prompt.md")" \
+      # spawn.py starts the child as its own session leader (its pid is its pgid)
+      # and records it, so kill paths never have to guess with pgrep. It is the
+      # portable setsid+timeout: macOS ships neither.
+      python3 "$KIT/spawn.py" --pgid-file "$RUN/child.pgid" --timeout-min "$CHILD_TIMEOUT" -- \
+        "$CLAUDE_BIN" -p "$(cat "$ITER_DIR/prompt.md")" \
         --model fable --max-budget-usd "$BUDGET" --max-turns "$CHILD_TURNS" \
-        --permission-mode acceptEdits --permission-prompts none \
+        --permission-mode acceptEdits --permission-prompts none --setting-sources project \
         --settings "$CHILD_SETTINGS" --agents "$AGENTS_JSON" \
         --output-format stream-json --include-hook-events --forward-subagent-text --verbose \
         2>>"$RUN/loop.log"
