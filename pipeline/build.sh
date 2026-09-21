@@ -121,6 +121,8 @@ jq -n --arg lk "$LOOP_KIT" --argjson allow "$ALLOW_JSON" '{worktree:{baseRef:"he
          SubagentStop:[{hooks:[{type:"command",command:("bash "+$lk+"/hooks/events.sh"),async:true,timeout:5}]}],
          PreToolUse:[{matcher:"Agent",hooks:[{type:"command",command:("bash "+$lk+"/hooks/budget-gate.sh"),timeout:5}]}]}}' > "$CHILD_SETTINGS"
 AGENTS_JSON=$(python3 "$LOOP_KIT/agents_json.py" --no-ui)
+# AGENT_MODEL_FALLBACK=opus swaps every fable-pinned subagent (the reviewer) when fable is out of quota
+[ -n "${AGENT_MODEL_FALLBACK:-}" ] && AGENTS_JSON=$(jq -c --arg m "$AGENT_MODEL_FALLBACK" 'map_values(if .model == "fable" then .model = $m else . end)' <<<"$AGENTS_JSON")
 
 # an accepted milestone closes its spec rows in the loop's backlog (worktree and project)
 regress_check() {  # regress_check MS ITER_DIR -> prints " m1(exit 2)" per earlier done milestone that no longer accepts, empty when all hold
