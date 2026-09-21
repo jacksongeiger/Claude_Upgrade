@@ -1,0 +1,1 @@
+../../commands/jg-build.md

@@ -1,0 +1,1 @@
+../../commands/jg-spec.md

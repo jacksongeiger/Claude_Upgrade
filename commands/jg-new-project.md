@@ -1,6 +1,23 @@
+---
+description: Bootstrap a new project — a five-minute brief, /jg-validate on it, then the folder, docs, .env, deps, hook and first commit. Stops at the verdict.
+---
+
 > Overlap note: The built-in `init` command only creates a `CLAUDE.md`. This command bootstraps an entire project skeleton — feasibility check, template selection, folder structure, README/CHANGELOG/DEAD_ENDS stubs, `.env`/`.env.example`, dependency manifest, pre-push hook, and initial commit. Use `init` if you only need the CLAUDE.md for an existing repo; use this for a brand-new project.
 
 You are bootstrapping a new project. Walk through this flow in order — do not skip steps unless the user explicitly tells you to.
+
+## 0. The brief (five minutes, before any evidence is bought)
+A two-sentence idea is too thin to validate well: the author role has to
+invent who it is for and what would count as failure. Ask the human these,
+one at a time, and write the answers into a paragraph that becomes the idea
+text for step 1. Keep their words; do not improve the idea.
+1. **Who** is it for, and what do they do today instead? (a person or a role, not "users")
+2. **What pain** does it remove, in their words? What does it cost them now (time, money, missed chances)?
+3. **What would make you stop?** A number or a fact that, if true, means you should not build it (e.g. "fewer than N people have this problem", "an existing tool already does it for free", "the signal cannot be measured before the price moves").
+4. **How would you know it worked** a month after shipping? One or two numbers.
+5. **Budget**: what you expect to spend building it, in dollars. This picks the evidence band (< $20 light, $20–100 standard, > $100 an experiment is required before dependent work).
+If the human already gave a full brief in the prompt, confirm it in one line
+and move on. The paragraph is quoted back once before step 1 runs.
 
 ## 1. Validate
 - Create the project folder first (step 3 moves up: confirm the path, `mkdir`, `cd`, `git init`), because validation writes its files under the project's `.pipeline/validate/`.

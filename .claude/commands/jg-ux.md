@@ -1,0 +1,1 @@
+../../commands/jg-ux.md

@@ -6,7 +6,7 @@ Kit: `~/Claude_Upgrade/pipeline/` (`KIT`). Argument: `$ARGUMENTS`.
 
 | Argument | Do this |
 |---|---|
-| `--build-usd N "<idea or URL>"` | `bash $KIT/validate.sh --project . --idea "<idea>" --build-usd N` and print the last line of the run's `VERDICT.md` plus its path. Exit 0 GO · 2 NO-GO · 3 needs-human · 4 infra (blocked here: run it on the Mac) · 5 PIVOT (the author was re-run once; the human decides). |
+| `--build-usd N "<idea, a brief, or a URL>"` | `bash $KIT/validate.sh --project . --idea "<idea>" --build-usd N` and print the last line of the run's `VERDICT.md` plus its path. Exit 0 GO · 2 NO-GO · 3 needs-human · 4 infra (blocked here: run it on the Mac) · 5 PIVOT (the author was re-run once; the human decides). |
 | `show` | Print `.pipeline/validate/*/VERDICT.md`, newest first. |
 | `overrule <slug> "<reason>" [--measure M --kill-value V --direction min\|max]` | `python3 $KIT/validate.py overrule --dir .pipeline/validate/<slug> --by "$(git config user.name)" --reason "<reason>" [--measure M --kill-value V --direction <dir>]` then `validate.py verdict --dir ... --no-refetch`. Without a measure it is a verdict-level overrule: the NO-GO entry stays in DEAD_ENDS.md with the overrule written under it. With one, `/jg-feedback` re-checks that number after ship. The overrule is stored with the verdict either way. |
 | `handoff <slug>` | `python3 $KIT/validate.py handoff --dir .pipeline/validate/<slug> --spec spec.json`: writes the claims as `anchors`, the kill numbers as success lines, and the `validation` block the spec gate reads. `/jg-spec`'s round 4 does this itself; use this only to re-stamp after a re-run. |
@@ -38,3 +38,9 @@ the skeptic's numbers would go unused.
   shop for a better number; change the idea or overrule with a reason.
 - Blocked hosts are an infra result, not a NO-GO: the cloud cannot reach
   forums or search engines, the Mac can.
+
+The more the idea text says — who, the pain in their words, what exists
+today, what would make the human stop, how success would be measured — the
+sharper the claims and the fewer the guessed kill numbers. `/jg-new-project`
+collects exactly that in its brief; on a bare `/jg-validate`, ask for those
+five answers first when the idea is under about 60 words.
