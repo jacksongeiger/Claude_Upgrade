@@ -12,12 +12,18 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 function loadPlaywright() {
+  // 1. the project's own node_modules: resolve from the working directory, not
+  //    from this file (which lives in the kit, whose parents hold no playwright)
+  try {
+    return require(require.resolve('playwright', { paths: [process.cwd()] }));
+  } catch (err) { /* fall through */ }
+  // 2. wherever this file's own resolution chain finds it
   try {
     return require('playwright');
-  } catch (err) {
-    const globalRoot = execSync('npm root -g').toString().trim();
-    return require(path.join(globalRoot, 'playwright'));
-  }
+  } catch (err) { /* fall through */ }
+  // 3. the global install
+  const globalRoot = execSync('npm root -g').toString().trim();
+  return require(path.join(globalRoot, 'playwright'));
 }
 
 module.exports = { loadPlaywright };
