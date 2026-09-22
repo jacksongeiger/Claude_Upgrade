@@ -204,11 +204,38 @@ async function doAction(page, action) {
   }
 }
 
+// Requests in flight on the page, for settle(). Event streams stay open by design and are not counted.
+const inflight = new Set();
+function trackRequests(page) {
+  page.on('request', (req) => { if (req.resourceType() !== 'eventsource') inflight.add(req); });
+  page.on('requestfinished', (req) => inflight.delete(req));
+  page.on('requestfailed', (req) => inflight.delete(req));
+}
+
+// Look when a person would: no request in flight and the page unchanged for 500 ms, capped at 3 s so a slow
+// screen still shows its loading state. waitForLoadState('networkidle') is not enough: it is reached once per
+// document, so after a client-side navigation it returns at once and the step was captured before the new
+// screen drew; at the bare load event client-fetched screens were still skeletons (memescout, 2026-09-22).
+async function settle(page, quietMs = 500, capMs = 3000) {
+  const start = Date.now();
+  let lastChange = start;
+  let lastSize = -1;
+  while (Date.now() - start < capMs) {
+    let size = lastSize;
+    try {
+      size = await page.evaluate(() => document.documentElement.innerHTML.length);
+    } catch (_) {
+      size = -2; // mid-navigation: the old document is gone
+    }
+    if (inflight.size > 0 || size !== lastSize) lastChange = Date.now();
+    lastSize = size;
+    if (Date.now() - lastChange >= quietMs) return;
+    await page.waitForTimeout(100);
+  }
+}
+
 async function captureState(page, run, step) {
-  // Look when a person would: once the network has been quiet for 500 ms, capped at 3 s so a slow page still
-  // shows its loading state. At the bare load event, client-fetched screens were still skeletons, and personas
-  // clicked loading placeholders that were gone a moment later (memescout, 2026-09-22).
-  await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+  await settle(page);
   const shotsDir = path.join(run, 'shots');
   fs.mkdirSync(shotsDir, { recursive: true });
   const shot = path.join(shotsDir, `step-${step}.png`);
@@ -288,6 +315,7 @@ async function main() {
   try {
     const context = await browser.newContext({ viewport: parseViewport(args.viewport) });
     const page = await context.newPage();
+    trackRequests(page);
     try {
       await page.goto(args.url, { waitUntil: 'load', timeout: 15000 });
     } catch (_) {
