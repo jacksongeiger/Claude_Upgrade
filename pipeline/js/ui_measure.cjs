@@ -349,8 +349,10 @@ function measurePage() {
   const docW = document.documentElement.scrollWidth, offenders = [];
   if (docW > vw + 1) for (const [el] of els) { const r = el.getBoundingClientRect(); if (r.right > vw + 1 && offenders.length < 5) offenders.push(`${short(el)} +${round(r.right - vw)}px`); }
   let clipped = 0, truncated = 0; const clipEx = [];
+  // screen-reader-only text (1px, absolutely placed, clipped) is hidden on purpose, not clipped
+  const srOnly = (el, cs) => cs.position === 'absolute' && (el.clientWidth <= 1 || el.clientHeight <= 1 || cs.clip !== 'auto' || /inset\(50%\)/.test(cs.clipPath || ''));
   for (const [el, cs] of els) {
-    if (!ownText(el)) continue;
+    if (!ownText(el) || srOnly(el, cs)) continue;
     if (['hidden', 'clip'].includes(cs.overflowX) && el.scrollWidth > el.clientWidth + 1) {
       if (cs.textOverflow === 'ellipsis') truncated++; else { clipped++; push(clipEx, short(el)); }
     }
@@ -463,7 +465,8 @@ function stressText() {
   let clipped = 0;
   for (const el of document.querySelectorAll('body *')) {
     const cs = getComputedStyle(el);
-    if (['hidden', 'clip'].includes(cs.overflowX) && cs.textOverflow !== 'ellipsis' && el.scrollWidth > el.clientWidth + 1 && el.textContent.trim()) clipped++;
+    const hidden = cs.position === 'absolute' && (el.clientWidth <= 1 || el.clientHeight <= 1 || cs.clip !== 'auto');
+    if (!hidden && ['hidden', 'clip'].includes(cs.overflowX) && cs.textOverflow !== 'ellipsis' && el.scrollWidth > el.clientWidth + 1 && el.textContent.trim()) clipped++;
   }
   return { textsTripled: n, horizontal: document.documentElement.scrollWidth > innerWidth + 1, docWidth: document.documentElement.scrollWidth, clippedText: clipped };
 }
