@@ -257,6 +257,15 @@ class _Server:
         if self.base or not serve_cmd or not port:
             return self.base
         import socket, time
+        # A server already listening is reused, never doubled: a second serve_cmd fails to bind but still
+        # runs its startup, which rebuilt the live server's demo data under memescout's personas (2026-09-22).
+        # self.proc stays None, so stop() leaves a server this run did not start alone.
+        try:
+            with socket.create_connection(("127.0.0.1", int(port)), timeout=1):
+                self.base = f"http://127.0.0.1:{port}"
+                return self.base
+        except OSError:
+            pass
         self.proc = subprocess.Popen(["bash", "-c", serve_cmd], cwd=workdir, stdout=subprocess.DEVNULL,
                                      stderr=subprocess.DEVNULL, start_new_session=True)
         deadline = time.time() + 60
