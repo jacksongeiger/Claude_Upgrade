@@ -110,7 +110,27 @@ function measurePage() {
   const add = (m, k, n = 1) => m.set(k, (m.get(k) || 0) + n);
   const top = (m, n) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, n).map(([value, count]) => ({ value, count }));
   const total = (m) => [...m.values()].reduce((a, c) => a + c, 0);
-  const lines = (el) => { const rg = document.createRange(); rg.selectNodeContents(el); return new Set([...rg.getClientRects()].filter((x) => x.width > 2).map((x) => Math.round(x.top))).size; };
+  // Lines of visible text. Only text boxes count, and boxes that share a vertical band are one line, so a
+  // centred icon or count badge next to the label is not a second line; screen-reader-only text is skipped.
+  const lines = (el) => {
+    const bands = [];
+    const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+      const p = n.parentElement;
+      if (!n.textContent.trim() || !p) continue;
+      const pcs = getComputedStyle(p);
+      if (pcs.position === 'absolute' && (p.clientWidth <= 1 || p.clientHeight <= 1 || pcs.clip !== 'auto' || /inset\(50%\)/.test(pcs.clipPath || ''))) continue;
+      const rg = document.createRange(); rg.selectNodeContents(n);
+      for (const r of rg.getClientRects()) {
+        if (r.width <= 2 || r.height <= 0) continue;
+        const mid = (r.top + r.bottom) / 2;
+        const band = bands.find((b) => mid >= b.top && mid <= b.bottom);
+        if (band) { band.top = Math.min(band.top, r.top); band.bottom = Math.max(band.bottom, r.bottom); }
+        else bands.push({ top: r.top, bottom: r.bottom });
+      }
+    }
+    return bands.length;
+  };
 
   // ---- colour: any CSS colour -> [r,g,b,a] through a 1×1 canvas (oklch, lab, p3 included)
   const cv = document.createElement('canvas'); cv.width = cv.height = 1;
