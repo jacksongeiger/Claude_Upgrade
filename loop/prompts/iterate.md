@@ -49,6 +49,14 @@ Do not build anything this iteration.
 The row(s) in `target.task_ids` are your task. You may split one row into up
 to {{MAX_FANOUT}} subtasks; you may not substitute a different row.
 
+A row with `dimension: ui` is a finding from /jg-ui's measured check: its
+title names the place and the problem, its note the rule and the fix. Read
+`{{KIT}}/../pipeline/prompts/ui-craft.md` and the project's
+`design-tokens.json` (the direction; never edit it — it is pinned) along
+with the file the row names, and put in the executor's goal the CSS
+variables and components to use, never literal values. The `ui` scorer
+re-measures after the merge, so a row is done when its finding stops firing.
+
 **Read budget: the files the row names, what they import, and one existing
 test file for style — nothing else.** In particular, do not read the loop kit
 (`{{KIT}}`, `run.sh`, `merge.sh`, `check_plan.py`); you are not debugging

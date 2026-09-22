@@ -67,6 +67,14 @@ def main(argv=None):
                       "setup": c.get("setup") or [], "url": c.get("url") or "/"}
                      for f in spec.get("features", []) for c in f.get("acceptance", []) if c.get("type") == "persona"]
             entry.update({"serve_cmd": serve.get("cmd"), "port": serve.get("port"), "tasks": tasks})
+        elif name == "ui":
+            # the /jg-ui check as a scoreboard dimension: the measured floor and
+            # direction only (never the judge's opinion), so a night can climb it;
+            # the direction is pinned so the loop can't move the target it's scored on
+            entry.update({"script": "cmd", "timeout_s": 900,
+                          "cmd": f"python3 {KIT}/ui_check.py score --workdir . --no-dark --label nightshift"})
+            if (project / "design-tokens.json").exists():
+                entry["pins"] = ["design-tokens.json"]
         elif name == "perf":
             # the spec's perf checks are the bench: their budget stands in for
             # a baseline until the first measured run replaces it

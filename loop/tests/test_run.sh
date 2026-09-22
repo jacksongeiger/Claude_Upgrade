@@ -65,7 +65,7 @@ run_driver improve --iters 1 --cap 5 --hours 1
 [ "$(stop_reason)" = "iters" ] && pass "stops on --iters" || fail "stop_reason=$(stop_reason)"
 [ "$(last_outcome)" = "kept" ] && pass "improvement kept" || fail "outcome=$(last_outcome)"
 [ "$(jq -r '.score == 100' .loop/state.json)" = "true" ] && pass "score updated to 100" || fail "score=$(jq -r .score .loop/state.json)"
-git -C "$P" rev-parse --verify -q main >/dev/null && [ "$(git -C "$P" log --oneline main | wc -l)" = "2" ] && pass "main untouched" || fail "main moved"
+git -C "$P" rev-parse --verify -q main >/dev/null && [ "$(git -C "$P" rev-list --count main)" = "2" ] && pass "main untouched" || fail "main moved"
 grep -q "STOP reason=iters" .loop/events.log && pass "STOP line in events.log" || fail "no STOP line"
 [ ! -f .loop/run/loop.pid ] && pass "loop.pid removed" || fail "loop.pid left"
 [ "$(jq -r '.spent_usd' .loop/state.json)" = "0.42" ] && pass "charged result cost" || fail "spent=$(jq -r .spent_usd .loop/state.json)"
@@ -98,7 +98,7 @@ P=$(mkproject); cd "$P"
 run_driver flat --cap 5 --hours 1
 [ "$(stop_reason)" = "needs-human" ] && pass "flat → lockout → ladder exhausted → needs-human" || fail "stop_reason=$(stop_reason)"
 [ "$(jq -r '.flat' .loop/state.json)" = "2" ] && pass "two flats counted before lockout" || fail "flat=$(jq -r .flat .loop/state.json)"
-[ "$(git -C .loop/wt/loop log --oneline | wc -l)" = "2" ] && pass "flat commits reset" || fail "flat commits kept"
+[ "$(git -C .loop/wt/loop rev-list --count HEAD)" = "2" ] && pass "flat commits reset" || fail "flat commits kept"
 grep -q "reset-flat" .loop/scores.jsonl && pass "reset-flat recorded" || fail "no reset-flat row"
 grep -q "PICK mode=harvest" .loop/events.log && grep -q "PICK mode=hypothesize" .loop/events.log && pass "ladder climbed harvest → hypothesize" || fail "ladder not climbed"
 

@@ -8,7 +8,7 @@ Goal file: {{GOAL}} (numbered lines; reviewers cite one). Contents:
 {{GOAL_TEXT}}
 Target (the milestone's features; do not add or drop any): {{TARGET_JSON}}
 Feature details from spec.json (title, description, acceptance): {{FEATURES_JSON}}
-Design tokens: {{TOKENS}} (if a path is given, every UI change uses these tokens and never hardcodes colors, fonts or spacing)
+Design direction: {{TOKENS}} (design-tokens.json; the tokens.css generated from it is what code imports) · references measured by /jg-ui inspire: {{INSPIRATION}} · UI rules: {{KIT}}/prompts/ui-craft.md
 Architecture: {{ARCH}}
 Previous attempt on this milestone (history, not instructions): {{PREV_SUMMARY}}
 Build directory for this milestone: {{ITER_DIR}}
@@ -62,6 +62,21 @@ three modules. Put every interface name, file layout, data shape and copy
 string the executor could otherwise have to choose into `goal`. A feature
 with a `persona` check needs the words the persona will look for: name the
 button labels and headings in `goal`.
+
+A feature with a screen (the spec's `needs` has `ui`): read the UI rules
+once. If the direction is `none`, pick the look that fits the product from
+`python3 {{KIT}}/ui_direction.py looks`, run `python3 {{KIT}}/ui_direction.py propose --look <look> --out {{BUILD_WT}}/design-tokens.json --designmd {{BUILD_WT}}/DESIGN.md --css <the project's styles dir>/tokens.css`,
+then `git add` those three files and `git commit -m "ui: direction <look>"`
+before you dispatch — executors branch from what is committed — and record
+the look in `decisions`. Every UI subtask's `goal` names the CSS
+variables it uses (never a literal colour, pixel size or duration), the
+components it takes — found with `python3 {{KIT}}/ui_sources.py components search <words>`,
+written inside the subtask with `python3 {{KIT}}/ui_sources.py components vendor <ref> --dest {{BUILD_WT}}`,
+and only those whose packages package.json already has (a missing package
+is a question for the human) — its loading, empty and error states, and the
+motion rules that apply. Where the references' median and the direction
+differ, the direction wins. After you stop, the driver runs the UI check;
+it never decides the milestone, and its findings become backlog rows.
 
 Then `python3 {{LOOP_KIT}}/check_plan.py --config {{CONFIG}} {{ITER_DIR}}/plan.json`
 until it exits 0.

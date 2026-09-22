@@ -1,6 +1,129 @@
 # Changelog
 
 ---
+### v3.5 — 2026-09-21 — /jg-ui: craft, measured
+
+**Stage 4b, `/jg-ui`.** Every UI piece in the kit inspected a screen and
+none constructed one (`docs/UI-SKILL-BRIEF.md`): the kit could say a screen
+was broken, not how to make it good. The new stage records a direction per
+project, builds with real components, reads references as numbers and
+measures every screen as the build makes it. Advisory by the human's
+choice: nothing in it blocks a build, a milestone or a merge, and every
+finding is a backlog row. Each piece, named by the problem it removes:
+
+- `ui_direction.py`, `ui_color.py`: a greenfield project had no system to be
+  held to, and extraction needs a page that already looks good. Six looks
+  (calm-dense, precise, editorial, dark-compact, friendly, expressive)
+  become `design-tokens.json` (type scale, spacing, 12-step colour scales
+  for light and dark, radii, shadows, motion, and a `direction` block whose
+  targets the check reads), `tokens.css` (also under shadcn/ui's variable
+  names, so vendored components follow it untouched) and `DESIGN.md`
+  (google-labs-code/design.md). `/jg-ui direction` renders three candidates
+  on one picker page; the human picks; nothing is written without a yes.
+  `--from` starts from a measured site, a Claude Design export or any
+  DESIGN.md. A sweep of 6 looks × 16 accents × 4 neutrals: 0 contrast
+  failures; the scale generator reproduces Radix gray exactly.
+- `ui_sources.py`: components were hand-rolled or recalled from memory.
+  Live search, show and vendor over the registries' own JSON: shadcn/ui
+  new-york-v4 471 items, Kokonut UI 51 (decorative, marketing, AI chat; 36
+  use motion; 35 of 46 components hardcode colours), Bklit 56 (charts
+  only; 19 examples overwrite `app/page.tsx`; some need a paid icon
+  licence). `vendor` needs no CLI, so a headless build can use it: each
+  file's target honoured, imports rewritten to the project's aliases
+  (shadcn items now import `cn` from the `cn` package), nothing
+  overwritten, packages printed and never installed, provenance in
+  `.pipeline/ui/components.lock.json`. A dry run over every item came out
+  clean for 152/158 shadcn, 47/51 Kokonut, 42/56 Bklit. A source is
+  retried once, then named. `libraries <job>` gives one library per job
+  (Sonner, cmdk, Vaul, NumberFlow …).
+- `js/ui_measure.cjs`: the old readers misread reference sites. On Linear,
+  67% of the elements `js/tokens.cjs` sampled were invisible or in
+  `<head>`, and it reported 16px everywhere; the skill's
+  `extract.js` split every cubic-bezier into four easings and chose body
+  size by element count. The new instrument reads visible elements only,
+  takes the size carrying the most characters of running copy as the body,
+  keeps an easing whole, and adds type ratio, spacing on-grid %, OKLCH
+  accent count, measure, density, hierarchy, contrast pairs, motion and
+  mobile checks, a focus pass and long-content stress. One script reads a
+  reference, the localhost and a file:// harness, so the numbers compare.
+  Live: Linear 13px body, ratio 1.30; Stripe 16px, 1.20; Vercel 14px, 1.46.
+- `ui_inspire.py`: `inspiration.md` held prose and the build never opened
+  it. Each reference becomes a numbers card; the median lands in
+  `inspiration.json`, which the build's planner now receives. Adopting
+  Stripe's card gave the editorial look with Stripe's #533afd. Of the
+  galleries tried, 10 return outbound links to a plain request
+  (recent.design, minimal.gallery, onepagelove, httpster, landing.love,
+  awwwards …); land-book, lapa.ninja and saaspo sit behind Cloudflare, and
+  Mobbin needs a login.
+- `/jg-ui fix`, `js/picker.js`: one rewrite of an ugly screen is a guess
+  the human can only take or refuse. Now one piece per run, three variants
+  on named axes (density, layout, interaction, personality, motion) in a
+  harness outside production, flipped with keys 1–3 and D for dark, each
+  measured; the human picks; the winner is built in and measured before
+  and after.
+- `ui_check.py`, `ui_tells.json`: the auditor reported breakage (clipped
+  text, overflow, contrast); nothing measured type, spacing, motion or fit
+  to a direction. Three kinds of finding: `floor` (contrast, type,
+  targets, focus, overflow, motion, phones, states), `direction` (the page
+  against the project's own tokens) and `fashion` (generated-UI tells in a
+  list dated 2026-09-21: anti-slop advice goes stale, so these never count
+  and sit at rung 2). The 0–100 score is floor plus direction only. A
+  deliberately bad fixture scores 0 with 30 findings; each direction's own
+  specimen scores 100.
+- `agents/ui-judge.md`, `prompts/ui-rubric.md`: the persona rubric grades
+  behaviour only. Five craft dimensions (hierarchy, rhythm, alignment,
+  restraint, fit), 0–3 each; the judge sees screenshots before any
+  measured finding; a finding that cites no element from the page's census
+  is dropped; findings become rows and never move the score.
+- `prompts/ui-craft.md`, `skills/ui-design/`: the rules a screen is built
+  against, each measured by the check or graded by the rubric. The skill
+  lived only in `~/.claude/skills/`, invisible to cloud sessions and
+  headless builds; it is versioned here now and `install.sh` links
+  `skills/` into `~/.claude/skills/`.
+
+**Wired into the pipeline.** `build.sh` runs `ui_check.py` after acceptance
+for specs whose `needs` include `ui`: advisory, it never changes the
+milestone; the judge runs only while ≥ $3 of the cap remains, its cost
+charged to the ledger; findings land as `ui` rows. `build.md` has the
+planner author a direction when none exists and put tokens, components,
+states and motion into each UI subtask's goal. `spec_check.py` maps need
+`ui` to a `ui` Nightshift scorer; `mkconfig.py` makes it a cmd scorer
+(`ui_check.py score`) with `design-tokens.json` pinned. `tools_plan.py`
+adds the component baseline (tailwindcss and @tailwindcss/vite 4.3.3,
+motion 13.4.0, radix-ui 1.6.7, class-variance-authority 0.7.1, cn 0.3.2,
+clsx 2.1.1, tailwind-merge 3.7.0, lucide-react 1.47.0, sonner 2.0.8),
+because the loop's allowlist denies `npm install`. `/jg-ux tokens` and
+`inspire` now point here.
+
+**Reachability, re-measured.** The brief had motion.dev, kokonutui.com,
+bklit.com, ui.shadcn.com, mobbin.com and godly.website refused from the
+cloud. From this Mac all six return 200 (godly.website now redirects to
+recent.design), and `ui_sources.py probe` reached 13/13 UI hosts.
+
+**Taken from others, with attribution; nothing installed.**
+emilkowalski/skills (MIT, 40k★, commit 85e8e23): motion standards
+(ease-out, UI under 300ms, transform and opacity only, springs with bounce
+0), the prototype pattern (variants behind a picker, the human picks),
+mobile fixes and pick-ui-library, distilled into `ui-craft.md`, the
+direction's motion tokens, ui_measure's checks and the curated libraries.
+google-labs-code/design.md for DESIGN.md; impeccable's thresholds and its
+judge-before-detector rule; verdict's grounding rule (a judged finding must
+cite a real element); interface-design's "taste is not a defect"; fashion
+tells kept in a dated list of their own. The Claude Design masterclass:
+design system first, reference don't describe, one visual change at a
+time, negatives (the Avoid question); its tweaks became the picker and its
+verifier the check. ReadyDesign-Skill gave two patterns (retry a source
+once, then name it; every import maps to a fetched source) and was not
+installed; nor was ui-registry-mcp; 21st.dev stays optional; `js/tokens.cjs`
+no longer reads reference sites (all four in DEAD_ENDS.md). motionsites.ai
+is a paid prompt catalogue, browsed by hand; HeyGen hyperframes (HTML→video,
+52k★) makes launch videos, not screens.
+
+The human's four decisions still hold: the direction depends on the
+project; it runs on demand and by itself in the build; it never blocks and
+always reports; components are real, off the shelf.
+
+---
 ### v3.4 — 2026-09-20 — the kit runs on a stock Mac
 
 **Measured on macOS 15 with /bin/bash 3.2 and Claude Code 2.1.274**, where the

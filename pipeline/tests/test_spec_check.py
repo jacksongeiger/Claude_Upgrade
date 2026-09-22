@@ -217,11 +217,14 @@ def test_derive_scorers_proposed(tmp_path):
     run([str(p), "--derive"], tmp_path)
     scorers = json.loads((tmp_path / ".pipeline" / "scorers.proposed.json").read_text())["scorers"]
     by_name = {s["name"]: s["weight"] for s in scorers}
-    assert set(by_name) == {"tests", "lighthouse", "persona", "perf"}
+    # the fixture needs "ui": /jg-ui's measured check is a scorer of its own,
+    # so its `ui` backlog rows have a dimension Nightshift can climb
+    assert [s["name"] for s in scorers] == ["tests", "perf", "lighthouse", "persona", "ui"]
     assert by_name["tests"] == pytest.approx(0.4)
-    assert by_name["lighthouse"] == pytest.approx(0.2)
-    assert by_name["persona"] == pytest.approx(0.2)
-    assert by_name["perf"] == pytest.approx(0.2)
+    assert by_name["lighthouse"] == pytest.approx(0.15)
+    assert by_name["persona"] == pytest.approx(0.15)
+    assert by_name["perf"] == pytest.approx(0.15)
+    assert by_name["ui"] == pytest.approx(0.15)
     assert sum(by_name.values()) == pytest.approx(1.0)
 
 

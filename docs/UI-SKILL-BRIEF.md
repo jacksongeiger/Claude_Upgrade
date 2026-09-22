@@ -127,3 +127,102 @@ the fact and `/jg-ui` handling craft.
   are per file, so a new file is not linked until then.
 - A new agent must also be reachable from the repo's own sessions: the
   symlinks in `.claude/agents/` and `.claude/commands/`.
+
+## As built (2026-09-21)
+
+Built on the Mac, branch `feat/jg-ui`. The four decisions hold: the
+direction depends on the project; it runs on demand and by itself in the
+build; it never blocks and always reports; components are real, off the
+shelf. The contract is `pipeline/README.md` (Stage 4b); the numbers are in
+CHANGELOG v3.5.
+
+**Followed the proposal.**
+
+- `/jg-ui` sits beside `/jg-ux`: `/jg-ux` judges behaviour, `/jg-ui`
+  handles craft. The four proposed sections exist (`direction`, `inspire`,
+  `fix`, `check`), plus `components`, `libraries` and `score`.
+- Probe first: `ui_sources.py probe` writes `.pipeline/ui/reachable.json`;
+  a source that fails is retried once and named, never replaced from memory.
+- `inspire` measures numbers (body, scale ratio, spacing grid, accents,
+  motion, density) into `inspiration.json`, and `build.md` now receives its
+  path: the hole where `inspiration.md` was never read is closed. What to
+  take from a site is written by the session that looked at the
+  screenshots, never by the script.
+- The contrast check the index lacked is ours: `ui_color.py` (WCAG 2
+  luminance, alpha compositing, OKLCH), stdlib only.
+- Findings become `.loop/backlog.yaml` rows (`dimension: ui`,
+  `source: ui`); a clean re-check closes them. `ui_check.py` exits 0
+  whatever it finds. No blocking gate was reintroduced.
+- Nothing installs itself: `vendor` prints the packages an item needs.
+- Kit conventions: command, agent, prompts and scripts beside the others;
+  the `.claude/agents/` and `.claude/commands/` symlinks exist.
+
+**Where it moved.**
+
+- **The direction is three candidates on a picker, not one question.** Up
+  to four questions (look, accent, theme, avoid) narrow six looks to three
+  on distinct axes; `ui_direction.py picker` renders them on one page (keys
+  1–3, D for dark); the human picks, and nothing is written without a yes.
+  A look is easier to choose seen than described (the Claude Design
+  masterclass: reference, don't describe).
+- **DESIGN.md adopted** (the google-labs-code/design.md format), beside
+  `design-tokens.json` and `tokens.css`: scripts read the JSON, code
+  imports the CSS (which also carries shadcn/ui's variable names, so
+  vendored components follow it untouched), people and other tools read
+  DESIGN.md. `--from` takes a DESIGN.md (a Claude Design export), a URL or a
+  local page.
+- **`fix` is three variants behind `js/picker.js`, not one rewrite.** One
+  piece per run; three variants on named axes in a harness outside
+  production, measured side by side; the human picks; the winner is built
+  in and measured before and after (Emil Kowalski's prototype pattern).
+- **The check has three kinds.** `floor` (durable: contrast, type,
+  targets, focus, overflow, motion, phones, states), `direction` (the page
+  against the project's own tokens) and `fashion` (dated tells in
+  `ui_tells.json`, rung 2, never scored: anti-slop advice goes stale). The
+  0–100 score comes from floor and direction only. Beyond the proposed
+  contrast, hex/px grep and states, it measures type, spacing, motion,
+  focus, phones and long-content stress through `js/ui_measure.cjs`.
+- **The judge is 0–3, grounded, rows only.** The proposed four dimensions
+  plus fit to the direction, 0–3 each: raters disagree by two points out of
+  ten, so a finer number would be false precision. It sees the screenshots
+  before any measured finding; a finding that cites no element from the
+  page's census is dropped; it never moves the score.
+- **A `ui` Nightshift scorer.** Decision 2 stands: `/jg-ui` is not a night.
+  But "so Nightshift can pick them up" needs a scoreboard dimension, since
+  the loop never picks a row without one. Need `ui` → a cmd scorer,
+  `ui_check.py score` (floor and direction, never the judge), with
+  `design-tokens.json` pinned so a night cannot move its own target.
+- **A component baseline in `/jg-tools`.** Real components need their
+  packages and the loop's allowlist denies `npm install`, so
+  `tools_plan.py` offers them pinned for ui + javascript (tailwindcss,
+  motion, radix-ui, class-variance-authority, cn, clsx, tailwind-merge,
+  lucide-react, sonner) for the human to approve. A build vendors only
+  items whose packages are installed and asks about the rest.
+- **The build authors a direction when none exists.** The proposal had the
+  human answer `direction`. A headless build with no direction would hold
+  screens to nothing, so the planner runs `ui_direction.py propose` for the
+  look that fits the product, writes it into the build worktree and
+  records the look in `decisions`. Unattended, `/jg-ui` itself never adopts
+  over an existing file.
+- **The skill moved into the repo.** `ui-design` lived only in
+  `~/.claude/skills/`, invisible to cloud sessions and headless builds; it
+  is versioned in `skills/` and `install.sh` links it.
+
+**What the named resources turned out to be.**
+
+- Reachability: the six hosts refused above all return 200 from the Mac
+  (godly.website now redirects to recent.design); the probe reached 13/13
+  UI hosts.
+- shadcn/ui new-york-v4: 471 registry items, which now import `cn` from the
+  `cn` package. Kokonut UI: 51, decorative, marketing and AI chat; 36 use
+  motion; 35 of 46 components hardcode colours. Bklit (ui.bklit.com): 56,
+  charts only; 19 examples overwrite `app/page.tsx`; some need a paid icon
+  licence. Vendored without the CLI, a dry run over every item came out
+  clean for 152/158, 47/51 and 42/56.
+- Motion: the motion rules and tokens (ease-out, UI under 300ms, transform
+  and opacity only, springs with bounce 0) come from emilkowalski/skills
+  (MIT, commit 85e8e23), with attribution; `motion` 13.4.0 is in the
+  baseline.
+- `readydesign-skill`: read first, as asked; two patterns taken, not
+  installed. `ui-registry-mcp`: not installed. Both, and 21st.dev as a
+  default source, are in `DEAD_ENDS.md`.

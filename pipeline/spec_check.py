@@ -44,10 +44,13 @@ ACCEPT_TO_SCORER = {
     "persona": "persona", "evals": "evals",
 }
 
-CANONICAL_SCORER_ORDER = ["tests", "perf", "lighthouse", "persona", "evals"]
+CANONICAL_SCORER_ORDER = ["tests", "perf", "lighthouse", "persona", "ui", "evals"]
 NEED_TO_SCORER = {
     "unit-tests": "tests", "coverage": "tests", "lighthouse": "lighthouse",
     "persona": "persona", "perf": "perf", "evals": "evals",
+    # /jg-ui's measured craft check: its `ui` backlog rows are only ever picked
+    # when a scorer of that name has headroom
+    "ui": "ui",
 }
 
 # validation
@@ -372,7 +375,11 @@ def derive(spec, project_dir):
     wanted = [".pipeline/run/", ".pipeline/wt/", ".pipeline/build/", ".pipeline/ux/*/shots/", ".pipeline/validate/*/bodies/",
               ".pipeline/gates/last/", ".pipeline/ledger.jsonl", ".pipeline/events.*", ".pipeline/assess.json",
               ".loop/run/", ".loop/wt/", ".loop/state.json", ".loop/events.*", ".loop/iterations/",
-              ".loop/heartbeat", ".loop/map.json", ".loop/report.*", ".claude/worktrees/"]
+              ".loop/heartbeat", ".loop/map.json", ".loop/report.*", ".claude/worktrees/",
+              # /jg-ui's scratch: measurements and screenshots; the rows, the direction,
+              # inspiration.json and components.lock.json are the records
+              ".pipeline/ui/check/", ".pipeline/ui/fix/", ".pipeline/ui/direction/shots/",
+              ".pipeline/ui/inspire/shots/", ".pipeline/ui/reachable.*"]
     existing = gi.read_text().splitlines() if gi.exists() else []
     missing = [w for w in wanted if w not in existing]
     if missing:
