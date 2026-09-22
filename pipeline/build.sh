@@ -115,7 +115,7 @@ for f in spec.json GOAL.md design-tokens.json DESIGN.md; do [ -f "$PROJECT/$f" ]
 STEP="child-settings"
 CHILD_SETTINGS="$RUN/child-settings.json"
 ALLOW_JSON=$(python3 "$LOOP_KIT/allowlist.py" --config "$CONFIG" --kit "$LOOP_KIT")
-ALLOW_JSON=$(jq -c --arg k "$KIT" '. + ["Bash(python3 " + $k + "/*)", "Bash(node " + $k + "/*)", "Bash(bash " + $k + "/*)"]' <<<"$ALLOW_JSON")
+ALLOW_JSON=$(jq -c --arg k "$KIT" --arg l "$LOOP_KIT" '. + ["Bash(python3 " + $k + "/*)", "Bash(node " + $k + "/*)", "Bash(bash " + $k + "/*)", "Read(/" + $k + "/**)", "Read(/" + $l + "/**)"]' <<<"$ALLOW_JSON")
 jq -n --arg lk "$LOOP_KIT" --argjson allow "$ALLOW_JSON" '{worktree:{baseRef:"head"},permissions:{allow:$allow},
   hooks:{SubagentStart:[{hooks:[{type:"command",command:("bash "+$lk+"/hooks/events.sh"),async:true,timeout:5}]}],
          SubagentStop:[{hooks:[{type:"command",command:("bash "+$lk+"/hooks/events.sh"),async:true,timeout:5}]}],

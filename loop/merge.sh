@@ -203,7 +203,9 @@ for id in "${ids[@]}"; do
     fi
 
     # 4. files-changed trip: cumulative size of the iteration so far
-    nfiles=$(git diff --name-only "$base"..HEAD | wc -l | tr -d ' ')
+    # vendored component kits (shadcn, Bklit) and lockfiles are copied wholesale and do not count
+    vendored_re=$(jq -r '.vendored_paths_regex // "(^|/)components/(ui|charts)/|(^|/)(package-lock\\.json|pnpm-lock\\.yaml)$"' "$NIGHTSHIFT_CONFIG")
+    nfiles=$(git diff --name-only "$base"..HEAD | grep -vE "$vendored_re" | wc -l | tr -d ' ')
     if [ "$nfiles" -gt "$max_files" ]; then
         git reset --hard "$pre" >/dev/null 2>&1
         echo "SCOPE-DRIFT $id"
@@ -261,8 +263,18 @@ for id in "${ids[@]}"; do
     add_merged "$id"
 
     # 7. cleanup — only on merge
+    # never remove the worktree this merge runs in (the build worktree) or the main checkout, even
+    # when a report names it: a planner that split a task by hand reported the build worktree, and
+    # this step deleted it mid-milestone (2026-09-22)
     if [ -n "$worktree" ]; then
-        git worktree remove --force "$worktree" >/dev/null 2>&1 || true
+        wt_real=$(cd "$worktree" 2>/dev/null && pwd -P || printf '%s' "$worktree")
+        here_real=$(cd "$(git rev-parse --show-toplevel)" && pwd -P)
+        main_real=$(cd "$(git worktree list --porcelain | awk '/^worktree /{print substr($0,10); exit}')" 2>/dev/null && pwd -P)
+        if [ "$wt_real" = "$here_real" ] || [ "$wt_real" = "$main_real" ]; then
+            echo "KEEP $worktree (the worktree this merge runs in)"
+        else
+            git worktree remove --force "$worktree" >/dev/null 2>&1 || true
+        fi
     fi
     git branch -D "$branch" >/dev/null 2>&1 || true
 done
