@@ -39,16 +39,16 @@ Ask whether to adopt it. Only on a yes, copy it to
 
 ## inspire
 
-Sources to search, in this order, with the spec's one-liner and UI words:
-the project's own README and any `docs/design*` file; component libraries
-(shadcn/ui, Radix Themes, Material, Chakra, Ant Design); public galleries
-(Mobbin, Godly, Land-book, SaaS UI galleries). Pick five references whose
-job is closest to this product's job. For each: URL, one line on what it
-does well for this product's task, one line on what to take (a pattern, a
-scale, a layout — never an asset), and a screenshot via
-`node {{KIT}}/js/snap.cjs --url <url> --out {{UX_DIR}}/inspiration/<n>.png`.
-Write `{{UX_DIR}}/inspiration.md`. If web access is unavailable, say so in
-the file and list the library references from memory with that caveat.
+References are read as numbers now (/jg-ui inspire): run
+`python3 {{KIT}}/ui_inspire.py run --for "<the spec's one-liner>" --out {{PROJECT_DIR}}/.pipeline/ui/inspire`.
+It picks the kit's vetted references that fit plus design galleries for the
+product's category, measures each (body size, scale ratio, spacing grid,
+accents, motion, density) and writes `inspiration.json` (which the build's
+planner reads) and `inspiration.md`. Look at each screenshot and replace
+every `take:` placeholder in `inspiration.md` with one line naming the
+system to take — a density, a scale, a restraint — never an asset or a
+look. A source it could not reach is named in the file, never replaced
+from memory.
 
 Rules: never modify product code in this stage; never install anything;
 never copy assets from a reference. Stop after writing the files.

@@ -8,13 +8,12 @@ Exit codes follow pytest's own convention (0 all passed, 1 failures/errors).
 Covers: (1) the fixture-JSON -> proposal conversion (fonts, type scale
 naming, spacing snapping, hex colors with roles, radii); (2) a live run
 against a small HTML page served by `python3 -m http.server`, skipped
-cleanly when `node` is not on PATH.
+cleanly when Playwright can't be loaded (conftest.playwright_ok).
 """
 
 import http.server
 import importlib.util
 import json
-import shutil
 import socket
 import subprocess
 import sys
@@ -24,6 +23,7 @@ import time
 from pathlib import Path
 
 import pytest
+from conftest import PLAYWRIGHT_MISSING, playwright_ok
 
 PIPELINE_DIR = Path(__file__).resolve().parent.parent
 TOKENS_EXTRACT_PY = PIPELINE_DIR / "tokens_extract.py"
@@ -163,7 +163,7 @@ LIVE_HTML = """<!DOCTYPE html>
 """
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="node is not on PATH")
+@pytest.mark.skipif(not playwright_ok(), reason=PLAYWRIGHT_MISSING)
 def test_live_extraction(tmp_path):
     site_dir = tmp_path / "site"
     site_dir.mkdir()

@@ -1,0 +1,17 @@
+{
+  "as_of": "2026-09-21",
+  "why": "Fashion tells: what machine-made UI looked like when this list was dated. They go stale (last year's anti-slop fix becomes this year's tell), so they never count toward the ui score and every finding they raise is advisory at rung 2. The durable floor lives in ui_check.py. Re-date this list, don't grow it forever.",
+  "sources": [
+    "github.com/pbakaus/impeccable (antipatterns.json, Apache-2.0)",
+    "Gesso-Build/skills @gessobuild/anti-slop (MIT)",
+    "github.com/emilkowalski/skills (MIT, 85e8e23)",
+    "the kit's own ~/.claude/skills/ui-design/references/tells.md"
+  ],
+  "ai_purple": ["#6366f1", "#818cf8", "#4f46e5", "#4338ca", "#3730a3", "#8b5cf6", "#7c3aed", "#6d28d9", "#a78bfa", "#5b21b6"],
+  "overused_fonts": ["Inter", "Roboto", "Open Sans", "Lato", "Montserrat", "Arial", "Helvetica", "Fraunces", "Instrument Sans",
+                     "Instrument Serif", "Geist", "Mona Sans", "Plus Jakarta Sans", "Space Grotesk", "Recoleta", "Playfair Display"],
+  "centered_text_pct": 60,
+  "em_dash_max": 8,
+  "shadcn_default_radius": ["0.5rem", "0.625rem"],
+  "shadcn_default_primary": ["oklch(0.205 0 0)", "oklch(0.21 0.006 285.885)", "240 5.9% 10%", "222.2 47.4% 11.2%"]
+}

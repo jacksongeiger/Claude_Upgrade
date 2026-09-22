@@ -1,5 +1,4 @@
 import json
-import shutil
 import socket
 import subprocess
 import sys
@@ -7,11 +6,12 @@ import time
 from pathlib import Path
 
 import pytest
+from conftest import PLAYWRIGHT_MISSING, playwright_ok
 
 KIT = Path(__file__).resolve().parents[1]
 DRIVER = KIT / "js" / "persona_driver.cjs"
 
-pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+pytestmark = pytest.mark.skipif(not playwright_ok(), reason=PLAYWRIGHT_MISSING)
 
 PAGE = """<!doctype html>
 <html><body>

@@ -40,6 +40,7 @@ cd ~/Claude_Upgrade
 - `CLAUDE.md` → `~/.claude/CLAUDE.md`
 - each `commands/*.md` → `~/.claude/commands/` (every `/jg-*` and `/ard`, in every project)
 - each `agents/*.md` → `~/.claude/agents/` (persona, reviewer, executors, judges)
+- each `skills/*/` → `~/.claude/skills/` (`ui-design`, which fires before any UI change)
 
 Then `./install.sh --check` says what the machine still lacks, with the fix
 for each line. For UI projects the persona, screenshot and lighthouse pieces
@@ -84,7 +85,7 @@ contract; the design pages are linked from the CHANGELOG.
 
 ## The project pipeline — idea to Nightshift
 
-`pipeline/` puts six commands on one spine, `spec.json`, and reuses every
+`pipeline/` puts seven commands on one spine, `spec.json`, and reuses every
 Nightshift part (agents, worktrees, guards, allowlist, cost meter, merge):
 
 ```bash
@@ -94,6 +95,8 @@ Nightshift part (agents, worktrees, guards, allowlist, cost meter, merge):
                     # reviewers check, merge.sh lands, accept.py decides; you merge to main
 /jg-ux              # a fresh-eyes persona tries the app; a judge grades the trail;
                     # findings become numbers Nightshift can move
+/jg-ui              # craft: you pick a direction from three looks; real components;
+                    # the build measures every screen itself; advisory, never a gate
 /jg-ship v0.1.0     # a checklist script; you type "deploy"; a persona smoke run
 /jg-feedback        # FEEDBACK.md and error exports → backlog rows
 /jg-loop dryrun     # then Nightshift: it scores the baseline itself and picks

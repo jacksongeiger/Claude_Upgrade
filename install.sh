@@ -345,6 +345,7 @@ if [ "${1:-}" = "--check" ]; then
     row "git"                   'have git'      "xcode-select --install"
     row "commands linked"       '[ -L "$COMMANDS_DIR/jg-validate.md" ]' "run ./install.sh"
     row "agents linked"         '[ -L "$AGENTS_DIR/persona.md" ]' "run ./install.sh"
+    row "/jg-ui + ui-design skill linked" '[ -L "$COMMANDS_DIR/jg-ui.md" ] && [ -L "$CLAUDE_DIR/skills/ui-design" ]' "run ./install.sh (move a hand-made ~/.claude/skills/ui-design aside first)"
     row "global CLAUDE.md"      '[ -L "$CLAUDE_DIR/CLAUDE.md" ]' "run ./install.sh"
     row "rdx (resource discovery)" '[ -x "$REPO_DIR/discovery/venv/bin/rdx" ] || [ -d "$REPO_DIR/discovery/venv" ]' "./install.sh --discovery"
     row "playwright (persona, screenshot gates, tokens)" 'node -e "require(\"$REPO_DIR/pipeline/js/pw.cjs\").loadPlaywright()" >/dev/null 2>&1' "npm install -g playwright && npx playwright install chromium"
@@ -402,6 +403,14 @@ mkdir -p "$AGENTS_DIR"
 for ag in "$REPO_DIR/agents/"*.md; do
     [ -f "$ag" ] || continue
     link "$ag" "$AGENTS_DIR/$(basename "$ag")"
+done
+
+# Each skill (a folder): user-level, so it loads in every project's sessions
+# and fires on its description (ui-design: before any UI change)
+mkdir -p "$CLAUDE_DIR/skills"
+for sk in "$REPO_DIR/skills/"*/; do
+    [ -f "${sk}SKILL.md" ] || continue
+    link "${sk%/}" "$CLAUDE_DIR/skills/$(basename "$sk")"
 done
 
 register_hook SessionStart "$REPO_DIR/hooks/session-start.sh"

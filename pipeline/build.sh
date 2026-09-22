@@ -107,9 +107,9 @@ PY
 # edits those between milestones, so they are refreshed at every start;
 # the backlog is the loop's own state and is only seeded once
 mkdir -p "$WT/.loop" "$WT/.loop/run"
-for f in spec.json GOAL.md design-tokens.json; do [ -f "$PROJECT/$f" ] && cp "$PROJECT/$f" "$WT/$f"; done
+for f in spec.json GOAL.md design-tokens.json DESIGN.md; do [ -f "$PROJECT/$f" ] && cp "$PROJECT/$f" "$WT/$f"; done
 [ -f "$PROJECT/.loop/backlog.yaml" ] && [ ! -f "$WT/.loop/backlog.yaml" ] && cp "$PROJECT/.loop/backlog.yaml" "$WT/.loop/backlog.yaml"
-(cd "$WT" && git add -f .loop/backlog.yaml GOAL.md spec.json 2>/dev/null; [ -f design-tokens.json ] && git add -f design-tokens.json; git diff --cached --quiet || git commit -q -m "build: refresh spec, goal and backlog from the project") >>"$RUN/build.log" 2>&1 || true
+(cd "$WT" && git add -f .loop/backlog.yaml GOAL.md spec.json 2>/dev/null; [ -f design-tokens.json ] && git add -f design-tokens.json; [ -f DESIGN.md ] && git add -f DESIGN.md; git diff --cached --quiet || git commit -q -m "build: refresh spec, goal and backlog from the project") >>"$RUN/build.log" 2>&1 || true
 
 # ---- child settings (same as Nightshift) ------------------------------------
 STEP="child-settings"
@@ -187,6 +187,7 @@ PY
     BUDGET=$(jq -n --argjson p "$PER_MS" --argjson c "$CAP" --argjson s "$SPENT" '[$p, ($c - $s)] | min')
     cp "$PROJECT/GOAL.md" "$ITER_DIR/goal.md" 2>/dev/null || cp "$NSDIR/goal.md" "$ITER_DIR/goal.md"
     TOKENS_PATH=$( [ -f "$WT/design-tokens.json" ] && echo "$WT/design-tokens.json" || echo "none" )
+    INSPIRATION_PATH=$( [ -f "$PROJECT/.pipeline/ui/inspire/inspiration.json" ] && echo "$PROJECT/.pipeline/ui/inspire/inspiration.json" || echo "none" )
     ARCH=$( [ -f "$WT/ARCHITECTURE.md" ] && echo "$WT/ARCHITECTURE.md" || echo "none" )
 
     STEP="prompt"
@@ -196,7 +197,7 @@ t=pathlib.Path(sys.argv[1]).read_text()
 subs={"MILESTONE":"$MS","MILESTONE_TITLE":$(jq -Rn --arg s "$MS_TITLE" '$s'),"PROJECT_DIR":"$PROJECT","BUILD_WT":"$WT","BUILD_BRANCH":"$BRANCH",
  "KIT":"$KIT","LOOP_KIT":"$LOOP_KIT","CONFIG":"$CONFIG","GOAL":"$ITER_DIR/goal.md","GOAL_TEXT":pathlib.Path("$ITER_DIR/goal.md").read_text(),
  "TARGET_JSON":pathlib.Path("$ITER_DIR/target.json").read_text(),"FEATURES_JSON":$(jq -Rn --arg s "$FEATURES_JSON" '$s'),
- "TOKENS":"$TOKENS_PATH","ARCH":"$ARCH","PREV_SUMMARY":$(jq -Rn --arg s "$PREV" '$s'),"ITER_DIR":"$ITER_DIR","ITER":"$ITER",
+ "TOKENS":"$TOKENS_PATH","INSPIRATION":"$INSPIRATION_PATH","ARCH":"$ARCH","PREV_SUMMARY":$(jq -Rn --arg s "$PREV" '$s'),"ITER_DIR":"$ITER_DIR","ITER":"$ITER",
  "SETUP_CMD":$(jq -Rn --arg s "$SETUP_CMD" '$s'),"TEST_CMD":$(jq -Rn --arg s "$TEST_CMD" '$s'),"MAX_FANOUT":"$MAX_FANOUT","OPUS_ALLOWED":"$OPUS",
  "BUDGET":"$BUDGET","QUESTIONS":"$WT/.pipeline/questions.md","ACCEPT_EXTRA":""}
 for k,v in subs.items(): t=t.replace("{{"+k+"}}",str(v))
@@ -259,6 +260,24 @@ PY
     # earlier done milestone is re-accepted before this one counts.
     REGRESSED=""
     if [ "$ARC" = "0" ]; then REGRESSED=$(regress_check "$MS" "$ITER_DIR"); [ -z "$REGRESSED" ] || ARC=2; fi
+
+    # ---- the UI check: measured craft, advisory -----------------------------
+    # Never changes the milestone's outcome (the human chose "never block,
+    # always report"): every screen is measured as it is built and the
+    # findings land as `ui` rows in the worktree's backlog. The judge runs
+    # while the budget has room for it; its cost is charged like any other.
+    if jq -e '(.needs // []) | index("ui")' "$SPEC" >/dev/null 2>&1; then
+        STEP="ui-check"
+        UI_JUDGE=""; jq -en --argjson c "$CAP" --argjson s "$SPENT" '($c - $s) >= 3' >/dev/null 2>&1 && UI_JUDGE="--judge --judge-budget 0.6"
+        python3 "$KIT/ui_check.py" run --workdir "$WT" --label "$MS" --out "$ITER_DIR/ui" --backlog "$WT/.loop/backlog.yaml" \
+            --changed-since "$MAIN" --ledger "$LEDGER" $UI_JUDGE >>"$RUN/build.log" 2>&1; UIRC=$?
+        UI_COST=$(jq -r '.judge_cost_usd // 0' "$ITER_DIR/ui/check.json" 2>/dev/null); [ -n "$UI_COST" ] || UI_COST=0
+        SPENT=$(jq -n --argjson s "$SPENT" --argjson c "$UI_COST" '$s + $c')
+        jq --argjson s "$SPENT" '.spent_usd = $s' "$STATE" > "$STATE.tmp" 2>/dev/null && mv "$STATE.tmp" "$STATE"
+        event UI_CHECK "id=$MS score=$(jq -r '.score // "none"' "$ITER_DIR/ui/check.json" 2>/dev/null) rc=$UIRC judge=$UI_COST"
+        (cd "$WT" && git add -f .loop/backlog.yaml 2>/dev/null; git diff --cached --quiet || git commit -q -m "build: ui check after $MS (advisory)") >>"$RUN/build.log" 2>&1 || true
+    fi
+
     case "$ARC" in
       0) python3 "$KIT/milestone.py" --spec "$SPEC" --state "$STATE" set "$MS" done --note "accepted iter $ITER" >/dev/null
          mark_rows_done "$MS"

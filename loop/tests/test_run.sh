@@ -9,7 +9,8 @@ fail() { echo "  FAIL $1"; FAIL=1; }
 
 mkproject() {  # creates a project + nightshift config; prints project path
   local d; d=$(mktemp -d)
-  HOME_FAKE="$d/home"; mkdir -p "$HOME_FAKE"
+  HOME_FAKE="$d/home"; mkdir -p "$HOME_FAKE/.claude"
+  echo '{}' > "$HOME_FAKE/.claude/.credentials.json"   # the Linux auth file: with it the child gets a kit-owned CLAUDE_CONFIG_DIR
   local p="$d/proj"; mkdir -p "$p"; cd "$p"
   git init -q -b main . ; git config user.email t@t; git config user.name t
   echo "# proj" > README.md; echo "PASS PASS FAIL FAIL" > tests.txt
@@ -64,15 +65,20 @@ run_driver improve --iters 1 --cap 5 --hours 1
 [ "$(stop_reason)" = "iters" ] && pass "stops on --iters" || fail "stop_reason=$(stop_reason)"
 [ "$(last_outcome)" = "kept" ] && pass "improvement kept" || fail "outcome=$(last_outcome)"
 [ "$(jq -r '.score == 100' .loop/state.json)" = "true" ] && pass "score updated to 100" || fail "score=$(jq -r .score .loop/state.json)"
-git -C "$P" rev-parse --verify -q main >/dev/null && [ "$(git -C "$P" log --oneline main | wc -l)" = "2" ] && pass "main untouched" || fail "main moved"
+git -C "$P" rev-parse --verify -q main >/dev/null && [ "$(git -C "$P" rev-list --count main)" = "2" ] && pass "main untouched" || fail "main moved"
 grep -q "STOP reason=iters" .loop/events.log && pass "STOP line in events.log" || fail "no STOP line"
 [ ! -f .loop/run/loop.pid ] && pass "loop.pid removed" || fail "loop.pid left"
 [ "$(jq -r '.spent_usd' .loop/state.json)" = "0.42" ] && pass "charged result cost" || fail "spent=$(jq -r .spent_usd .loop/state.json)"
 
-# 1c. the child ran with a kit-owned CLAUDE_CONFIG_DIR holding only its settings (no user hooks, no plugins)
+# 1c. the child ran with a kit-owned CLAUDE_CONFIG_DIR holding only its settings (no user hooks, no plugins),
+# and with --setting-sources project, which is what keeps them out on macOS where the config dir must stay unset
 CFGDIR=$(sed -n 's/^CLAUDE_CONFIG_DIR=//p' .loop/wt/loop/.loop/iterations/1/child-env.txt 2>/dev/null)
 case "$CFGDIR" in "$HOME_FAKE"/.claude/nightshift/*/claude) pass "child CLAUDE_CONFIG_DIR is the slug's own dir" ;; *) fail "child CLAUDE_CONFIG_DIR=$CFGDIR" ;; esac
 [ -f "$CFGDIR/settings.json" ] && jq -e '.hooks.PreToolUse' "$CFGDIR/settings.json" >/dev/null && pass "child config dir carries the kit's settings and hooks" || fail "no settings.json with hooks in $CFGDIR"
+grep -q -- "--setting-sources project" .loop/wt/loop/.loop/iterations/1/child-env.txt && pass "child gets --setting-sources project" || fail "no --setting-sources project in child args"
+# without the auth file (macOS: Keychain), child_config.sh returns empty and the driver must leave the variable unset
+NOCRED=$(mktemp -d); HOME="$NOCRED" bash "$KIT/child_config.sh" "$NOCRED/ns" "$CFGDIR/settings.json" > "$NOCRED/out"
+[ -z "$(cat "$NOCRED/out")" ] && pass "no credentials file → empty config dir (macOS path)" || fail "child_config.sh without credentials printed: $(cat "$NOCRED/out")"
 
 # 6b. child allowlist is derived from the config's commands (test_cmd "bash ./run_tests.sh")
 jq -e '.permissions.allow | index("Bash(bash:*)")' .loop/run/child-settings.json >/dev/null && pass "child allowlist carries the test runner" || fail "runner rule missing from child-settings.json"
@@ -92,7 +98,7 @@ P=$(mkproject); cd "$P"
 run_driver flat --cap 5 --hours 1
 [ "$(stop_reason)" = "needs-human" ] && pass "flat → lockout → ladder exhausted → needs-human" || fail "stop_reason=$(stop_reason)"
 [ "$(jq -r '.flat' .loop/state.json)" = "2" ] && pass "two flats counted before lockout" || fail "flat=$(jq -r .flat .loop/state.json)"
-[ "$(git -C .loop/wt/loop log --oneline | wc -l)" = "2" ] && pass "flat commits reset" || fail "flat commits kept"
+[ "$(git -C .loop/wt/loop rev-list --count HEAD)" = "2" ] && pass "flat commits reset" || fail "flat commits kept"
 grep -q "reset-flat" .loop/scores.jsonl && pass "reset-flat recorded" || fail "no reset-flat row"
 grep -q "PICK mode=harvest" .loop/events.log && grep -q "PICK mode=hypothesize" .loop/events.log && pass "ladder climbed harvest → hypothesize" || fail "ladder not climbed"
 

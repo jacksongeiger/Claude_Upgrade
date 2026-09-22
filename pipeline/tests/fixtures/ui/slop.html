@@ -1,0 +1,38 @@
+<!doctype html>
+<!-- A page built to fail /jg-ui's check: every defect here is one the
+     measurement must find. Do not "fix" it; tests count on each one. -->
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Slop fixture</title>
+<style>
+body{margin:0;font-family:Arial,sans-serif;background:#fff;color:#222;text-align:center}
+.hero{background:linear-gradient(135deg,#7c3aed,#3b82f6);color:#fff;padding:83px 19px 61px;min-height:420px}
+.hero h1{font-size:57px;margin:0 0 7px;background:linear-gradient(90deg,#f0abfc,#93c5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{font-size:21px;margin:0 0 13px}
+.btn{display:inline-block;background:#6366f1;color:#fff;border:0;border-radius:24px;padding:13px 29px;font-size:15px;font-weight:700;transition:all 500ms ease-in;box-shadow:0 0 24px rgba(124,58,237,.5)}
+.btn:hover{transform:scale(1.08)}
+.pop{transition:transform 350ms cubic-bezier(.68,-0.55,.27,1.55)}
+.muted{color:#aaa;font-size:13px;line-height:1.1}
+.card{border:1px solid #ddd;border-radius:18px;padding:11px;margin:9px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.stripe{border:0;border-left:4px solid #7c3aed;border-radius:8px;padding:17px;margin:5px}
+.wide{width:600px;margin:0 auto}
+.icons button{width:16px;height:16px;padding:0;margin:0 1px;border:0;background:#eee;font-size:9px}
+.clip{width:120px;overflow:hidden;white-space:nowrap;margin:0 auto}
+.s1{font-size:11px}.s2{font-size:12.5px}.s3{font-size:17px}.s4{font-size:19px}.s5{font-size:23px}.s6{font-size:27px}.s7{font-size:31px}
+input{font-size:13px;padding:3px 5px}
+</style></head><body>
+<section class="hero">
+  <h1>Supercharge your workflow ✨</h1>
+  <p>Lorem ipsum dolor sit amet — the all-in-one platform trusted by 10,000+ teams — with 99.99% uptime.</p>
+  <a class="btn" href="#">🚀 Get started</a> <button class="btn pop" type="button">Learn more</button>
+</section>
+<div class="card"><div class="card"><div class="card">
+  <p class="muted">John Doe, CEO at Acme — "This changed everything for our team and our customers and our investors alike."</p>
+</div></div></div>
+<div class="stripe"><span class="s1">tiny</span> <span class="s2">odd</span> <span class="s3">seventeen</span> <span class="s4">nineteen</span>
+  <span class="s5">twenty-three</span> <span class="s6">twenty-seven</span> <span class="s7">thirty-one</span></div>
+<div class="wide"><p>This block is six hundred pixels wide, whatever the screen.</p></div>
+<div class="icons"><button aria-label="a">A</button><button aria-label="b">B</button><button aria-label="c">C</button></div>
+<div class="clip">A label far too long for its box and clipped without an ellipsis</div>
+<form><input type="email" placeholder="Email"> <button class="btn" type="button">Subscribe</button></form>
+</body></html>

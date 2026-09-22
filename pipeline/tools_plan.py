@@ -85,6 +85,19 @@ KNOWN = {
     ("ui", "javascript"): [
         {"slug": "vite", "kind": "npm-dev", "version": "5.4.11",
          "source": "known", "tier": "green"},
+        # /jg-ui's component baseline: what shadcn/ui (new-york-v4), Kokonut UI and
+        # Bklit items import, so a build can vendor real components without
+        # acquiring a package itself (the loop's allowlist denies npm install)
+        {"slug": "tailwindcss", "kind": "npm-dev", "version": "4.3.3", "source": "known", "tier": "green"},
+        {"slug": "@tailwindcss/vite", "kind": "npm-dev", "version": "4.3.3", "source": "known", "tier": "green"},
+        {"slug": "motion", "kind": "npm", "version": "13.4.0", "source": "known", "tier": "green"},
+        {"slug": "radix-ui", "kind": "npm", "version": "1.6.7", "source": "known", "tier": "green"},
+        {"slug": "class-variance-authority", "kind": "npm", "version": "0.7.1", "source": "known", "tier": "green"},
+        {"slug": "cn", "kind": "npm", "version": "0.3.2", "source": "known", "tier": "green"},
+        {"slug": "clsx", "kind": "npm", "version": "2.1.1", "source": "known", "tier": "green"},
+        {"slug": "tailwind-merge", "kind": "npm", "version": "3.7.0", "source": "known", "tier": "green"},
+        {"slug": "lucide-react", "kind": "npm", "version": "1.47.0", "source": "known", "tier": "green"},
+        {"slug": "sonner", "kind": "npm", "version": "2.0.8", "source": "known", "tier": "green"},
     ],
     ("db", "javascript"): [
         {"slug": "better-sqlite3", "kind": "npm-dev", "version": "11.5.0",

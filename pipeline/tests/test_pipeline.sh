@@ -74,7 +74,7 @@ NIGHTSHIFT_CLAUDE="$LOOP/tests/fake_claude.sh" FAKE_CLAUDE_MODE=improve bash "$K
 [ "$(jq -r '.milestones.m1.status' .pipeline/build/state.json)" = "done" ] && pass "m1 done" || fail "m1 state: $(jq -c .milestones .pipeline/build/state.json)"
 [ "$(jq -r '.milestones.m2.status' .pipeline/build/state.json)" = "done" ] && pass "m2 done" || fail "m2 not done"
 git tag | grep -q "^build/m1$" && pass "milestone tag" || fail "no build/m1 tag"
-[ "$(git log --oneline main | wc -l)" = "2" ] && pass "main untouched" || fail "main moved"
+[ "$(git rev-list --count main)" = "2" ] && pass "main untouched" || fail "main moved"
 [ "$(jq -s 'map(.cost_usd) | add' .pipeline/ledger.jsonl)" != "null" ] && pass "ledger has costs" || fail "ledger empty"
 grep -q "MILESTONE_DONE id=m1" .pipeline/events.log && pass "events logged" || fail "no MILESTONE_DONE"
 [ -f .pipeline/wt/build/.pipeline/build/m1/acceptance.final.json ] && pass "acceptance.final.json written" || fail "no acceptance record"
