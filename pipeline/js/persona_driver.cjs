@@ -205,6 +205,10 @@ async function doAction(page, action) {
 }
 
 async function captureState(page, run, step) {
+  // Look when a person would: once the network has been quiet for 500 ms, capped at 3 s so a slow page still
+  // shows its loading state. At the bare load event, client-fetched screens were still skeletons, and personas
+  // clicked loading placeholders that were gone a moment later (memescout, 2026-09-22).
+  await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
   const shotsDir = path.join(run, 'shots');
   fs.mkdirSync(shotsDir, { recursive: true });
   const shot = path.join(shotsDir, `step-${step}.png`);
